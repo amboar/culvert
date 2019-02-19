@@ -46,24 +46,9 @@ and runtime environments.
 
 ## Tool Features
 
-* Currently supports use of the P2A, iLPC2AHB, LPC2AHB and Debug UART interfaces
-
 * Probes for the availability of all interfaces over any available interface
 
-  * Can optionally set the exit status based on confidentiality and integrity
-    requirements. Ideal for integration into platform security test suites.
-
-* In-band BMC console from the host
-
-* Reflash or dump the firmware of a running BMC from the host
-
-  * The BMC CPU is clock-gated immediately prior to beginning the flash
-    operations, and ungated immediately prior to a SoC reset subsequent to
-    completion of the flash operations.
-
-* Read and write BMC RAM
-
-* Also supports the Linux `/dev/mem` interface for execution on the BMC itself
+* Currently supports just `/dev/mem` as a backend
 
 ## Compiling
 
