@@ -1,3 +1,10 @@
+## Current Capabilities and Restrictions
+
+The implementation is currently restricted to running as `root` on the BMC and
+will only evaluate the BMC's configuration with respect to the bridges
+described in CVE-2019-6260. It does not demonstrate exploitation of the
+bridges.
+
 # A Test and Debug Tool for ASPEED BMC AHB Interfaces
 
 ASPEED BMCs have several implicit modes of operation:
@@ -48,7 +55,8 @@ and runtime environments.
 
 * Probes for the availability of all interfaces over any available interface
 
-* Currently supports just `/dev/mem` as a backend
+* Currently supports just the BMC-side `/dev/mem` backend (no host-side
+  support).
 
 ## Compiling
 
