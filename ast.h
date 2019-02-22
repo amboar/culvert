@@ -28,14 +28,18 @@ enum ast_generation { ast_g4, ast_g5 };
 #define     SDMC_GMP_G5_XDMA            (1 << 17)
 #define     SDMC_GMP_G4_XDMA            (1 << 16)
 #define AST_G5_SCU			0x1e6e2000
-#define   SCU_MISC_CTRL			0x2c
-#define     SCU_MISC_CTRL_P2A_DRAM_RO	(1 << 25)
-#define     SCU_MISC_CTRL_P2A_LPCH_RO	(1 << 24)
-#define     SCU_MISC_CTRL_P2A_SOC_RO	(1 << 23)
-#define     SCU_MISC_CTRL_P2A_FLASH_RO	(1 << 22)
-#define     SCU_MISC_CTRL_UART_DBG	(1 << 10)
-#define   SCU_MISC_CTRL2		0x4c
-#define     SCU_MISC_CTRL2_UART_DBG_1M	(1 << 30)
+#define   SCU_MISC			0x2c
+#define     SCU_MISC_G4_P2A_DRAM_RO	(1 << 25)
+#define     SCU_MISC_G4_P2A_SPI_RO	(1 << 24)
+#define     SCU_MISC_G4_P2A_SOC_RO	(1 << 23)
+#define     SCU_MISC_G4_P2A_FMC_RO	(1 << 22)
+#define     SCU_MISC_G5_P2A_DRAM_RO	(1 << 25)
+#define     SCU_MISC_G5_P2A_LPCH_RO	(1 << 24)
+#define     SCU_MISC_G5_P2A_SOC_RO	(1 << 23)
+#define     SCU_MISC_G5_P2A_FLASH_RO	(1 << 22)
+#define     SCU_MISC_UART_DBG	        (1 << 10)
+#define   SCU_MISC2		        0x4c
+#define     SCU_MISC2_UART_DBG_1M	(1 << 30)
 #define   SCU_HW_STRAP			0x70
 #define     SCU_HW_STRAP_UART_DBG_SEL	(1 << 29)
 #define     SCU_HW_STRAP_SIO_DEC	(1 << 20)
@@ -104,11 +108,12 @@ struct ast_cap_lpc {
 };
 
 enum ast_p2ab_ranges {
-    p2ab_bmc_fw,
-    p2ab_soc_io,
-    p2ab_bmc_flash,
-    p2ab_soc_reserved,
-    p2ab_lpc_host,
+    p2ab_fw,
+    p2ab_soc,
+    p2ab_fmc,
+    p2ab_spi,
+    p2ab_rsvd,
+    p2ab_lpch,
     p2ab_dram,
     p2ab_ranges_max,
 };

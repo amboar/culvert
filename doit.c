@@ -226,6 +226,25 @@ static void cmd_probe_pr(bool result, const char *t, const char *f,
     }
 }
 
+static int cmd_probe_range_cmp(const void *a, const void *b)
+{
+    const int64_t as = (*(struct ahb_range **)a)->start;
+    const int64_t bs = (*(struct ahb_range **)b)->start;
+
+    return as - bs;
+}
+
+static void cmd_probe_sort_ranges(struct ahb_range *src,
+                                  struct ahb_range **dst, size_t nmemb)
+{
+    int i;
+
+    for (i = 0; i < p2ab_ranges_max; i++) {
+        dst[i] = &src[i];
+    }
+    qsort(dst, nmemb, sizeof(src), cmd_probe_range_cmp);
+}
+
 static int cmd_probe(const char *name, int argc, char *argv[])
 {
     struct ast_interfaces ifaces;
@@ -358,9 +377,16 @@ static int cmd_probe(const char *name, int argc, char *argv[])
                     pass_requirement &=
                         !(ifaces.pci.vga_mmio == ip_state_enabled);
                 if (ifaces.pci.vga_mmio == ip_state_enabled) {
+                    struct ahb_range *ranges[p2ab_ranges_max];
+
+                    cmd_probe_sort_ranges(&ifaces.pci.ranges[0], ranges,
+                                          p2ab_ranges_max);
                     printf("P2A write filter state:\n");
                     for (i = 0; i < p2ab_ranges_max; i++) {
-                        struct ahb_range *r = &ifaces.pci.ranges[i];
+                        struct ahb_range *r = ranges[i];
+
+                        if (r->start == 0 && r->len == 0)
+                            continue;
 
                         cmd_probe_pr(r->rw, "Read-write", "Read-only",
                                      "0x%08x-0x%08"PRIx64" (%s): ",

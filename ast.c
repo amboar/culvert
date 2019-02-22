@@ -66,6 +66,7 @@ static int ast_pci_status(struct ahb *ctx, struct ast_cap_pci *pci)
 {
     struct ahb_range *r;
     uint32_t val;
+    uint32_t rev;
     int rc;
 
     rc = ahb_readl(ctx, AST_G5_SCU | SCU_PCIE_CONFIG, &val);
@@ -85,45 +86,101 @@ static int ast_pci_status(struct ahb *ctx, struct ast_cap_pci *pci)
     pci->bmc_xdma = (val & SCU_PCIE_CONFIG_BMC_XDMA) ?
                         ip_state_enabled : ip_state_disabled;
 
-    rc = ahb_readl(ctx, AST_G5_SCU | SCU_MISC_CTRL, &val);
+    rc = ahb_readl(ctx, AST_G5_SCU | SCU_MISC, &val);
     if (rc)
         return rc;
 
-    r = &pci->ranges[p2ab_bmc_fw];
-    r->name = "Firmware";
-    r->start = 0;
-    r->len = 0x10000000;
-    r->rw = !(val & SCU_MISC_CTRL_P2A_FLASH_RO);
+    rc = ahb_readl(ctx, AST_G5_SCU | SCU_SILICON_REVISION, &rev);
+    if (rc)
+        return rc;
 
-    r = &pci->ranges[p2ab_soc_io];
-    r->name = "SoC IO";
-    r->start = 0x10000000;
-    r->len = 0x10000000;
-    r->rw = !(val & SCU_MISC_CTRL_P2A_SOC_RO);
+    if (rev_is_generation(rev, ast_g4)) {
+        r = &pci->ranges[p2ab_fw];
+        r->name = "Firmware";
+        r->start = 0;
+        r->len = 0x18000000;
+        r->rw = !(val & SCU_MISC_G4_P2A_FMC_RO);
 
-    r = &pci->ranges[p2ab_bmc_flash];
-    r->name = "Flashes";
-    r->start = 0x20000000;
-    r->len = 0x20000000;
-    r->rw = !(val & SCU_MISC_CTRL_P2A_FLASH_RO);
+        r = &pci->ranges[p2ab_soc];
+        r->name = "SoC IO";
+        r->start = 0x18000000;
+        r->len = 0x08000000;
+        r->rw = !(val & SCU_MISC_G4_P2A_SOC_RO);
 
-    r = &pci->ranges[p2ab_soc_reserved];
-    r->name = "Reserved";
-    r->start = 0x40000000;
-    r->len = 0x20000000;
-    r->rw = !(val & SCU_MISC_CTRL_P2A_SOC_RO);
+        r = &pci->ranges[p2ab_fmc];
+        r->name = "BMC Flash";
+        r->start = 0x20000000;
+        r->len = 0x10000000;
+        r->rw = !(val & SCU_MISC_G4_P2A_FMC_RO);
 
-    r = &pci->ranges[p2ab_lpc_host];
-    r->name = "LPC Host";
-    r->start = 0x60000000;
-    r->len = 0x20000000;
-    r->rw = !(val & SCU_MISC_CTRL_P2A_LPCH_RO);
+        r = &pci->ranges[p2ab_spi];
+        r->name = "Host Flash";
+        r->start = 0x30000000;
+        r->len = 0x10000000;
+        r->rw = !(val & SCU_MISC_G4_P2A_SPI_RO);
 
-    r = &pci->ranges[p2ab_dram];
-    r->name = "DRAM";
-    r->start = 0x80000000;
-    r->len = 0x80000000;
-    r->rw = !(val & SCU_MISC_CTRL_P2A_LPCH_RO);
+        r = &pci->ranges[p2ab_dram];
+        r->name = "DRAM";
+        r->start = 0x40000000;
+        r->len = 0x20000000;
+        r->rw = !(val & SCU_MISC_G4_P2A_DRAM_RO);
+
+        r = &pci->ranges[p2ab_lpch];
+        r->name = "LPC Host";
+        r->start = 0x60000000;
+        r->len = 0x20000000;
+        r->rw = !(val & SCU_MISC_G4_P2A_SOC_RO);
+
+        r = &pci->ranges[p2ab_rsvd];
+        r->name = "Reserved";
+        r->start = 0x80000000;
+        r->len = 0x80000000;
+        r->rw = !(val & SCU_MISC_G4_P2A_SOC_RO);
+    } else if (rev_is_generation(rev, ast_g5)) {
+        r = &pci->ranges[p2ab_fw];
+        r->name = "Firmware";
+        r->start = 0;
+        r->len = 0x10000000;
+        r->rw = !(val & SCU_MISC_G5_P2A_FLASH_RO);
+
+        r = &pci->ranges[p2ab_soc];
+        r->name = "SoC IO";
+        r->start = 0x10000000;
+        r->len = 0x10000000;
+        r->rw = !(val & SCU_MISC_G5_P2A_SOC_RO);
+
+        r = &pci->ranges[p2ab_fmc];
+        r->name = "BMC Flash";
+        r->start = 0x20000000;
+        r->len = 0x10000000;
+        r->rw = !(val & SCU_MISC_G5_P2A_FLASH_RO);
+
+        r = &pci->ranges[p2ab_spi];
+        r->name = "Host Flash";
+        r->start = 0x30000000;
+        r->len = 0x10000000;
+        r->rw = !(val & SCU_MISC_G5_P2A_FLASH_RO);
+
+        r = &pci->ranges[p2ab_rsvd];
+        r->name = "Reserved";
+        r->start = 0x40000000;
+        r->len = 0x20000000;
+        r->rw = !(val & SCU_MISC_G5_P2A_SOC_RO);
+
+        r = &pci->ranges[p2ab_lpch];
+        r->name = "LPC Host";
+        r->start = 0x60000000;
+        r->len = 0x20000000;
+        r->rw = !(val & SCU_MISC_G5_P2A_LPCH_RO);
+
+        r = &pci->ranges[p2ab_dram];
+        r->name = "DRAM";
+        r->start = 0x80000000;
+        r->len = 0x80000000;
+        r->rw = !(val & SCU_MISC_G5_P2A_DRAM_RO);
+    } else {
+        return -ENOTSUP;
+    }
 
     return 0;
 }
@@ -143,11 +200,11 @@ static int ast_debug_status(struct ahb *ctx, struct ast_cap_uart *uart)
         return 0;
     }
 
-    rc = ahb_readl(ctx, AST_G5_SCU | SCU_MISC_CTRL, &val);
+    rc = ahb_readl(ctx, AST_G5_SCU | SCU_MISC, &val);
     if (rc)
         return rc;
 
-    uart->debug = !(val & SCU_MISC_CTRL_UART_DBG) ?
+    uart->debug = !(val & SCU_MISC_UART_DBG) ?
                     ip_state_enabled : ip_state_disabled;
 
     rc = ahb_readl(ctx, AST_G5_SCU | SCU_HW_STRAP, &val);
@@ -300,19 +357,31 @@ int ast_ahb_bridge_discover(struct ahb *ahb, struct ast_interfaces *state)
 static int ast_p2ab_enable_writes(struct ahb *ahb)
 {
     uint32_t val;
+    uint32_t rev;
     int rc;
 
     logi("Disabling %s write filters\n", ahb_interface_names[ahb_p2ab]);
 
-    rc = ahb_readl(ahb, AST_G5_SCU | SCU_MISC_CTRL, &val);
+    rc = ahb_readl(ahb, AST_G5_SCU | SCU_MISC, &val);
+    if (rc)
+        return rc;
+
+    rc = ahb_readl(ahb, AST_G5_SCU | SCU_SILICON_REVISION, &rev);
     if (rc)
         return rc;
 
     /* Unconditionally turn off all write filters */
-    val &= ~(SCU_MISC_CTRL_P2A_DRAM_RO | SCU_MISC_CTRL_P2A_LPCH_RO |
-            SCU_MISC_CTRL_P2A_SOC_RO  | SCU_MISC_CTRL_P2A_FLASH_RO);
+    if (rev_is_generation(rev, ast_g4)) {
+        val &= ~(SCU_MISC_G4_P2A_DRAM_RO | SCU_MISC_G4_P2A_SPI_RO |
+                SCU_MISC_G4_P2A_SOC_RO  | SCU_MISC_G4_P2A_FMC_RO);
+    } else if (rev_is_generation(rev, ast_g5)) {
+        val &= ~(SCU_MISC_G5_P2A_DRAM_RO | SCU_MISC_G5_P2A_LPCH_RO |
+                SCU_MISC_G5_P2A_SOC_RO  | SCU_MISC_G5_P2A_FLASH_RO);
+    } else {
+        return -ENOTSUP;
+    }
 
-    rc = ahb_writel(ahb, AST_G5_SCU | SCU_MISC_CTRL, val);
+    rc = ahb_writel(ahb, AST_G5_SCU | SCU_MISC, val);
 
     return rc;
 }
@@ -340,7 +409,7 @@ int ast_ahb_init(struct ahb *ahb, bool rw)
     have_bmc_mmio = state.pci.bmc_mmio == ip_state_enabled;
     have_p2ab = (have_vga && have_vga_mmio) || (have_bmc && have_bmc_mmio);
 
-    if (!have_p2ab || (rw && !state.pci.ranges[p2ab_soc_io].rw)) {
+    if (!have_p2ab || (rw && !state.pci.ranges[p2ab_soc].rw)) {
         if (state.lpc.superio != ip_state_enabled)
             return -ENOTSUP;
 
@@ -376,7 +445,7 @@ int ast_ahb_init(struct ahb *ahb, bool rw)
             usleep(1000);
         }
 
-        if (rw && !state.pci.ranges[p2ab_soc_io].rw) {
+        if (rw && !state.pci.ranges[p2ab_soc].rw) {
             rc = ast_p2ab_enable_writes(ahb);
             if (rc)
                 goto cleanup_ahb;
