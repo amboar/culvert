@@ -71,7 +71,7 @@ Building is a matter of issuing `make`, while cross compilation is performed by
 setting `CROSS_COMPILE` in the make environment, e.g:
 
 ```
-$ make CROSS_COMPILE=powerpc64le-linux-gnu-
+$ make CROSS_COMPILE=arm-linux-gnueabi-
 ```
 
 ## Execution and Example output
