@@ -125,7 +125,6 @@ int ahb_cleanup(struct ahb *ctx)
     } else if (ctx->bridge == ahb_debug) {
         debug_cleanup(ctx->debug);
         debug_destroy(ctx->debug);
-        free(ctx->debug);
     } else
         assert(false);
 
