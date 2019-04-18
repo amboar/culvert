@@ -1,6 +1,6 @@
 ifeq ($(shell basename "$$(which git)"),git)
 ifeq ($(shell git rev-parse --is-inside-work-tree),true)
-VERSION = $(shell git describe --tags --dirty)
+VERSION = $(shell git describe --tags --dirty --always)
 endif
 endif
 
