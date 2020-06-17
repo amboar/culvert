@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #define _GNU_SOURCE
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -315,7 +316,10 @@ int flash_write(struct flash_chip *c, uint32_t dst, const void *src,
 		d += chunk;
 		s += chunk;
 		todo -= chunk;
+
+		fprintf(stderr, ".");
 	}
+	fprintf(stderr, "\n");
 
  writing_done:
 	if (!verify)
@@ -339,7 +343,10 @@ int flash_write(struct flash_chip *c, uint32_t dst, const void *src,
 		dst += chunk;
 		src += chunk;
 		size -= chunk;
+
+		fprintf(stderr, ".");
 	}
+	fprintf(stderr, "\n");
 	return 0;
 }
 

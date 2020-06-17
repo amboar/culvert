@@ -3,21 +3,20 @@
 
 #define _GNU_SOURCE
 #include "ast.h"
+#include "console.h"
 #include "debug.h"
 #include "log.h"
 #include "prompt.h"
+#include "ts16.h"
+#include "tty.h"
 
 #include <assert.h>
-#include <arpa/inet.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
 static inline int streq(const char *a, const char *b)
@@ -25,13 +24,73 @@ static inline int streq(const char *a, const char *b)
     return !strcmp(a, b);
 }
 
-int debug_init(struct debug *ctx, const char *compatible, const char *ip,
-               int port, const char *username, const char *password)
+static int ts16_console_init(struct debug *ctx, va_list args)
 {
-    struct sockaddr_in concentrator_addr, console_addr;
-    int concentrator, console;
-    int rc, cleanup;
-    char *cmd;
+    const char *ip, *username, *password;
+    struct ts16 *ts16;
+    int port;
+    int fd;
+
+    ts16 = malloc(sizeof(*ts16));
+    if (!ts16)
+        return -ENOMEM;
+
+    ip = va_arg(args, const char *);
+    port = va_arg(args, int);
+    username = va_arg(args, const char *);
+    password = va_arg(args, const char *);
+
+    fd = ts16_init(ts16, ip, port, username, password);
+    if (fd < 0) { goto cleanup_free; }
+
+    ctx->console = &ts16->console;
+
+    return fd;
+
+cleanup_free:
+    free(ts16);
+
+    return fd;
+}
+
+static int tty_console_init(struct debug *ctx, const char *path)
+{
+    struct tty *tty;
+    int fd;
+
+    tty = malloc(sizeof(*tty));
+    if (!tty)
+        return -ENOMEM;
+
+    fd = tty_init(tty, path);
+    if (fd < 0) { goto cleanup_free; }
+
+    ctx->console = &tty->console;
+
+    return fd;
+
+cleanup_free:
+    free(tty);
+
+    return fd;
+}
+
+int debug_init(struct debug *ctx, ...)
+{
+    va_list args;
+    int rc;
+
+    va_start(args, ctx);
+    rc = debug_init_v(ctx, args);
+    va_end(args);
+
+    return rc;
+}
+
+int debug_init_v(struct debug *ctx, va_list args)
+{
+    const char *interface;
+    int rc, fd;
 
     /*
      * Sanity-check presence of the password, though we also test again below
@@ -42,136 +101,29 @@ int debug_init(struct debug *ctx, const char *compatible, const char *ip,
         return -ENOTSUP;
     }
 
-    if (!compatible || !streq("digi,portserver-ts-16", compatible))
+    interface = va_arg(args, const char *);
+
+    if (!interface)
         return -EINVAL;
 
-    ctx->port = port;
+    if (streq("digi,portserver-ts-16", interface)) {
+        fd = ts16_console_init(ctx, args);
+    } else {
+        fd = tty_console_init(ctx, interface);
+    }
 
-    logi("Connecting to Digi Portserver TS 16 at %s:%d\n", ip, 23);
-    concentrator_addr.sin_family = AF_INET;
-    concentrator_addr.sin_port = htons(23);
-    if (inet_aton(ip, &concentrator_addr.sin_addr) == 0)
-        return -errno;
+    if (fd < 0) {
+        loge("Failed to initialise the console (%s): %d\n", interface, fd);
+        return fd;
+    }
 
-    concentrator = socket(AF_INET, SOCK_STREAM, 0);
-    if (concentrator < 0) { return -errno; }
-
-    rc = connect(concentrator, (struct sockaddr *)&concentrator_addr,
-                 sizeof(concentrator_addr));
-    if (rc < 0) { rc = -errno; goto cleanup_concentrator; }
-
-    rc = prompt_init(&ctx->concentrator, concentrator, "\r\n", false);
-    if (rc < 0) { goto cleanup_concentrator; };
-
-    logi("Logging into Digi Portserver TS\n");
-    rc = prompt_expect_run(&ctx->concentrator, "login: ", username);
-    if (rc < 0) { rc = -errno; goto cleanup_concentrator_prompt; }
-
-    rc = prompt_expect_run(&ctx->concentrator, "password: ", password);
-    if (rc < 0) { rc = -errno; goto cleanup_concentrator_prompt; }
-
-    logi("Configuring binary mode on port %d\n", ctx->port);
-    rc = asprintf(&cmd, "set port range=%d bin=on", ctx->port);
-    if (rc < 0) { goto cleanup_concentrator_prompt; }
-
-    rc = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-    if (rc < 0) { goto cleanup_concentrator_prompt; }
-
-    logi("Resetting port %d\n", ctx->port);
-    rc = asprintf(&cmd, "kill tty=%d", ctx->port);
-    if (rc < 0) { goto cleanup_port; }
-
-    rc = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-    if (rc < 0) { goto cleanup_port; }
-
-    sleep(1);
-
-    /* Use the "raw" port on the Digi portserver, which is 2000 + 100 */
-    logi("Connecting to BMC console at %s:%d\n", ip, 2000 + 100 + port);
-    console_addr = concentrator_addr;
-    console_addr.sin_port = htons(2000 + 100 + port);
-    console = socket(AF_INET, SOCK_STREAM, 0);
-    if (console < 0) { goto cleanup_concentrator_prompt; }
-
-    rc = connect(console, (struct sockaddr *)&console_addr,
-                 sizeof(console_addr));
-    if (rc < 0) { rc = -errno; goto cleanup_console; }
-
-    rc = prompt_init(&ctx->console, console, "\r", false);
-    if (rc < 0) { goto cleanup_console; };
+    rc = prompt_init(&ctx->prompt, fd, "\r", false);
+    if (rc < 0) { goto cleanup_ts16; }
 
     return 0;
 
-cleanup_console:
-    close(console);
-
-cleanup_port:
-    logi("Disabling binary mode on port %d\n", ctx->port);
-    cleanup = asprintf(&cmd, "set port range=%d bin=off", ctx->port);
-    if (cleanup < 0 && !rc) { rc = cleanup; };
-
-    cleanup = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-    if (cleanup < 0 && !rc) { rc = cleanup; };
-
-    logi("Resetting port %d\n", ctx->port);
-    cleanup = asprintf(&cmd, "kill tty=%d", ctx->port);
-    if (cleanup < 0 && !rc) { rc = cleanup; };
-
-    cleanup = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-    if (cleanup < 0 && !rc) { rc = cleanup; };
-
-    sleep(1);
-
-cleanup_concentrator_prompt:
-    cleanup = prompt_destroy(&ctx->concentrator);
-    if (cleanup < 0 && !rc) { rc = cleanup; }
-
-cleanup_concentrator:
-    close(concentrator);
-
-    return rc;
-}
-
-int debug_cleanup(struct debug *ctx)
-{
-    char *cmd;
-    int rc;
-
-    logi("Reverting port %d to 115200 baud\n", ctx->port);
-    rc = asprintf(&cmd, "set line range=%d baud=115200", ctx->port);
-    if (rc < 0)
-        return rc;
-
-    rc = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-    if (rc < 0)
-        return rc;
-
-    sleep(1);
-
-    logi("Disabling binary mode on port %d\n", ctx->port);
-    rc = asprintf(&cmd, "set port range=%d bin=off", ctx->port);
-    if (rc < 0)
-        return -errno;
-
-    rc = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-    if (rc < 0)
-        return rc;
-
-    logi("Resetting port %d\n", ctx->port);
-    rc = asprintf(&cmd, "kill tty=%d", ctx->port);
-    if (rc < 0)
-        return rc;
-
-    rc = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-
-    sleep(1);
+cleanup_ts16:
+    console_destroy(ctx->console);
 
     return rc;
 }
@@ -180,8 +132,8 @@ int debug_destroy(struct debug *ctx)
 {
     int rc = 0;
 
-    rc |= prompt_destroy(&ctx->console);
-    rc |= prompt_destroy(&ctx->concentrator);
+    rc |= prompt_destroy(&ctx->prompt);
+    rc |= console_destroy(ctx->console);
 
     return rc ? -EBADF : 0;
 }
@@ -189,59 +141,38 @@ int debug_destroy(struct debug *ctx)
 int debug_enter(struct debug *ctx)
 {
     const char *password;
-    int cleanup;
-    char *cmd;
     int rc;
 
     logi("Entering debug mode\n");
-    rc = asprintf(&cmd, "set line range=%d baud=1200", ctx->port);
-    if (rc < 0)
-        return -errno;
-
-    rc = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-    if (rc < 0)
-        return rc;
-
-    sleep(1);
 
     password = getenv("AST_DEBUG_PASSWORD");
     if (!password) {
         loge("AST_DEBUG_PASSWORD environment variable is not defined\n");
         return -ENOTSUP;
     }
-    rc = prompt_write(&ctx->console, password, strlen(password));
+
+    rc = console_set_baud(ctx->console, 1200);
+    if (rc < 0)
+        return rc;
+
+    rc = prompt_write(&ctx->prompt, password, strlen(password));
     if (rc < 0)
         goto cleanup_port_password;
 
-    rc = prompt_expect(&ctx->console, "$ ");
+    rc = prompt_expect(&ctx->prompt, "$ ");
     if (rc < 0)
         goto cleanup_port_password;
 
-    rc = asprintf(&cmd, "set line range=%d baud=115200", ctx->port);
-    if (rc < 0)
-        goto cleanup_port_password;
+    rc = console_set_baud(ctx->console, 115200);
+    if (!rc)
+        sleep(1);
 
-    rc = prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-    if (rc < 0)
-        goto cleanup_port_password;
-
-    sleep(1);
-
-    return 0;
+    return rc;
 
 cleanup_port_password:
-    cleanup = asprintf(&cmd, "set line range=%d baud=115200", ctx->port);
-    if (cleanup < 0)
-        return -errno;
+    console_set_baud(ctx->console, 115200);
 
-    prompt_expect_run(&ctx->concentrator, "#> ", cmd);
-    free(cmd);
-
-    sleep(1);
-
-    prompt_run(&ctx->console, "");
+    prompt_run(&ctx->prompt, "");
 
     return rc;
 }
@@ -251,13 +182,15 @@ int debug_exit(struct debug *ctx)
     int rc;
 
     logi("Exiting debug mode\n");
-    rc = prompt_run(&ctx->console, "q");
+    rc = prompt_run(&ctx->prompt, "q");
     if (rc < 0)
         return rc;
 
     sleep(1);
 
-    return prompt_run(&ctx->console, "");
+    prompt_run(&ctx->prompt, "");
+
+    return console_set_baud(ctx->console, 115200);
 }
 
 int debug_probe(struct debug *ctx)
@@ -329,7 +262,7 @@ static int debug_read_fixed(struct debug *ctx, char mode, uint32_t phys,
         return -errno;
 
     prompt = &buf[0];
-    rc = prompt_run_expect(&ctx->console, command, "$ ", &prompt, sizeof(buf));
+    rc = prompt_run_expect(&ctx->prompt, command, "$ ", &prompt, sizeof(buf));
     free(command);
     if (rc < 0)
         return rc;
@@ -338,7 +271,7 @@ static int debug_read_fixed(struct debug *ctx, char mode, uint32_t phys,
     *prompt = '\0';
 
     /* Discard echoed response */
-    response = strchr(buf, ctx->console.eol[0]);
+    response = strchr(buf, ctx->prompt.eol[0]);
     if (!response)
         return -EIO;
 
@@ -393,30 +326,30 @@ retry:
         if (rc < 0)
             return -errno;
 
-        rc = prompt_run(&ctx->console, command);
+        rc = prompt_run(&ctx->prompt, command);
         free(command);
         if (rc < 0)
             return rc;
 
         /* Eat the echoed command */
         do {
-            found = prompt_gets(&ctx->console, line, sizeof(line));
+            found = prompt_gets(&ctx->prompt, line, sizeof(line));
             if (found < 0)
                 return found;
         } while (!strcmp("$ \n", line)); /* Deal any prompt from a prior run */
 
         consumed = 0;
         do {
-            found = prompt_gets(&ctx->console, line, sizeof(line));
+            found = prompt_gets(&ctx->prompt, line, sizeof(line));
             if (found < 0)
                 return found;
 
             rc = debug_parse_d(line, cursor);
             if (rc < 0) {
-                rc = prompt_run(&ctx->console, "");
+                rc = prompt_run(&ctx->prompt, "");
                 if (rc < 0)
                     return rc;
-                rc = prompt_expect(&ctx->console, "$ ");
+                rc = prompt_expect(&ctx->prompt, "$ ");
                 if (rc < 0)
                     return rc;
                 loge("Failed to parse line '%s'\n", line);
@@ -461,11 +394,11 @@ ssize_t debug_write(struct debug *ctx, uint32_t phys, const void *buf, size_t le
             if (rc < 0)
                 return -errno;
 
-            rc = prompt_run(&ctx->console, command);
+            rc = prompt_run(&ctx->prompt, command);
             if (rc < 0)
                 return rc;
 
-            rc = prompt_expect(&ctx->console, "$ ");
+            rc = prompt_expect(&ctx->prompt, "$ ");
             if (rc < 0)
                 return rc;
             if (rc == 0)
@@ -490,16 +423,16 @@ ssize_t debug_write(struct debug *ctx, uint32_t phys, const void *buf, size_t le
         if (rc < 0)
             return -errno;
 
-        rc = prompt_run(&ctx->console, command);
+        rc = prompt_run(&ctx->prompt, command);
         free(command);
         if (rc < 0)
             return rc;
 
-        rc = prompt_write(&ctx->console, (const char *)cursor, egress);
+        rc = prompt_write(&ctx->prompt, (const char *)cursor, egress);
         if (rc < 0)
             return rc;
 
-        rc = prompt_expect(&ctx->console, "$ ");
+        rc = prompt_expect(&ctx->prompt, "$ ");
         if (rc < 0)
             return rc;
 
@@ -525,12 +458,12 @@ int debug_writel(struct debug *ctx, uint32_t phys, uint32_t val)
     if (rc < 0)
         return -errno;
 
-    rc = prompt_run(&ctx->console, command);
+    rc = prompt_run(&ctx->prompt, command);
     if (rc < 0)
         return rc;
 
     if (!((phys & ~0x20) == (AST_G5_WDT | WDT_RELOAD) && val == 0)) {
-        rc = prompt_expect(&ctx->console, "$ ");
+        rc = prompt_expect(&ctx->prompt, "$ ");
         if (rc < 0)
             return rc;
         if (rc == 0)

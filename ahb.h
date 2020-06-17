@@ -4,14 +4,10 @@
 #ifndef _AHB_H
 #define _AHB_H
 
-#include "debug.h"
-#include "devmem.h"
-#include "ilpc.h"
-#include "p2a.h"
-
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 enum ahb_bridge {
     ahb_ilpcb,
@@ -31,6 +27,12 @@ struct ahb_range {
     bool rw;
 };
 
+struct ilpcb;
+struct l2ab;
+struct p2ab;
+struct debug;
+struct devmem;
+
 struct ahb {
     enum ahb_bridge bridge;
     union {
@@ -42,7 +44,7 @@ struct ahb {
     };
 };
 
-void ahb_use(struct ahb *ctx, enum ahb_bridge type, void *bridge);
+struct ahb *ahb_use(struct ahb *ctx, enum ahb_bridge type, void *bridge);
 
 int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...);
 

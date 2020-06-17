@@ -4,21 +4,22 @@
 #ifndef _DEBUG_H
 #define _DEBUG_H
 
+#include "console.h"
 #include "prompt.h"
 
 #include <errno.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <sys/types.h>
 
 struct debug {
-    struct prompt concentrator;
-    struct prompt console;
+    struct console *console;
+    struct prompt prompt;
     int port;
 };
 
-int debug_init(struct debug *ctx, const char *compatible, const char *ip,
-               int port, const char *username, const char *password);
-int debug_cleanup(struct debug *ctx);
+int debug_init(struct debug *ctx, ...);
+int debug_init_v(struct debug *ctx, va_list args);
 int debug_destroy(struct debug *ctx);
 
 int debug_enter(struct debug *ctx);

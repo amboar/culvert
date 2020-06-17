@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
 
+#include "ahb.h"
 #include "ast.h"
 #include "devmem.h"
 #include "mb.h"
@@ -61,14 +62,12 @@ int devmem_destroy(struct devmem *ctx)
 
 int devmem_probe(struct devmem *ctx)
 {
-    uint32_t rev;
+    struct ahb ahb;
     int rc;
 
-    rc = devmem_readl(ctx, AST_G5_SCU | SCU_SILICON_REVISION, &rev);
-    if (rc < 0)
-        return rc;
+    rc = rev_probe(ahb_use(&ahb, ahb_devmem, ctx));
 
-    return rev_is_supported(rev);
+    return rc < 0 ? rc : 1;
 }
 
 static int64_t devmem_setup_win(struct devmem *ctx, uint32_t phys, size_t len)

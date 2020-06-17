@@ -22,6 +22,7 @@
 #include "ast.h"
 #include "clk.h"
 #include "debug.h"
+#include "devmem.h"
 #include "flash.h"
 #include "ilpc.h"
 #include "l2a.h"
@@ -41,7 +42,7 @@
 /* Buffer sizes */
 #define BMC_FLASH_LEN   (32 << 20)
 #define DUMP_RAM_WIN  (8 << 20)
-#define SFC_FLASH_WIN (1 << 20)
+#define SFC_FLASH_WIN (64 << 10)
 
 static void help(const char *name)
 {
@@ -58,9 +59,9 @@ static void help(const char *name)
     printf("%s devmem read ADDRESS\n", name);
     printf("%s devmem write ADDRESS VALUE\n", name);
     printf("%s console HOST_UART BMC_UART BAUD USER PASSWORD\n", name);
-    printf("%s read firmware\n", name);
-    printf("%s read ram\n", name);
-    printf("%s write firmware\n", name);
+    printf("%s read firmware [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s read ram [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s replace ram MATCH REPLACE\n", name);
     printf("%s reset TYPE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
@@ -71,8 +72,14 @@ static void help(const char *name)
 static int ahb_from_args(struct ahb *ahb, int argc, char *argv[])
 {
     /* Local interfaces */
-    if (argc == 0)
+    if (argc == 0) {
+        logi("Probing local interfaces\n");
         return ast_ahb_init(ahb, true);
+    }
+
+    /* Local debug interface */
+    if (argc == 1)
+        return ahb_init(ahb, ahb_debug, argv[0]);
 
     /* Remote debug interface */
     assert(argc == 5);
@@ -218,46 +225,52 @@ static int cmd_p2a(const char *name, int argc, char *argv[])
 
 static int cmd_debug(const char *name, int argc, char *argv[])
 {
-    const char *interface, *ip, *port, *username, *password;
     struct debug _debug, *debug = &_debug;
     struct ahb _ahb, *ahb = &_ahb;
     int rc, cleanup;
 
     /* ./doit debug read 0x1e6e207c digi,portserver-ts-16 <IP> <SERIAL PORT> <USER> <PASSWORD> */
-    if (argc < 7) {
+    if (!argc) {
         loge("Not enough arguments for debug command\n");
         help(name);
         exit(EXIT_FAILURE);
     }
 
+    logi("Initialising debug interface\n");
     if (!strcmp("read", argv[0])) {
-        interface = argv[2];
-        ip = argv[3];
-        port = argv[4];
-        username = argv[5];
-        password = argv[6];
-    } else if (!strcmp("write", argv[0])) {
-        if (argc < 8) {
-            loge("Not enough arguments for debug command\n");
+        if (argc == 3) {
+            rc = debug_init(debug, argv[2]);
+        } else if (argc == 7) {
+            rc = debug_init(debug, argv[2], argv[3], atoi(argv[4]), argv[5],
+                            argv[6]);
+        } else {
+            loge("Incorrect arguments for debug command\n");
             help(name);
             exit(EXIT_FAILURE);
         }
-        interface = argv[3];
-        ip = argv[4];
-        port = argv[5];
-        username = argv[6];
-        password = argv[7];
+    } else if (!strcmp("write", argv[0])) {
+        if (argc == 4) {
+            rc = debug_init(debug, argv[3]);
+        } else if (argc == 8) {
+            rc = debug_init(debug, argv[3], argv[4], atoi(argv[5]), argv[6],
+                            argv[7]);
+        } else {
+            loge("Incorrect arguments for debug command\n");
+            help(name);
+            exit(EXIT_FAILURE);
+        }
     } else {
         loge("Unsupported command: %s\n", argv[0]);
         help(name);
         exit(EXIT_FAILURE);
     }
 
-    logi("Initialising debug interface\n");
-    rc = debug_init(debug, interface, ip, atoi(port), username, password);
-    if (rc < 0) { errno = -rc; perror("debug_init"); exit(EXIT_FAILURE); }
+    if (rc < 0) {
+        errno = -rc;
+        perror("debug_init");
+        exit(EXIT_FAILURE);
+    }
 
-    logi("Entering debug context\n");
     rc = debug_enter(debug);
     if (rc < 0) { errno = -rc; perror("debug_enter"); goto cleanup_debug; }
 
@@ -269,7 +282,6 @@ static int cmd_debug(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    logi("Exiting debug context\n");
     cleanup = debug_exit(debug);
     if (cleanup < 0) { errno = -cleanup; perror("debug_exit"); }
 
@@ -471,7 +483,6 @@ static int cmd_dump_firmware(struct ahb *ahb)
     int cleanup;
     int rc;
 
-
     logi("Testing BMC SFC write filter configuration\n");
     rc = ahb_readl(ahb, 0x1e6200a4, &sfc_wafcr);
     if (rc) { errno = -rc; perror("ahb_readl"); return rc; }
@@ -552,6 +563,7 @@ static int cmd_read(const char *name, int argc, char *argv[])
     }
 
     rc = ahb_from_args(ahb, argc - 1, argv + 1);
+    printf("ahb_from_args: 0x%x\n", rc);
     if (rc < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
@@ -588,6 +600,7 @@ static int cmd_write(const char *name, int argc, char *argv[])
 {
     struct ahb _ahb, *ahb = &_ahb;
     struct flash_chip *chip;
+    bool live = false;
     ssize_t ingress;
     struct sfc *sfc;
     int rc, cleanup;
@@ -595,7 +608,7 @@ static int cmd_write(const char *name, int argc, char *argv[])
     char *buf;
 
     if (argc < 1) {
-        loge("Not enough arguments for dump command\n");
+        loge("Not enough arguments for write command\n");
         help(name);
         exit(EXIT_FAILURE);
     }
@@ -606,7 +619,29 @@ static int cmd_write(const char *name, int argc, char *argv[])
         return -EINVAL;
     }
 
-    rc = ahb_from_args(ahb, argc - 1, argv + 1);
+    /* Do option parsing for the "firmware" write type */
+    while (1) {
+        int option_index = 0;
+        int c;
+
+        static struct option long_options[] = {
+            { "live", no_argument, NULL, 'l' },
+            { },
+        };
+
+        c = getopt_long(argc, argv, "l", long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+            case 'l':
+                logi("BMC is live, will take actions to halt its execution\n");
+                live = true;
+                break;
+        }
+    }
+
+    rc = ahb_from_args(ahb, argc - optind, &argv[optind]);
     if (rc < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
@@ -622,7 +657,7 @@ static int cmd_write(const char *name, int argc, char *argv[])
 
     if (ahb->bridge == ahb_devmem)
         loge("I hope you know what you are doing\n");
-    else {
+    else if (live) {
         logi("Preventing system reset\n");
         rc = wdt_prevent_reset(ahb);
         if (rc < 0)
@@ -632,12 +667,12 @@ static int cmd_write(const char *name, int argc, char *argv[])
         rc = clk_disable(ahb, clk_arm);
         if (rc < 0)
             goto cleanup_soc;
-    }
 
-    logi("Configuring VUART for host Tx discard\n");
-    rc = vuart_set_host_tx_discard(ahb, discard_enable);
-    if (rc < 0)
-        goto cleanup_clk;
+        logi("Configuring VUART for host Tx discard\n");
+        rc = vuart_set_host_tx_discard(ahb, discard_enable);
+        if (rc < 0)
+            goto cleanup_clk;
+    }
 
     logi("Initialising flash subsystem\n");
     rc = sfc_init(&sfc, ahb, SFC_TYPE_FMC);
@@ -662,7 +697,7 @@ static int cmd_write(const char *name, int argc, char *argv[])
         }
 
         do {
-            if (ingress % (64 * 1024) != 0) {
+            if (ingress < SFC_FLASH_WIN) {
                 loge("Unexpected ingress value: 0x%zx\n", ingress);
                 goto cleanup_flash;
             }
@@ -688,7 +723,7 @@ cleanup_sfc:
     sfc_destroy(sfc);
 
 cleanup_soc:
-    if (!rc && ahb->bridge != ahb_devmem) {
+    if (live && !rc && ahb->bridge != ahb_devmem) {
         int64_t wait;
 
         logi("Performing SoC reset\n");
@@ -702,12 +737,14 @@ cleanup_soc:
     }
 
 cleanup_vuart:
-    logi("Deconfiguring VUART host Tx discard\n");
-    cleanup = vuart_set_host_tx_discard(ahb, discard_enable);
-    if (cleanup) { errno = -cleanup; perror("vuart_set_host_tx_discard"); }
+    if (live) {
+        logi("Deconfiguring VUART host Tx discard\n");
+        cleanup = vuart_set_host_tx_discard(ahb, discard_enable);
+        if (cleanup) { errno = -cleanup; perror("vuart_set_host_tx_discard"); }
+    }
 
 cleanup_clk:
-    if (rc < 0) {
+    if (live && rc < 0) {
         logi("Ungating ARM clock\n");
         cleanup = clk_enable(ahb, clk_arm);
         if (cleanup) { errno = -cleanup; perror("clk_enable"); }
@@ -715,7 +752,7 @@ cleanup_clk:
 
 cleanup_ahb:
     cleanup = ahb_cleanup(ahb);
-    if (cleanup) { errno = -cleanup; perror("ahb_destroy"); }
+    if (cleanup) { errno = -cleanup; perror("ahb_cleanup"); }
 
     if (rc < 0)
         exit(EXIT_FAILURE);

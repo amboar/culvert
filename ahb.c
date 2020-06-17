@@ -31,7 +31,7 @@ static void ahb_notify_bridge(struct ahb *ctx)
     logi("Initialised %s AHB interface\n", ahb_interface_names[ctx->bridge]);
 }
 
-void ahb_use(struct ahb *ctx, enum ahb_bridge type, void *bridge)
+struct ahb *ahb_use(struct ahb *ctx, enum ahb_bridge type, void *bridge)
 {
     ctx->bridge = type;
     if (type == ahb_ilpcb)
@@ -48,6 +48,8 @@ void ahb_use(struct ahb *ctx, enum ahb_bridge type, void *bridge)
         assert(false);
 
     ahb_notify_bridge(ctx);
+
+    return ctx;
 }
 
 int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...)
@@ -76,20 +78,13 @@ int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...)
             return rc;
         }
     } else if (type == ahb_debug) {
-        const char *interface, *ip, *username, *password;
         va_list args;
-        int port;
 
         ctx->debug = malloc(sizeof(*ctx->debug));
 
         va_start(args, type);
-        interface = va_arg(args, const char *);
-        ip = va_arg(args, const char *);
-        port = va_arg(args, int);
-        username = va_arg(args, const char *);
-        password = va_arg(args, const char *);
+        rc = debug_init_v(ctx->debug, args);
         va_end(args);
-        rc = debug_init(ctx->debug, interface, ip, port, username, password);
         if (rc < 0) {
             free(ctx->debug);
             return rc;
@@ -102,8 +97,10 @@ int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...)
         }
     } else if (type == ahb_devmem) {
         ctx->devmem = malloc(sizeof(*ctx->devmem));
+        logi("Initialising devmem interface");
         rc = devmem_init(ctx->devmem);
         if (rc < 0) {
+            loge("devmem_init failed: %d\n", rc);
             free(ctx->devmem);
             return rc;
         }
@@ -123,7 +120,7 @@ int ahb_cleanup(struct ahb *ctx)
             ctx->bridge == ahb_p2ab || ctx->bridge == ahb_devmem) {
         ahb_destroy(ctx);
     } else if (ctx->bridge == ahb_debug) {
-        debug_cleanup(ctx->debug);
+        debug_exit(ctx->debug);
         debug_destroy(ctx->debug);
     } else
         assert(false);

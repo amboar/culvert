@@ -8,7 +8,7 @@
 
 #include "ahb.h"
 
-enum ast_generation { ast_g4, ast_g5 };
+enum ast_generation { ast_g4, ast_g5, ast_g6 };
 
 /* AST2500 Memory Space Allocations */
 #define AST_G5_SOC_IO			0x1e600000

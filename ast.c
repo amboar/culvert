@@ -90,9 +90,9 @@ static int ast_pci_status(struct ahb *ctx, struct ast_cap_pci *pci)
     if (rc)
         return rc;
 
-    rc = ahb_readl(ctx, AST_G5_SCU | SCU_SILICON_REVISION, &rev);
-    if (rc)
-        return rc;
+    rev = rev_probe(ctx);
+    if (rev < 0)
+        return rev;
 
     if (rev_is_generation(rev, ast_g4)) {
         r = &pci->ranges[p2ab_fw];
@@ -179,7 +179,8 @@ static int ast_pci_status(struct ahb *ctx, struct ast_cap_pci *pci)
         r->len = 0x80000000;
         r->rw = !(val & SCU_MISC_G5_P2A_DRAM_RO);
     } else {
-        return -ENOTSUP;
+        loge("No description for the PCIe configuration layout on the %s\n",
+             rev_name(rev));
     }
 
     return 0;
@@ -191,9 +192,12 @@ static int ast_debug_status(struct ahb *ctx, struct ast_cap_uart *uart)
     uint32_t rev;
     int rc;
 
-    rc = ahb_readl(ctx, AST_G5_SCU | SCU_SILICON_REVISION, &rev);
-    if (rc)
-        return rc;
+    rev = rev_probe(ctx);
+    if (rev < 0)
+        return rev;
+
+    if (rev_is_generation(rev, ast_g6))
+        return 0;
 
     if (rev_is_generation(rev, ast_g4)) {
         uart->debug = ip_state_absent;
@@ -229,9 +233,12 @@ static int ast_xdma_status(struct ahb *ctx, struct ast_cap_xdma *xdma)
     uint32_t rev;
     int rc;
 
-    rc = ahb_readl(ctx, AST_G5_SCU | SCU_SILICON_REVISION, &rev);
-    if (rc)
-        return rc;
+    rev = rev_probe(ctx);
+    if (rev < 0)
+        return rev;
+
+    if (rev_is_generation(rev, ast_g6))
+        return 0;
 
     rc = ahb_readl(ctx, AST_G5_SDMC | SDMC_GMP, &val);
     if (rc)
@@ -321,15 +328,15 @@ int ast_ahb_bridge_probe(struct ast_interfaces *state)
 int ast_ahb_bridge_discover(struct ahb *ahb, struct ast_interfaces *state)
 {
     const char *chip;
-    uint32_t val;
+    int64_t val;
     int rc;
 
     logi("Performing interface discovery via %s\n",
          ahb_interface_names[ahb->bridge]);
 
-    rc = ahb_readl(ahb, AST_G5_SCU | SCU_SILICON_REVISION, &val);
-    if (rc)
-        return rc;
+    val = rev_probe(ahb);
+    if (val < 0)
+        return val;
 
     chip = rev_name(val);
     assert(chip);
@@ -366,8 +373,8 @@ static int ast_p2ab_enable_writes(struct ahb *ahb)
     if (rc)
         return rc;
 
-    rc = ahb_readl(ahb, AST_G5_SCU | SCU_SILICON_REVISION, &rev);
-    if (rc)
+    rev = rev_probe(ahb);
+    if (rc < 0)
         return rc;
 
     /* Unconditionally turn off all write filters */
@@ -377,6 +384,8 @@ static int ast_p2ab_enable_writes(struct ahb *ahb)
     } else if (rev_is_generation(rev, ast_g5)) {
         val &= ~(SCU_MISC_G5_P2A_DRAM_RO | SCU_MISC_G5_P2A_LPCH_RO |
                 SCU_MISC_G5_P2A_SOC_RO  | SCU_MISC_G5_P2A_FLASH_RO);
+    } else if (rev_is_generation(rev, ast_g6)) {
+        return 0;
     } else {
         return -ENOTSUP;
     }
@@ -400,8 +409,10 @@ int ast_ahb_init(struct ahb *ahb, bool rw)
     if (rc)
         return rc;
 
-    if (state.kernel.have_devmem)
+    if (state.kernel.have_devmem) {
+        logi("Detected devmem interface\n");
         return ahb_init(ahb, ahb_devmem);
+    }
 
     have_vga = state.pci.vga == ip_state_enabled;
     have_vga_mmio = state.pci.vga_mmio == ip_state_enabled;
@@ -483,9 +494,10 @@ int ast_ahb_init(struct ahb *ahb, bool rw)
     if (state.lpc.superio != ip_state_enabled) {
         logi("Enabling %s interface via %s\n",
              ahb_interface_names[ahb_ilpcb], ahb_interface_names[ahb_p2ab]);
-        rc = ahb_readl(ahb, AST_G5_SCU | SCU_SILICON_REVISION, &val);
-        if (rc)
-            goto cleanup_ahb;
+        val = rev_probe(ahb);
+        if (val < 0) { rc = val; goto cleanup_ahb; }
+
+        if (rev_is_generation(val, ast_g6)) { rc = 0; goto cleanup_ahb; }
 
         val = SCU_HW_STRAP_SIO_DEC;
 

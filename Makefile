@@ -18,6 +18,7 @@ CC = gcc
 SRCS += uart/suart.c uart/mux.c uart/vuart.c
 SRCS += prompt.c ast.c ahb.c p2a.c shell.c pci.c l2a.c lpc.c sio.c ilpc.c doit.c
 SRCS += clk.c wdt.c sfc.c flash.c mmio.c devmem.c log.c priv.c debug.c rev.c
+SRCS += ts16.c tty.c
 
 OBJS = $(SRCS:%.c=%.o)
 DEPS = $(SRCS:%.c=%.d)
@@ -36,6 +37,9 @@ $(SRCS): version
 
 version:
 	git describe --tags --dirty > $@
+
+cscope: $(SRCS)
+	git ls-files | grep '\.[ch]$$' | xargs cscope -b
 
 .PHONY: clean
 clean:

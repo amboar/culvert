@@ -4,6 +4,8 @@
 #include "ast.h"
 #include "vuart.h"
 
+#include <errno.h>
+
 int vuart_set_host_tx_discard(struct ahb *ahb, enum vuart_discard state)
 {
     uint32_t val;
