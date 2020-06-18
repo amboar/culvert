@@ -1,6 +1,7 @@
 ifeq ($(shell basename "$$(which git)"),git)
-ifeq ($(shell git rev-parse --is-inside-work-tree),true)
+ifeq ($(shell git rev-parse --is-inside-work-tree 2> /dev/null),true)
 VERSION = $(shell git describe --tags --dirty --always)
+BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
 endif
 endif
 
@@ -27,7 +28,7 @@ all: doit
 
 ARCHIVE = $(shell basename "$$(pwd)")-$(VERSION)
 dist: version
-	git archive --format=tar --prefix=$(ARCHIVE)/ --output=$(ARCHIVE).tar master
+	git archive --format=tar --prefix=$(ARCHIVE)/ --output=$(ARCHIVE).tar $(BRANCH)
 	tar -uf $(ARCHIVE).tar --owner=0 --group=0 --transform='s|^|$(ARCHIVE)/|' $^
 	gzip $(ARCHIVE).tar
 
@@ -35,15 +36,16 @@ doit: $(OBJS)
 
 $(SRCS): version
 
+.PHONY: version
 version:
-	git describe --tags --dirty > $@
+	echo $(VERSION) > $@
 
 cscope: $(SRCS)
 	git ls-files | grep '\.[ch]$$' | xargs cscope -b
 
 .PHONY: clean
 clean:
-	$(RM) version doit $(OBJS) $(DEPS)
+	$(RM) doit $(OBJS) $(DEPS)
 
 %.o : %.c
 	$(CROSS_COMPILE)$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c $< -o $@
