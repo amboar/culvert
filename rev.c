@@ -100,13 +100,15 @@ int64_t rev_probe(struct ahb *ahb)
     /* Based on the above observations, extract the true silicon revision ID */
     rev = is_g6 ? probe[0] : probe[1];
 
+    logd("Found revision 0x%x\n", rev);
+
     /* Is it a supported revision? */
     for (i = 0; i < ARRAY_SIZE(bmc_silicon_revs); i++) {
         if (rev == bmc_silicon_revs[i].rev)
             return rev;
     }
 
-    loge("Revision 0x%x is unsupported\n", rev);
+    logd("Revision 0x%x is unsupported\n", rev);
 
     return -ENODEV;
 }

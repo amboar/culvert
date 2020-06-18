@@ -2,6 +2,7 @@
 // Copyright (C) 2018,2019 IBM Corp.
 
 #include "ilpc.h"
+#include "log.h"
 #include "rev.h"
 
 #include <errno.h>
@@ -22,17 +23,17 @@ int ilpcb_destroy(struct ilpcb *ctx)
 
 int ilpcb_probe(struct ilpcb *ctx)
 {
-    uint32_t rev;
+    struct ahb ahb;
     int rc;
+
+    logd("Probing %s\n", ahb_interface_names[ahb_ilpcb]);
 
     if (!sio_present(&ctx->sio))
         return 0;
 
-    rc = ilpcb_readl(ctx, 0x1e6e207c, &rev);
-    if (rc)
-        return rc;
+    rc = rev_probe(ahb_use(&ahb, ahb_ilpcb, ctx));
 
-    return rev_is_supported(rev);
+    return rc < 0 ? rc : 1;
 }
 
 int ilpcb_mode(struct ilpcb *ctx)

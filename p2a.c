@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
 
-#include "p2a.h"
-#include "pci.h"
+#include "ahb.h"
+#include "log.h"
 #include "mb.h"
 #include "mmio.h"
+#include "p2a.h"
+#include "pci.h"
 #include "rev.h"
 
 #include <assert.h>
@@ -88,14 +90,16 @@ int p2ab_destroy(struct p2ab *ctx)
 
 int p2ab_probe(struct p2ab *ctx)
 {
-    uint32_t rev = 0xffffffff;
-    int rc;
+    struct ahb ahb;
+    int64_t rc;
 
-    rc = p2ab_readl(ctx, 0x1e6e207c, &rev);
-    if (rc)
+    logd("Probing %s\n", ahb_interface_names[ahb_p2ab]);
+
+    rc = rev_probe(ahb_use(&ahb, ahb_p2ab, ctx));
+    if (rc < 0)
         return rc;
 
-    return rev_is_supported(rev);
+    return rc < 0 ? rc : 1;
 }
 
 int64_t p2ab_map(struct p2ab *ctx, uint32_t phys, size_t len)

@@ -197,6 +197,8 @@ int debug_probe(struct debug *ctx)
 {
     int rc;
 
+    logd("Probing %s\n", ahb_interface_names[ahb_debug]);
+
     rc = debug_enter(ctx);
     if (rc < 0)
         return rc;

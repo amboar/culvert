@@ -47,8 +47,6 @@ struct ahb *ahb_use(struct ahb *ctx, enum ahb_bridge type, void *bridge)
     else
         assert(false);
 
-    ahb_notify_bridge(ctx);
-
     return ctx;
 }
 

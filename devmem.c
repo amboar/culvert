@@ -4,6 +4,7 @@
 #include "ahb.h"
 #include "ast.h"
 #include "devmem.h"
+#include "log.h"
 #include "mb.h"
 #include "mmio.h"
 #include "rev.h"
@@ -64,6 +65,8 @@ int devmem_probe(struct devmem *ctx)
 {
     struct ahb ahb;
     int rc;
+
+    logd("Probing %s\n", ahb_interface_names[ahb_devmem]);
 
     rc = rev_probe(ahb_use(&ahb, ahb_devmem, ctx));
 
