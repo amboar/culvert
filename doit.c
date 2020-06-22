@@ -1380,19 +1380,58 @@ static const struct command cmds[] = {
 int main(int argc, char *argv[])
 {
     const struct command *cmd = &cmds[0];
+    bool show_help = false;
+    int verbose = 0;
 
-    if (argc < 2) {
-        loge("Not enough arguments\n");
+    while (1) {
+        static struct option long_options[] = {
+            { "help", no_argument, NULL, 'h' },
+            { "verbose", no_argument, NULL, 'v' },
+            { },
+        };
+        int option_index = 0;
+        int c;
+
+        c = getopt_long(argc, argv, "+hv", long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+            case 'h':
+                show_help = true;
+                break;
+            case 'v':
+                verbose++;
+                break;
+            default:
+                continue;
+        }
+    }
+
+    if (optind == argc) {
+        if (!show_help)
+            loge("Not enough arguments\n");
         help(argv[0]);
         exit(EXIT_FAILURE);
     }
 
+    if ((level_info + verbose) <= level_trace) {
+        log_set_level(level_info + verbose);
+    } else {
+        log_set_level(level_trace);
+    }
+
     while (cmd->fn) {
-        if (!strcmp(cmd->name, argv[1])) {
-            if (!strcmp("probe", argv[1]))
-                return cmd->fn(argv[0], argc - 1, argv + 1);
-            else
-                return cmd->fn(argv[0], argc - 2, argv + 2);
+        if (!strcmp(cmd->name, argv[optind])) {
+            int offset = optind;
+
+            /* probe uses getopt, but for subcommands not using getopt */
+            if (strcmp("probe", argv[optind])) {
+                offset += 1;
+            }
+            optind = 1;
+
+            return cmd->fn(argv[0], argc - offset, argv + offset);
         }
 
         cmd++;

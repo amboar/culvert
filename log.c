@@ -19,6 +19,8 @@ const int log_colour_lookup[] = {
     [level_error] = colour_red,
 };
 
+static enum log_level log_current_level;
+
 static void log_write_all(int fd, const char *buf, size_t len)
 {
     ssize_t egress;
@@ -54,6 +56,9 @@ void log_msg(enum log_level lvl, const char *fmt, ...)
     va_list args;
     int rc;
 
+    if (lvl > log_current_level)
+        return;
+
     if (isatty(fd))
         log_set_colour(fd, log_colour_lookup[lvl]);
 
@@ -83,4 +88,9 @@ void log_highlight(int fd, enum log_colour colour, const char *fmt, ...)
 
     if (isatty(fd))
         log_reset_colour(fd);
+}
+
+void log_set_level(enum log_level level)
+{
+    log_current_level = level;
 }
