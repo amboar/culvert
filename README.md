@@ -1,5 +1,19 @@
 # A Test and Debug Tool for ASPEED BMC AHB Interfaces
 
+## Warning
+
+DO NOT USE THIS TOOL IF YOU HAVE NOT UNDERSTOOD ITS BEHAVIOURS IN THE CONTEXT
+OF YOUR TARGET MACHINE.
+
+This tool pokes at low-level hardware and firmware interfaces of your machine.
+Particularly, the act of probing implies uncertainty about the consequences if
+the target device is not the device we hoped to find.
+
+Use of this tool may lead to instability, crashes or critical failures of the
+target machine.
+
+## Introduction
+
 ASPEED BMCs have several implicit modes of operation:
 
 1. Development: BMC / host firmware bring-up
