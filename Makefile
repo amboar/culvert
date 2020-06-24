@@ -11,15 +11,22 @@ else
 VERSION ?= Unknown
 endif
 
+HOST = $(shell $(CROSS_COMPILE)$(CC) -dumpmachine)
+
 CFLAGS = -O2 -flto -Werror -Wall -std=gnu99 -DVERSION='"$(VERSION)"'
-CFLAGS += -DNDEBUG -I.
+CFLAGS += -DNDEBUG -I. -Iarch/$(HOST)
 LDFLAGS = -flto
 CC = gcc
 
 SRCS += uart/suart.c uart/mux.c uart/vuart.c
-SRCS += prompt.c ast.c ahb.c p2a.c shell.c pci.c l2a.c lpc.c sio.c ilpc.c doit.c
+SRCS += prompt.c ast.c ahb.c p2a.c shell.c pci.c l2a.c sio.c ilpc.c doit.c
 SRCS += clk.c wdt.c sfc.c flash.c mmio.c devmem.c log.c priv.c debug.c rev.c
 SRCS += ts16.c tty.c
+
+ifneq (,$(wildcard arch/$(HOST)/lpc.c))
+CFLAGS += -DHAVE_LPC=1
+SRCS += arch/$(HOST)/lpc.c
+endif
 
 OBJS = $(SRCS:%.c=%.o)
 DEPS = $(SRCS:%.c=%.d)
