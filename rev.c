@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdint.h>
 
 struct bmc_silicon_rev {
@@ -30,6 +31,8 @@ int64_t rev_probe(struct ahb *ahb)
     bool is_g6;
     int rc;
     int i;
+
+    logd("Probing for SoC revision registers\n");
 
     /*
      * The layout of the AST2600 SCU is drastically different from the 2400 and
@@ -68,6 +71,7 @@ int64_t rev_probe(struct ahb *ahb)
      */
     rc = ahb_readl(ahb, AST_SCU | 0x004, &probe[0]);
     if (rc < 0) { return rc; }
+    logt("0x%08" PRIx32 ": 0x%08" PRIx32 "\n", AST_SCU | 0x004, probe[0]);
 
     /*
      * SCU07C is:
@@ -92,6 +96,7 @@ int64_t rev_probe(struct ahb *ahb)
      */
     rc = ahb_readl(ahb, AST_SCU | 0x07c, &probe[1]);
     if (rc < 0) { return rc; }
+    logt("0x%08" PRIx32 ": 0x%08" PRIx32 "\n", AST_SCU | 0x07c, probe[1]);
 
 #undef AST_SCU
 

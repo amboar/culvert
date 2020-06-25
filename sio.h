@@ -24,6 +24,7 @@ enum sio_dev
 struct sio
 {
     struct lpc io;
+    uint16_t base;
 };
 
 int sio_init(struct sio *ctx);
@@ -31,7 +32,7 @@ int sio_destroy(struct sio *ctx);
 int sio_lock(struct sio *ctx);
 int sio_unlock(struct sio *ctx);
 int sio_select(struct sio *ctx, enum sio_dev dev);
-int sio_present(struct sio *ctx);
+int sio_probe(struct sio *ctx);
 int sio_readb(struct sio *ctx, uint32_t addr, uint8_t *val);
 int sio_writeb(struct sio *ctx, uint32_t addr, uint8_t val);
 

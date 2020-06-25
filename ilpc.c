@@ -28,7 +28,7 @@ int ilpcb_probe(struct ilpcb *ctx)
 
     logd("Probing %s\n", ahb_interface_names[ahb_ilpcb]);
 
-    if (!sio_present(&ctx->sio))
+    if (!sio_probe(&ctx->sio))
         return 0;
 
     rc = rev_probe(ahb_use(&ahb, ahb_ilpcb, ctx));
