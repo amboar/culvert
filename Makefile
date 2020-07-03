@@ -11,10 +11,13 @@ else
 VERSION ?= Unknown
 endif
 
-HOST = $(shell $(CROSS_COMPILE)$(CC) -dumpmachine)
+HOST := $(shell $(CROSS_COMPILE)$(CC) -dumpmachine | cut -d- -f1)
 
 CFLAGS = -O2 -flto -Werror -Wall -std=gnu99 -DVERSION='"$(VERSION)"'
-CFLAGS += -DNDEBUG -I. -Iarch/$(HOST)
+CFLAGS += -DNDEBUG -I.
+ifneq (,$(wildcard arch/$(HOST)))
+CFLAGS += -Iarch/$(HOST)
+endif
 LDFLAGS = -flto
 CC = gcc
 
