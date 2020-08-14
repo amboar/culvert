@@ -28,6 +28,7 @@
 #include "l2a.h"
 #include "log.h"
 #include "lpc.h"
+#include "otp.h"
 #include "p2a.h"
 #include "mb.h"
 #include "priv.h"
@@ -67,6 +68,10 @@ static void help(const char *name)
     printf("%s sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s otp read conf [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s otp write conf WORD BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
 }
 
 static int ahb_from_args(struct ahb *ahb, int argc, char *argv[])
@@ -1357,6 +1362,98 @@ cleanup_ahb:
     return rc;
 }
 
+int cmd_otp(const char *name, int argc, char *argv[])
+{
+    enum otp_region reg = otp_region_conf;
+    struct ahb _ahb, *ahb = &_ahb;
+    bool rd = true;
+    int argo = 2;
+    int cleanup;
+    int rc;
+
+// ./doit otp read conf INTERFACE [IP PORT USERNAME PASSWORD]
+// ./doit otp read strap INTERFACE [IP PORT USERNAME PASSWORD]
+// ./doit otp write strap <bit> <value> INTERFACE [IP PORT USERNAME PASSWORD]
+// ./doit otp write conf <word> <bit> <value> INTERFACE [IP PORT USERNAME PASSWORD]
+
+    if (argc < 2) {
+        loge("Not enough arguments for otp command\n");
+        help(name);
+        exit(EXIT_FAILURE);
+    }
+
+    if (!strcmp("conf", argv[1]))
+        reg = otp_region_conf;
+    else if (!strcmp("strap", argv[1]))
+        reg = otp_region_strap;
+    else {
+        loge("Unsupported otp region: %s\n", argv[1]);
+        help(name);
+        exit(EXIT_FAILURE);
+    }
+
+    if (!strcmp("write", argv[0])) {
+        rd = false;
+        if (reg == otp_region_strap)
+            argo += 2;
+        else
+            argo += 3;
+    } else if (strcmp("read", argv[0])) {
+        loge("Unsupported command: %s\n", argv[0]);
+        help(name);
+        exit(EXIT_FAILURE);
+    }
+
+    if (argc < argo) {
+        loge("Not enough arguments for otp command\n");
+        help(name);
+        exit(EXIT_FAILURE);
+    }
+
+    rc = ahb_from_args(ahb, argc - argo, &argv[argo]);
+    if (rc < 0) {
+        bool denied = (rc == -EACCES || rc == -EPERM);
+        if (denied && !priv_am_root()) {
+            priv_print_unprivileged(name);
+        } else if (rc == -ENOTSUP) {
+            loge("Probes failed, cannot access BMC AHB\n");
+        } else {
+            errno = -rc;
+            perror("ahb_init");
+        }
+        exit(EXIT_FAILURE);
+    }
+
+    if (rd)
+        rc = otp_read(ahb, reg);
+    else {
+        if (reg == otp_region_strap) {
+            unsigned int bit;
+            unsigned int val;
+
+            bit = strtoul(argv[2], NULL, 0);
+            val = strtoul(argv[3], NULL, 0);
+
+            rc = otp_write_strap(ahb, bit, val);
+        } else {
+            unsigned int word;
+            unsigned int bit;
+            unsigned int val;
+
+            word = strtoul(argv[2], NULL, 0);
+            bit = strtoul(argv[3], NULL, 0);
+            val = strtoul(argv[4], NULL, 0);
+
+            rc = otp_write_conf(ahb, word, bit, val);
+        }
+    }
+
+    cleanup = ahb_destroy(ahb);
+    if (cleanup < 0) { errno = -cleanup; perror("ahb_destroy"); }
+
+    return rc;
+}
+
 struct command {
     const char *name;
     int (*fn)(const char *, int, char *[]);
@@ -1374,6 +1471,7 @@ static const struct command cmds[] = {
     { "reset", cmd_reset },
     { "devmem", cmd_devmem },
     { "sfc", cmd_sfc },
+    { "otp", cmd_otp },
     { },
 };
 
