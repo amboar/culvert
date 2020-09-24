@@ -29,7 +29,7 @@
 static int __p2ab_writel(struct p2ab *ctx, size_t addr, uint32_t val)
 {
     assert(addr < (AST_MMIO_LEN - sizeof(val) + 1));
-    assert(!(addr & (sizeof(*val) - 1)));
+    assert(!(addr & (sizeof(val) - 1)));
 
     *((uint32_t *)(ctx->mmio + addr)) = htole32(val);
 
