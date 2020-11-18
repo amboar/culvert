@@ -31,6 +31,11 @@
 #define OTP_COMPARE_3   (OTP_BASE + 0x28)
 #define OTP_COMPARE_4   (OTP_BASE + 0x2c)
 
+#define NUM_OTP_CONF    16
+#define NUM_PROG_TRIES  5
+
+static int _chiprev = -1;
+
 struct otpstrap_status {
     uint8_t value;
     uint8_t option_array[7];
@@ -179,7 +184,7 @@ static int otp_set_soak(struct ahb *ahb, int soak)
 
     switch (soak) {
     case 0:
-        rc = otp_write_reg(ahb, 0x3000, 0x0);
+        rc = otp_write_reg(ahb, 0x3000, _chiprev >= 2 ? 0x0210 : 0x0);
         if (rc)
             return rc;
 
@@ -193,29 +198,29 @@ static int otp_set_soak(struct ahb *ahb, int soak)
 
         return otp_writel(ahb, OTP_TIMING, OTP_TIMING_DFLT);
     case 1:
-        rc = otp_write_reg(ahb, 0x3000, 0x4021);
+        rc = otp_write_reg(ahb, 0x3000, _chiprev >= 2 ? 0x1200 : 0x4021);
         if (rc)
             return rc;
 
-        rc = otp_write_reg(ahb, 0x5000, 0x302f);
+        rc = otp_write_reg(ahb, 0x5000, _chiprev >= 2 ? 0x100f : 0x302f);
         if (rc)
             return rc;
 
-        rc = otp_write_reg(ahb, 0x1000, 0x4020);
+        rc = otp_write_reg(ahb, 0x1000, _chiprev >= 2 ? 0x1024 : 0x4020);
         if (rc)
             return rc;
 
         return otp_writel(ahb, OTP_TIMING, OTP_TIMING_DFLT);
     case 2:
-        rc = otp_write_reg(ahb, 0x3000, 0x4021);
+        rc = otp_write_reg(ahb, 0x3000, _chiprev >= 2 ? 0x1220 : 0x4021);
         if (rc)
             return rc;
 
-        rc = otp_write_reg(ahb, 0x5000, 0x1027);
+        rc = otp_write_reg(ahb, 0x5000, _chiprev >= 2 ? 0x2004 : 0x1027);
         if (rc)
             return rc;
 
-        rc = otp_write_reg(ahb, 0x1000, 0x4820);
+        rc = otp_write_reg(ahb, 0x1000, _chiprev >= 2 ? 0x08a4 : 0x4820);
         if (rc)
             return rc;
 
@@ -223,6 +228,83 @@ static int otp_set_soak(struct ahb *ahb, int soak)
     default:
         return -EINVAL;
     }
+}
+
+static int otp_confirm()
+{
+    int rc;
+    char inp[8];
+
+    printf("Is this acceptable? If so, type YES: ");
+    rc = scanf("%7s", inp);
+    if (rc == EOF) {
+        loge("Invalid input\n");
+        return -errno;
+    }
+
+    if (strcmp(inp, "YES")) {
+        loge("Strap write unconfirmed\n");
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int otp_write(struct ahb *ahb, uint32_t address, uint32_t bitmask)
+{
+    int rc;
+    int tries = 0;
+    uint32_t prog;
+    uint32_t readback;
+
+    if (_chiprev < 0) {
+        uint32_t revision;
+
+        rc = ahb_readl(ahb, 0x1e6e2014, &revision);
+        if (!rc) {
+            if (((revision >> 24) & 0xf) != 5)
+                loge("Unknown AST2XXX chip %08x\n", revision);
+            else
+                _chiprev = (revision >> 16) & 0xf;
+        }
+    }
+
+    rc = otp_set_soak(ahb, 1);
+    if (rc)
+        return rc;
+
+    prog = ~bitmask;
+    rc = otp_program(ahb, address, prog);
+    if (rc)
+        goto undo_soak;
+
+    do {
+        rc = otp_read_reg(ahb, address, &readback);
+        if (rc)
+            goto undo_soak;
+
+        if (readback & bitmask)
+            break;
+
+        rc = otp_set_soak(ahb, (tries % 2) ? 1 : 2);
+        if (rc)
+            goto undo_soak;
+
+        rc = otp_program(ahb, address, prog);
+        if (rc)
+            goto undo_soak;
+    } while (tries++ < NUM_PROG_TRIES);
+
+    if (tries == NUM_PROG_TRIES) {
+        loge("Failed to program OTP\n");
+        rc = -EREMOTEIO;
+    } else
+        logi("Success!\n");
+
+undo_soak:
+    otp_set_soak(ahb, 0);
+
+    return rc;
 }
 
 int otp_read(struct ahb *ahb, enum otp_region reg)
@@ -281,16 +363,16 @@ int otp_read(struct ahb *ahb, enum otp_region reg)
         logi("Result:      %08x %08x\n", res[0], res[1]);
     } else {
         unsigned char i;
-        uint32_t conf[12];
+        uint32_t conf[NUM_OTP_CONF];
 
-        for (i = 0; i < 12; ++i) {
+        for (i = 0; i < NUM_OTP_CONF; ++i) {
             rc = otp_read_config(ahb, i, &conf[i]);
             if (rc)
                 goto done;
         }
 
         logi("OTP configuration:\n");
-        for (i = 0; i < 12; ++i)
+        for (i = 0; i < NUM_OTP_CONF; ++i)
             logi("%02u: %08x\n", i, conf[i]);
     }
 
@@ -299,10 +381,46 @@ done:
     return rc;
 }
 
-int otp_write_conf(struct ahb *ahb, unsigned int word, unsigned int bit,
-                   unsigned int val)
+int otp_write_conf(struct ahb *ahb, unsigned int word, unsigned int bit)
 {
-    return -EOPNOTSUPP;
+    int rc;
+    uint32_t conf;
+    uint32_t address;
+    uint32_t bitmask;
+
+    if (word >= NUM_OTP_CONF || bit >= 32)
+        return -EINVAL;
+
+    bitmask = 1 << bit;
+
+    rc = otp_writel(ahb, OTP_PROTECT_KEY, OTP_PASSWD);
+    if (rc)
+        return rc;
+
+    rc = otp_read_config(ahb, word, &conf);
+    if (rc)
+        goto done;
+
+    if (conf & bitmask) {
+        loge("Configuration bit already set\n");
+        rc = -EALREADY;
+        goto done;
+    }
+
+    address = 0x800;
+    address |= (word / 8) * 0x200;
+    address |= (word % 8) * 2;
+
+    logi("Writing configuration at OTP %04x with %08x\n", address, bitmask);
+    rc = otp_confirm();
+    if (rc)
+        goto done;
+
+    rc = otp_write(ahb, address, bitmask);
+
+done:
+    otp_writel(ahb, OTP_PROTECT_KEY, 0);
+    return rc;
 }
 
 int otp_write_strap(struct ahb *ahb, unsigned int bit, unsigned int val)
@@ -310,16 +428,15 @@ int otp_write_strap(struct ahb *ahb, unsigned int bit, unsigned int val)
     int i;
     int rc;
     int f = -1;
-    int trs = 0;
-    char inp[8];
-    uint32_t prog;
     uint32_t address;
     uint32_t bitmask;
     uint32_t protect;
     uint32_t res = 0;
     uint32_t word = 0;
     uint32_t strap[6];
-    uint32_t readback = 0;
+
+    if (bit >= 64 || val > 1)
+        return -EINVAL;
 
     rc = otp_writel(ahb, OTP_PROTECT_KEY, OTP_PASSWD);
     if (rc)
@@ -372,56 +489,11 @@ int otp_write_strap(struct ahb *ahb, unsigned int bit, unsigned int val)
     address |= (i % 8) * 2;
 
     logi("Writing strap at OTP %04x with %08x\n", address, bitmask);
-
-    printf("Is this acceptable? If so, type YES: ");
-    rc = scanf("%7s", inp);
-    if (rc == EOF) {
-        loge("Invalid input\n");
-        rc = -errno;
-        goto done;
-    }
-    if (strcmp(inp, "YES")) {
-        loge("Strap write unconfirmed\n");
-        rc = -EINVAL;
-        goto done;
-    }
-
-    rc = otp_set_soak(ahb, 1);
+    rc = otp_confirm();
     if (rc)
         goto done;
 
-    prog = ~bitmask;
-    rc = otp_program(ahb, address, prog);
-    if (rc)
-        goto undo_soak;
-
-    do {
-        rc = otp_read_reg(ahb, address, &readback);
-        if (rc)
-            goto undo_soak;
-
-        if (readback & bitmask)
-            break;
-
-        if (!trs) {
-            rc = otp_set_soak(ahb, 2);
-            if (rc)
-                goto undo_soak;
-        }
-
-        rc = otp_program(ahb, address, prog);
-        if (rc)
-            goto undo_soak;
-    } while (trs++ < 3);
-
-    if (trs == 3) {
-        loge("Failed to program strap bit\n");
-        rc = -EREMOTEIO;
-    } else
-        logi("Success!\n");
-
-undo_soak:
-    otp_set_soak(ahb, 0);
+    rc = otp_write(ahb, address, bitmask);
 
 done:
     otp_writel(ahb, OTP_PROTECT_KEY, 0);
