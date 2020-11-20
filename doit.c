@@ -1366,15 +1366,11 @@ int cmd_otp(const char *name, int argc, char *argv[])
 {
     enum otp_region reg = otp_region_conf;
     struct ahb _ahb, *ahb = &_ahb;
+    struct otp _otp, *otp = &_otp;
     bool rd = true;
     int argo = 2;
     int cleanup;
     int rc;
-
-// ./doit otp read conf INTERFACE [IP PORT USERNAME PASSWORD]
-// ./doit otp read strap INTERFACE [IP PORT USERNAME PASSWORD]
-// ./doit otp write strap <bit> <value> INTERFACE [IP PORT USERNAME PASSWORD]
-// ./doit otp write conf <word> <bit> <value> INTERFACE [IP PORT USERNAME PASSWORD]
 
     if (argc < 2) {
         loge("Not enough arguments for otp command\n");
@@ -1421,8 +1417,16 @@ int cmd_otp(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    rc = otp_init(otp, ahb);
+    if (rc < 0) {
+        errno = -rc;
+        perror("otp_init");
+        cleanup = ahb_destroy(ahb);
+        exit(EXIT_FAILURE);
+    }
+
     if (rd)
-        rc = otp_read(ahb, reg);
+        rc = otp_read(otp, reg);
     else {
         if (reg == otp_region_strap) {
             unsigned int bit;
@@ -1431,7 +1435,7 @@ int cmd_otp(const char *name, int argc, char *argv[])
             bit = strtoul(argv[2], NULL, 0);
             val = strtoul(argv[3], NULL, 0);
 
-            rc = otp_write_strap(ahb, bit, val);
+            rc = otp_write_strap(otp, bit, val);
         } else {
             unsigned int word;
             unsigned int bit;
@@ -1439,7 +1443,7 @@ int cmd_otp(const char *name, int argc, char *argv[])
             word = strtoul(argv[2], NULL, 0);
             bit = strtoul(argv[3], NULL, 0);
 
-            rc = otp_write_conf(ahb, word, bit);
+            rc = otp_write_conf(otp, word, bit);
         }
     }
 
