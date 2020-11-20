@@ -11,9 +11,15 @@ enum otp_region {
     otp_region_conf,
 };
 
-int otp_read(struct ahb *ahb, enum otp_region reg);
-int otp_write_conf(struct ahb *ahb, unsigned int word, unsigned int bit,
-                   unsigned int val);
-int otp_write_strap(struct ahb *ahb, unsigned int bit, unsigned int val);
+struct otp {
+    struct ahb *ahb;
+    uint32_t soak_parameters[3][3];
+};
+
+int otp_init(struct otp *otp, struct ahb *ahb);
+
+int otp_read(struct otp *otp, enum otp_region reg);
+int otp_write_conf(struct otp *otp, unsigned int word, unsigned int bit);
+int otp_write_strap(struct otp *otp, unsigned int bit, unsigned int val);
 
 #endif

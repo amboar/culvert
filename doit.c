@@ -71,7 +71,7 @@ static void help(const char *name)
     printf("%s otp read conf [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s otp write conf WORD BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
 }
 
 static int ahb_from_args(struct ahb *ahb, int argc, char *argv[])
@@ -1366,15 +1366,11 @@ int cmd_otp(const char *name, int argc, char *argv[])
 {
     enum otp_region reg = otp_region_conf;
     struct ahb _ahb, *ahb = &_ahb;
+    struct otp _otp, *otp = &_otp;
     bool rd = true;
     int argo = 2;
     int cleanup;
     int rc;
-
-// ./doit otp read conf INTERFACE [IP PORT USERNAME PASSWORD]
-// ./doit otp read strap INTERFACE [IP PORT USERNAME PASSWORD]
-// ./doit otp write strap <bit> <value> INTERFACE [IP PORT USERNAME PASSWORD]
-// ./doit otp write conf <word> <bit> <value> INTERFACE [IP PORT USERNAME PASSWORD]
 
     if (argc < 2) {
         loge("Not enough arguments for otp command\n");
@@ -1394,10 +1390,7 @@ int cmd_otp(const char *name, int argc, char *argv[])
 
     if (!strcmp("write", argv[0])) {
         rd = false;
-        if (reg == otp_region_strap)
-            argo += 2;
-        else
-            argo += 3;
+        argo += 2;
     } else if (strcmp("read", argv[0])) {
         loge("Unsupported command: %s\n", argv[0]);
         help(name);
@@ -1424,8 +1417,16 @@ int cmd_otp(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    rc = otp_init(otp, ahb);
+    if (rc < 0) {
+        errno = -rc;
+        perror("otp_init");
+        cleanup = ahb_destroy(ahb);
+        exit(EXIT_FAILURE);
+    }
+
     if (rd)
-        rc = otp_read(ahb, reg);
+        rc = otp_read(otp, reg);
     else {
         if (reg == otp_region_strap) {
             unsigned int bit;
@@ -1434,17 +1435,15 @@ int cmd_otp(const char *name, int argc, char *argv[])
             bit = strtoul(argv[2], NULL, 0);
             val = strtoul(argv[3], NULL, 0);
 
-            rc = otp_write_strap(ahb, bit, val);
+            rc = otp_write_strap(otp, bit, val);
         } else {
             unsigned int word;
             unsigned int bit;
-            unsigned int val;
 
             word = strtoul(argv[2], NULL, 0);
             bit = strtoul(argv[3], NULL, 0);
-            val = strtoul(argv[4], NULL, 0);
 
-            rc = otp_write_conf(ahb, word, bit, val);
+            rc = otp_write_conf(otp, word, bit);
         }
     }
 

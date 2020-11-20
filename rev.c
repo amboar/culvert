@@ -23,6 +23,7 @@ static const struct bmc_silicon_rev bmc_silicon_revs[] = {
     { 0x04030303, "AST2500 A2" },
     { 0x05000303, "AST2600 A0" },
     { 0x05010303, "AST2600 A1" },
+    { 0x05020303, "AST2600 A2" },
 };
 
 int64_t rev_probe(struct ahb *ahb)
@@ -98,12 +99,25 @@ int64_t rev_probe(struct ahb *ahb)
     if (rc < 0) { return rc; }
     logt("0x%08" PRIx32 ": 0x%08" PRIx32 "\n", AST_SCU | 0x07c, probe[1]);
 
-#undef AST_SCU
-
     is_g6 = !(((probe[0] >> 28) & 0xf) && ((probe[1] >> 24) & 0xff));
 
     /* Based on the above observations, extract the true silicon revision ID */
-    rev = is_g6 ? probe[0] : probe[1];
+    if (is_g6) {
+        /*
+         * AST2600 A2+ doesn't reflect the stepping in SCU004... that's only
+         * indicated in SCU014. But we can't just use 014 across the board
+         * because it can't be used to distinguish older chips
+         * (AST2400/AST2500) as easily as SCU004. So use it once we know it's
+         * the AST2600.
+         */
+        rc = ahb_readl(ahb, AST_SCU | 0x014, &rev);
+        if (rc < 0) { return rc; }
+        logt("0x%08" PRIx32 ": 0x%08" PRIx32 "\n", AST_SCU | 0x014, rev);
+    } else {
+        rev = probe[1];
+    }
+
+#undef AST_SCU
 
     logd("Found revision 0x%x\n", rev);
 
@@ -152,4 +166,9 @@ bool rev_is_generation(uint32_t rev, enum ast_generation gen)
     assert(gen < ARRAY_SIZE(bmc_silicon_gens));
 
     return rev >> 24 == bmc_silicon_gens[gen];
+}
+
+int rev_stepping(uint32_t rev)
+{
+    return (rev >> 16) & 0xf;
 }

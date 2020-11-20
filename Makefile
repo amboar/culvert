@@ -11,7 +11,8 @@ else
 VERSION ?= Unknown
 endif
 
-HOST := $(shell $(CROSS_COMPILE)$(CC) -dumpmachine | cut -d- -f1)
+CC ?= $(CROSS_COMPILE)gcc
+HOST := $(shell $(CC) -dumpmachine | cut -d- -f1)
 
 CFLAGS = -O2 -flto -Werror -Wall -std=gnu99 -DVERSION='"$(VERSION)"'
 CFLAGS += -DNDEBUG -I.
@@ -19,7 +20,6 @@ ifneq (,$(wildcard arch/$(HOST)))
 CFLAGS += -Iarch/$(HOST)
 endif
 LDFLAGS = -flto
-CC = gcc
 
 SRCS += uart/suart.c uart/mux.c uart/vuart.c
 SRCS += prompt.c ast.c ahb.c p2a.c shell.c pci.c l2a.c sio.c ilpc.c doit.c
@@ -58,9 +58,9 @@ clean:
 	$(RM) doit $(OBJS) $(DEPS)
 
 %.o : %.c
-	$(CROSS_COMPILE)$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c $< -o $@
 
 % : %.o
-	$(CROSS_COMPILE)$(CC) -o $@ $(LDFLAGS) $^ $(LOADLIBES)
+	$(CC) -o $@ $(LDFLAGS) $^ $(LOADLIBES)
 
 -include $(DEPS)
