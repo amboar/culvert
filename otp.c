@@ -22,8 +22,6 @@
 #define OTP_PROTECT_KEY OTP_BASE
 #define OTP_COMMAND     (OTP_BASE + 0x4)
 #define OTP_TIMING      (OTP_BASE + 0x8)
-#define  OTP_TIMING_DFLT 0x04190760
-#define  OTP_TIMING_SOAK 0x041930d4
 #define OTP_ADDR        (OTP_BASE + 0x10)
 #define OTP_STATUS      (OTP_BASE + 0x14)
 #define  OTP_STATUS_IDLE 0x6
@@ -33,7 +31,7 @@
 #define OTP_COMPARE_4   (OTP_BASE + 0x2c)
 
 #define NUM_OTP_CONF    16
-#define NUM_PROG_TRIES  5
+#define NUM_PROG_TRIES  16
 
 struct otpstrap_status {
     uint8_t value;
@@ -180,19 +178,9 @@ static int otp_write_reg(struct ahb *ahb, uint32_t addr, uint32_t val)
 static int otp_set_soak(struct otp *otp, unsigned int soak)
 {
     int rc;
-    uint32_t timing = 0;
 
-    switch (soak) {
-    case 0:
-    case 1:
-        timing = OTP_TIMING_DFLT;
-        break;
-    case 2:
-        timing = OTP_TIMING_SOAK;
-        break;
-    default:
+    if (soak > 2)
         return -EINVAL;
-    }
 
     rc = otp_write_reg(otp->ahb, 0x3000, otp->soak_parameters[soak][0]);
     if (rc)
@@ -206,7 +194,7 @@ static int otp_set_soak(struct otp *otp, unsigned int soak)
     if (rc)
         return rc;
 
-    return otp_writel(otp->ahb, OTP_TIMING, timing);
+    return otp_writel(otp->ahb, OTP_TIMING, otp->timings[soak]);
 }
 
 static int otp_confirm()
@@ -288,18 +276,30 @@ int otp_init(struct otp *otp, struct ahb *ahb)
         return -EOPNOTSUPP;
 
     if (rev_stepping((uint32_t)rev) >= 2) {
+        logi("Detected AST2600 A2\n");
+
+        otp->timings[0] = 0x04190760;
+        otp->timings[1] = 0x04191388;
+        otp->timings[2] = 0x04193a98;
+
         otp->soak_parameters[0][0] = 0x0210;
-        otp->soak_parameters[0][1] = 0x0;
+        otp->soak_parameters[0][1] = 0x2000;
         otp->soak_parameters[0][2] = 0x0;
 
         otp->soak_parameters[1][0] = 0x1200;
-        otp->soak_parameters[1][1] = 0x100f;
+        otp->soak_parameters[1][1] = 0x107f;
         otp->soak_parameters[1][2] = 0x1024;
 
         otp->soak_parameters[2][0] = 0x1220;
-        otp->soak_parameters[2][1] = 0x2004;
+        otp->soak_parameters[2][1] = 0x2074;
         otp->soak_parameters[2][2] = 0x08a4;
     } else {
+        logi("Detected AST2600 A0/A1\n");
+
+        otp->timings[0] = 0x04190760;
+        otp->timings[1] = 0x04190760;
+        otp->timings[2] = 0x041930d4;
+
         otp->soak_parameters[0][0] = 0x0;
         otp->soak_parameters[0][1] = 0x0;
         otp->soak_parameters[0][2] = 0x0;
