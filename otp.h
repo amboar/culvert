@@ -13,6 +13,7 @@ enum otp_region {
 
 struct otp {
     struct ahb *ahb;
+    uint32_t timings[3];
     uint32_t soak_parameters[3][3];
 };
 
