@@ -26,7 +26,7 @@ SRCS += prompt.c ast.c ahb.c p2a.c shell.c pci.c l2a.c sio.c ilpc.c
 SRCS += clk.c wdt.c sfc.c flash.c mmio.c devmem.c log.c priv.c debug.c rev.c
 SRCS += ts16.c tty.c otp.c
 SRCS += cmd/ilpc.c cmd/p2a.c cmd/debug.c cmd/devmem.c cmd/console.c
-SRCS += cmd/read.c cmd/write.c cmd/replace.c
+SRCS += cmd/read.c cmd/write.c cmd/replace.c cmd/probe.c
 SRCS += doit.c
 
 ifneq (,$(wildcard arch/$(HOST)/lpc.c))
