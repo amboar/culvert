@@ -74,78 +74,6 @@ static void help(const char *name)
     printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
 }
 
-static int ahb_from_args(struct ahb *ahb, int argc, char *argv[])
-{
-    /* Local interfaces */
-    if (argc == 0) {
-        logi("Probing local interfaces\n");
-        return ast_ahb_init(ahb, true);
-    }
-
-    /* Local debug interface */
-    if (argc == 1)
-        return ahb_init(ahb, ahb_debug, argv[0]);
-
-    /* Remote debug interface */
-    assert(argc == 5);
-    return ahb_init(ahb, ahb_debug, argv[0], argv[1], strtoul(argv[2], NULL, 0),
-                    argv[3], argv[4]);
-}
-
-static int access_ahb(const char *name, int argc, char *argv[],
-                      struct ahb *ahb)
-{
-    uint32_t address, data;
-    bool action_read;
-    int rc;
-
-    if (argc < 2) {
-        loge("Not enough arguments for ilpc command\n");
-        help(name);
-        exit(EXIT_FAILURE);
-    }
-
-    if (!strcmp("read", argv[0]))
-        action_read = true;
-    else if (!strcmp("write", argv[0]))
-        action_read = false;
-    else {
-        loge("Unknown action: %s\n", argv[0]);
-        help(name);
-        exit(EXIT_FAILURE);
-    }
-
-    address = strtoul(argv[1], NULL, 0);
-
-    if (!action_read) {
-        if (argc < 3) {
-            loge("Not enough arguments for ilpc write command\n");
-            help(name);
-            exit(EXIT_FAILURE);
-        }
-        data = strtoul(argv[2], NULL, 0);
-    }
-
-    if (action_read) {
-        rc = ahb_readl(ahb, address, &data);
-        if (rc) {
-            errno = -rc;
-            perror("ahb_readl");
-            exit(EXIT_FAILURE);
-        }
-        printf("0x%08x: 0x%08x\n", address, le32toh(data));
-    } else {
-        rc = ahb_writel(ahb, address, htole32(data));
-        if (rc) {
-            errno = -rc;
-            perror("ahb_writel");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    return 0;
-}
-
 static int cmd_ilpc(const char *name, int argc, char *argv[])
 {
     struct ilpcb _ilpcb, *ilpcb = &_ilpcb;
@@ -166,10 +94,10 @@ static int cmd_ilpc(const char *name, int argc, char *argv[])
     }
 
     ahb_use(ahb, ahb_ilpcb, ilpcb);
-    rc = access_ahb(name, argc, argv, ahb);
+    rc = ast_ahb_access(name, argc, argv, ahb);
     if (rc) {
         errno = -rc;
-        perror("access_ahb");
+        perror("ast_ahb_access");
         exit(EXIT_FAILURE);
     }
 
@@ -211,10 +139,10 @@ static int cmd_p2a(const char *name, int argc, char *argv[])
     }
 
     ahb_use(ahb, ahb_p2ab, p2ab);
-    rc = access_ahb(name, argc - 1, argv + 1, ahb);
+    rc = ast_ahb_access(name, argc - 1, argv + 1, ahb);
     if (rc) {
         errno = -rc;
-        perror("access_ahb");
+        perror("ast_ahb_access");
         exit(EXIT_FAILURE);
     }
 
@@ -280,10 +208,10 @@ static int cmd_debug(const char *name, int argc, char *argv[])
     if (rc < 0) { errno = -rc; perror("debug_enter"); goto cleanup_debug; }
 
     ahb_use(ahb, ahb_debug, debug);
-    rc = access_ahb(name, argc, argv, ahb);
+    rc = ast_ahb_access(name, argc, argv, ahb);
     if (rc) {
         errno = -rc;
-        perror("access_ahb");
+        perror("ast_ahb_access");
         exit(EXIT_FAILURE);
     }
 
@@ -318,10 +246,10 @@ static int cmd_devmem(const char *name, int argc, char *argv[])
     }
 
     ahb_use(ahb, ahb_devmem, devmem);
-    rc = access_ahb(name, argc, argv, ahb);
+    rc = ast_ahb_access(name, argc, argv, ahb);
     if (rc) {
         errno = -rc;
-        perror("access_ahb");
+        perror("ast_ahb_access");
         exit(EXIT_FAILURE);
     }
 
@@ -567,8 +495,8 @@ static int cmd_read(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    rc = ahb_from_args(ahb, argc - 1, argv + 1);
-    printf("ahb_from_args: 0x%x\n", rc);
+    rc = ast_ahb_from_args(ahb, argc - 1, argv + 1);
+    printf("ast_ahb_from_args: 0x%x\n", rc);
     if (rc < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
@@ -577,7 +505,7 @@ static int cmd_read(const char *name, int argc, char *argv[])
             loge("Probes failed, cannot access BMC AHB\n");
         } else {
             errno = -rc;
-            perror("ahb_init");
+            perror("ast_ahb_from_args");
         }
         exit(EXIT_FAILURE);
     }
@@ -646,7 +574,7 @@ static int cmd_write(const char *name, int argc, char *argv[])
         }
     }
 
-    rc = ahb_from_args(ahb, argc - optind, &argv[optind]);
+    rc = ast_ahb_from_args(ahb, argc - optind, &argv[optind]);
     if (rc < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
@@ -655,7 +583,7 @@ static int cmd_write(const char *name, int argc, char *argv[])
             loge("Probes failed, cannot access BMC AHB\n");
         } else {
             errno = -rc;
-            perror("ahb_init");
+            perror("ast_ahb_from_args");
         }
         exit(EXIT_FAILURE);
     }
@@ -1203,7 +1131,7 @@ static int cmd_reset(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    rc = ahb_from_args(ahb, argc - 1, argv + 1);
+    rc = ast_ahb_from_args(ahb, argc - 1, argv + 1);
     if (rc < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
@@ -1212,7 +1140,7 @@ static int cmd_reset(const char *name, int argc, char *argv[])
             loge("Probes failed, cannot access BMC AHB\n");
         } else {
             errno = -rc;
-            perror("ahb_init");
+            perror("ast_ahb_from_args");
         }
         exit(EXIT_FAILURE);
     }
@@ -1286,7 +1214,7 @@ static int cmd_sfc(const char *name, int argc, char *argv[])
     offset = strtoul(argv[2], NULL, 0);
     len = strtoul(argv[3], NULL, 0);
 
-    rc = ahb_from_args(ahb, argc - 4, argv + 4);
+    rc = ast_ahb_from_args(ahb, argc - 4, argv + 4);
     if (rc < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
@@ -1295,7 +1223,7 @@ static int cmd_sfc(const char *name, int argc, char *argv[])
             loge("Probes failed, cannot access BMC AHB\n");
         } else {
             errno = -rc;
-            perror("ahb_init");
+            perror("ast_ahb_from_args");
         }
         exit(EXIT_FAILURE);
     }
@@ -1403,7 +1331,7 @@ int cmd_otp(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    rc = ahb_from_args(ahb, argc - argo, &argv[argo]);
+    rc = ast_ahb_from_args(ahb, argc - argo, &argv[argo]);
     if (rc < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
@@ -1412,7 +1340,7 @@ int cmd_otp(const char *name, int argc, char *argv[])
             loge("Probes failed, cannot access BMC AHB\n");
         } else {
             errno = -rc;
-            perror("ahb_init");
+            perror("ast_ahb_from_args");
         }
         exit(EXIT_FAILURE);
     }

@@ -532,3 +532,71 @@ cleanup:
 
     return rc;
 }
+
+int ast_ahb_from_args(struct ahb *ahb, int argc, char *argv[])
+{
+    /* Local interfaces */
+    if (argc == 0) {
+        logi("Probing local interfaces\n");
+        return ast_ahb_init(ahb, true);
+    }
+
+    /* Local debug interface */
+    if (argc == 1)
+        return ahb_init(ahb, ahb_debug, argv[0]);
+
+    /* Remote debug interface */
+    assert(argc == 5);
+    return ahb_init(ahb, ahb_debug, argv[0], argv[1], strtoul(argv[2], NULL, 0),
+                    argv[3], argv[4]);
+}
+
+int ast_ahb_access(const char *name, int argc, char *argv[], struct ahb *ahb)
+{
+    uint32_t address, data;
+    bool action_read;
+    int rc;
+
+    if (argc < 2) {
+        loge("Not enough arguments for ilpc command\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!strcmp("read", argv[0]))
+        action_read = true;
+    else if (!strcmp("write", argv[0]))
+        action_read = false;
+    else {
+        loge("Unknown action: %s\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    address = strtoul(argv[1], NULL, 0);
+
+    if (!action_read) {
+        if (argc < 3) {
+            loge("Not enough arguments for ilpc write command\n");
+            exit(EXIT_FAILURE);
+        }
+        data = strtoul(argv[2], NULL, 0);
+    }
+
+    if (action_read) {
+        rc = ahb_readl(ahb, address, &data);
+        if (rc) {
+            errno = -rc;
+            perror("ahb_readl");
+            exit(EXIT_FAILURE);
+        }
+        printf("0x%08x: 0x%08x\n", address, le32toh(data));
+    } else {
+        rc = ahb_writel(ahb, address, htole32(data));
+        if (rc) {
+            errno = -rc;
+            perror("ahb_writel");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    return 0;
+}
