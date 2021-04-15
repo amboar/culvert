@@ -1,44 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (C) 2018,2019 IBM Corp.
+// Copyright (C) 2018,2021 IBM Corp.
 
-#define _GNU_SOURCE
-#include <arpa/inet.h>
-#include <assert.h>
-#include <errno.h>
 #include <getopt.h>
-#include <inttypes.h>
-#include <stdarg.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#include "ahb.h"
-#include "ast.h"
-#include "clk.h"
-#include "debug.h"
-#include "devmem.h"
-#include "flash.h"
-#include "ilpc.h"
-#include "l2a.h"
 #include "log.h"
-#include "lpc.h"
-#include "otp.h"
-#include "p2a.h"
-#include "mb.h"
-#include "priv.h"
-#include "prompt.h"
-#include "sfc.h"
-#include "sio.h"
-#include "uart/suart.h"
-#include "uart/mux.h"
-#include "uart/vuart.h"
-#include "wdt.h"
 
 int cmd_ilpc(const char *name, int argc, char *argv[]);
 int cmd_p2a(const char *name, int argc, char *argv[]);
