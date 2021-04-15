@@ -90,6 +90,10 @@ enum ast_generation { ast_g4, ast_g5, ast_g6 };
 #define AST_G5_HOST_FLASH		0x30000000
 #define AST_G5_DRAM       		0x80000000
 
+/* AST2600 Memory Space Allocations */
+#define AST_G6_SRAM                     0x10000000
+#define AST_G6_AHBC                     0x1e600000
+
 extern const uint32_t bmc_dram_sizes[4];
 extern const uint32_t bmc_vram_sizes[4];
 

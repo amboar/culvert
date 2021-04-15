@@ -21,6 +21,7 @@ int cmd_probe(const char *name, int argc, char *argv[]);
 int cmd_reset(const char *name, int argc, char *argv[]);
 int cmd_sfc(const char *name, int argc, char *argv[]);
 int cmd_otp(const char *name, int argc, char *argv[]);
+int cmd_trace(const char *name, int argc, char *argv[]);
 
 static void help(const char *name)
 {
@@ -49,6 +50,7 @@ static void help(const char *name)
     printf("%s otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s trace ADDRESS WIDTH:OFFSET MODE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
 }
 
 struct command {
@@ -69,6 +71,7 @@ static const struct command cmds[] = {
     { "devmem", cmd_devmem },
     { "sfc", cmd_sfc },
     { "otp", cmd_otp },
+    { "trace", cmd_trace },
     { },
 };
 
