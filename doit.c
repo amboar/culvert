@@ -46,6 +46,7 @@
 #define SFC_FLASH_WIN (64 << 10)
 
 int cmd_ilpc(const char *name, int argc, char *argv[]);
+int cmd_p2a(const char *name, int argc, char *argv[]);
 
 static void help(const char *name)
 {
@@ -74,51 +75,6 @@ static void help(const char *name)
     printf("%s otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-}
-
-static int cmd_p2a(const char *name, int argc, char *argv[])
-{
-    struct p2ab _p2ab, *p2ab = &_p2ab;
-    struct ahb _ahb, *ahb = &_ahb;
-    int cleanup;
-    int rc;
-
-    if (!strcmp("vga", argv[0]))
-        rc = p2ab_init(p2ab, AST_PCI_VID, AST_PCI_DID_VGA);
-    else if (!strcmp("bmc", argv[0]))
-        rc = p2ab_init(p2ab, AST_PCI_VID, AST_PCI_DID_BMC);
-    else {
-        loge("Unknown PCIe device: %s\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else {
-            errno = -rc;
-            perror("p2ab_init");
-        }
-        exit(EXIT_FAILURE);
-    }
-
-    ahb_use(ahb, ahb_p2ab, p2ab);
-    rc = ast_ahb_access(name, argc - 1, argv + 1, ahb);
-    if (rc) {
-        errno = -rc;
-        perror("ast_ahb_access");
-        exit(EXIT_FAILURE);
-    }
-
-    cleanup = p2ab_destroy(p2ab);
-    if (cleanup) {
-        errno = -cleanup;
-        perror("p2ab_destroy");
-        exit(EXIT_FAILURE);
-    }
-
-    return 0;
 }
 
 static int cmd_debug(const char *name, int argc, char *argv[])
