@@ -48,6 +48,7 @@
 int cmd_ilpc(const char *name, int argc, char *argv[]);
 int cmd_p2a(const char *name, int argc, char *argv[]);
 int cmd_debug(const char *name, int argc, char *argv[]);
+int cmd_devmem(const char *name, int argc, char *argv[]);
 
 static void help(const char *name)
 {
@@ -76,43 +77,6 @@ static void help(const char *name)
     printf("%s otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-}
-
-static int cmd_devmem(const char *name, int argc, char *argv[])
-{
-    struct devmem _devmem, *devmem = &_devmem;
-    struct ahb _ahb, *ahb = &_ahb;
-    int cleanup;
-    int rc;
-
-    rc = devmem_init(devmem);
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else {
-            errno = -rc;
-            perror("devmem_init");
-        }
-        exit(EXIT_FAILURE);
-    }
-
-    ahb_use(ahb, ahb_devmem, devmem);
-    rc = ast_ahb_access(name, argc, argv, ahb);
-    if (rc) {
-        errno = -rc;
-        perror("ast_ahb_access");
-        exit(EXIT_FAILURE);
-    }
-
-    cleanup = devmem_destroy(devmem);
-    if (cleanup) {
-        errno = -cleanup;
-        perror("devmem_destroy");
-        exit(EXIT_FAILURE);
-    }
-
-    return 0;
 }
 
 static int cmd_console(const char *name, int argc, char *argv[])
