@@ -52,6 +52,7 @@ int cmd_read(const char *name, int argc, char *argv[]);
 int cmd_write(const char *name, int argc, char *argv[]);
 int cmd_replace(const char *name, int argc, char *argv[]);
 int cmd_probe(const char *name, int argc, char *argv[]);
+int cmd_reset(const char *name, int argc, char *argv[]);
 
 static void help(const char *name)
 {
@@ -80,69 +81,6 @@ static void help(const char *name)
     printf("%s otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-}
-
-static int cmd_reset(const char *name, int argc, char *argv[])
-{
-    struct ahb _ahb, *ahb = &_ahb;
-    int64_t wait = 0;
-    int cleanup;
-    int rc;
-
-    if (argc < 1) {
-        loge("Not enough arguments for reset command\n");
-        help(name);
-        exit(EXIT_FAILURE);
-    }
-
-    if (strcmp("soc", argv[0])) {
-        loge("Unsupported reset type: '%s'\n", argv[0]);
-        help(name);
-        exit(EXIT_FAILURE);
-    }
-
-    rc = ast_ahb_from_args(ahb, argc - 1, argv + 1);
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_from_args");
-        }
-        exit(EXIT_FAILURE);
-    }
-
-    if (ahb->bridge != ahb_devmem) {
-        logi("Gating ARM clock\n");
-        rc = clk_disable(ahb, clk_arm);
-        if (rc < 0)
-            goto cleanup_ahb;
-    }
-
-    logi("Preventing system reset\n");
-    rc = wdt_prevent_reset(ahb);
-    if (rc < 0)
-        goto cleanup_clk;
-
-    logi("Performing SoC reset\n");
-    wait = wdt_perform_reset(ahb);
-    if (wait < 0) {
-cleanup_clk:
-        logi("Ungating ARM clock\n");
-        rc = clk_enable(ahb, clk_arm);
-    }
-
-cleanup_ahb:
-    cleanup = ahb_cleanup(ahb);
-    if (cleanup < 0) { errno = -cleanup; perror("ahb_destroy"); }
-
-    if (wait)
-        usleep(wait);
-
-    return rc;
 }
 
 enum flash_op { flash_op_read, flash_op_write, flash_op_erase };
