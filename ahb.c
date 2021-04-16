@@ -222,6 +222,9 @@ ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd)
     void *chunk, *cursor;
     int rc = 0;
 
+    if (!len)
+        return 0;
+
     chunk = malloc(AHB_CHUNK);
     if (!chunk)
         return -errno;
