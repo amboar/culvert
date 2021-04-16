@@ -95,7 +95,7 @@ int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...)
         }
     } else if (type == ahb_devmem) {
         ctx->devmem = malloc(sizeof(*ctx->devmem));
-        logi("Initialising devmem interface");
+        logi("Initialising devmem interface\n");
         rc = devmem_init(ctx->devmem);
         if (rc < 0) {
             loge("devmem_init failed: %d\n", rc);
