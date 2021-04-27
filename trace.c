@@ -132,7 +132,7 @@ int trace_start(struct ahb *ahb, uint32_t addr, int width, int offset,
         return rc;
 
     for (int i = 0; i < (TRACE_BUF_SIZE / 4); i++) {
-        ahb_writel(ahb, addr, 0);
+        ahb_writel(ahb, 4 * i + TRACE_BUF_BASE, 0);
     }
 
     buf = TRACE_BUF_BASE | AHBC_BCR_BUF_WRAP;
