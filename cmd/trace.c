@@ -1,0 +1,117 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2018,2021 IBM Corp.
+#include <errno.h>
+#include <inttypes.h>
+#include <signal.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "ahb.h"
+#include "log.h"
+#include "priv.h"
+#include "rev.h"
+#include "trace.h"
+
+//doit trace ADDRESS WIDTH:OFFSET MODE
+//doit trace 0x1e788000 1:0 read
+//doit trace 0x1e788000 2:2 read
+//doit trace 0x1e788000 4:0 write
+int cmd_trace(const char *name, int argc, char *argv[])
+{
+    struct ahb _ahb, *ahb = &_ahb;
+    enum trace_mode mode;
+    int width, offset;
+    uint32_t addr;
+    sigset_t set;
+    int64_t rev;
+    char *style;
+    int sig;
+    int rc;
+
+    if (argc < 3) {
+        loge("Not enough arguments for trace command\n");
+        return -EINVAL;
+    }
+
+    addr = strtoul(argv[0], NULL, 0);
+
+    style = argv[1];
+    width = strtoul(style, &style, 0);
+    if (*style != ':') {
+        loge("Invalid style\n");
+        return -EINVAL;
+    }
+    offset = strtoul(++style, NULL, 0);
+
+    if (!strcmp("read", argv[2])) {
+        mode = trace_read;
+    } else if (!strcmp("write", argv[2])) {
+        mode = trace_write;
+    } else {
+        loge("Unrecognised trace mode: %s\n", argv[2]);
+        return -EINVAL;
+    }
+
+    if (sigemptyset(&set)) {
+        rc = -errno;
+        loge("Unable to initialise signal set: %d\n", rc);
+        return rc;
+    }
+
+    if (sigaddset(&set, SIGINT)) {
+        rc = -errno;
+        loge("Unable to add SIGINT to signal set: %d\n", rc);
+        return rc;
+    }
+
+    rc = ast_ahb_from_args(ahb, argc - 3, &argv[3]);
+    if (rc < 0) {
+        bool denied = (rc == -EACCES || rc == -EPERM);
+        if (denied && !priv_am_root()) {
+            priv_print_unprivileged(name);
+        } else if (rc == -ENOTSUP) {
+            loge("Probes failed, cannot access BMC AHB\n");
+        } else {
+            errno = -rc;
+            perror("ast_ahb_from_args");
+        }
+        return rc;
+    }
+
+    rev = rev_probe(ahb);
+    if (rev < 0) {
+        rc = rev;
+        goto cleanup_ahb;
+    }
+
+    if (!rev_is_generation((uint32_t)rev, ast_g6))
+        goto cleanup_ahb;
+
+    if ((rc = trace_start(ahb, addr, width, offset, mode))) {
+        loge("Unable to start trace for 0x%08x %d:%d %s: %d\n",
+             addr, width, offset, mode, rc);
+        goto cleanup_ahb;
+    }
+
+    sigprocmask(SIG_BLOCK, &set, NULL);
+    if ((rc = sigwait(&set, &sig))) {
+        rc = -rc;
+        loge("Unable to wait for SIGINT: %d\n", rc);
+        goto cleanup_ahb;
+    }
+
+    if ((rc = trace_stop(ahb))) {
+        loge("Unable to stop trace: %d\n");
+        goto cleanup_ahb;
+    }
+
+    if ((rc = trace_dump(ahb, 1)))
+        loge("Unable to dump trace to stdout: %d\n", rc);
+
+cleanup_ahb:
+    ahb_destroy(ahb);
+
+    return rc;
+}

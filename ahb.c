@@ -95,7 +95,7 @@ int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...)
         }
     } else if (type == ahb_devmem) {
         ctx->devmem = malloc(sizeof(*ctx->devmem));
-        logi("Initialising devmem interface");
+        logi("Initialising devmem interface\n");
         rc = devmem_init(ctx->devmem);
         if (rc < 0) {
             loge("devmem_init failed: %d\n", rc);
@@ -221,6 +221,9 @@ ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd)
     ssize_t ingress, egress, remaining;
     void *chunk, *cursor;
     int rc = 0;
+
+    if (!len)
+        return 0;
 
     chunk = malloc(AHB_CHUNK);
     if (!chunk)
