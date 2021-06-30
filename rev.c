@@ -24,6 +24,7 @@ static const struct bmc_silicon_rev bmc_silicon_revs[] = {
     { 0x05000303, "AST2600 A0" },
     { 0x05010303, "AST2600 A1" },
     { 0x05020303, "AST2600 A2" },
+    { 0x05030303, "AST2600 A3" },
 };
 
 int64_t rev_probe(struct ahb *ahb)
