@@ -362,14 +362,14 @@ int otp_read(struct otp *otp, enum otp_region reg)
             res[1] ^= strap[i][1];
         }
 
-        logi("OTP straps:\n");
-        logi("Protect SCU: %08x %08x\n", scu_protect[0], scu_protect[1]);
-        logi("Protect:     %08x %08x\n", protect[0], protect[1]);
+        logi("OTP straps:\t\t63    32 31     0\n");
+        logi("Protect SCU:\t%08x %08x\n", scu_protect[1], scu_protect[0]);
+        logi("Protect:\t\t%08x %08x\n", protect[1], protect[0]);
 
         for (i = 0; i < 6; ++i)
-            logi("Option %u:    %08x %08x\n", i, strap[i][0], strap[i][1]);
+            logi("Option %u:\t\t%08x %08x\n", i, strap[i][1], strap[i][0]);
 
-        logi("Result:      %08x %08x\n", res[0], res[1]);
+        logi("Result:\t\t%08x %08x\n", res[1], res[0]);
     } else {
         unsigned char i;
         uint32_t conf[NUM_OTP_CONF];
