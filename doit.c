@@ -80,17 +80,19 @@ int main(int argc, char *argv[])
     const struct command *cmd = &cmds[0];
     bool show_help = false;
     int verbose = 0;
+    int quiet;
 
     while (1) {
         static struct option long_options[] = {
             { "help", no_argument, NULL, 'h' },
+            { "quiet", no_argument, NULL, 'q' },
             { "verbose", no_argument, NULL, 'v' },
             { },
         };
         int option_index = 0;
         int c;
 
-        c = getopt_long(argc, argv, "+hv", long_options, &option_index);
+        c = getopt_long(argc, argv, "+hqv", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -100,6 +102,9 @@ int main(int argc, char *argv[])
                 break;
             case 'v':
                 verbose++;
+                break;
+            case 'q':
+                quiet = true;
                 break;
             default:
                 continue;
@@ -113,7 +118,9 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if ((level_info + verbose) <= level_trace) {
+    if (quiet) {
+        log_set_level(level_none);
+    } else if ((level_info + verbose) <= level_trace) {
         log_set_level(level_info + verbose);
     } else {
         log_set_level(level_trace);
