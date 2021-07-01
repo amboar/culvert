@@ -101,6 +101,7 @@ int tty_init(struct tty *ctx, const char *path)
 
     tcgetattr(ctx->fd, &termios);
     cfmakeraw(&termios);
+    tcsetattr(ctx->fd, TCSAFLUSH, &termios);
 
     return ctx->fd;
 }
