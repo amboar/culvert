@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "log.h"
 
 int cmd_ilpc(const char *name, int argc, char *argv[]);

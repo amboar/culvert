@@ -101,7 +101,8 @@ int64_t wdt_perform_reset(struct ahb *ahb)
     /* The ARM clock gate is sticky on reset?! Ensure it's clear  */
     rc = ahb_writel(ahb, AST_G5_SCU | SCU_SILICON_REVISION,
                       SCU_HW_STRAP_ARM_CLK);
-    if (rc < 0);
+    if (rc < 0)
+        return rc;
 
     rc = ahb_writel(ahb, wdt_addr(victim, WDT_RELOAD), 0);
     if (rc < 0)

@@ -6,6 +6,7 @@
 #include "rev.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -48,13 +49,16 @@ int ilpcb_mode(struct ilpcb *ctx)
     return !!(hicrb & LPC_HICRB_ILPCB_RO); /* Maps to enum ilpcb_mode */
 }
 
-int ilpcb_read(struct ilpcb *ctx, size_t addr, void *buf, size_t len)
+ssize_t ilpcb_read(struct ilpcb *ctx, size_t addr, void *buf, size_t len)
 {
     struct sio *sio = &ctx->sio;
     size_t remaining;
     uint8_t data;
     int locked;
-    int rc;
+    ssize_t rc;
+
+    if (len > SSIZE_MAX)
+        return -EINVAL;
 
     rc = sio_unlock(sio);
     if (rc)
@@ -106,15 +110,18 @@ done:
         perror("sio_lock");
     }
 
-    return rc ? rc : len;
+    return rc ? rc : (ssize_t)len;
 }
 
-int ilpcb_write(struct ilpcb *ctx, size_t addr, const void *buf, size_t len)
+ssize_t ilpcb_write(struct ilpcb *ctx, size_t addr, const void *buf, size_t len)
 {
     struct sio *sio = &ctx->sio;
     size_t remaining;
     int locked;
-    int rc;
+    ssize_t rc;
+
+    if (len > SSIZE_MAX)
+        return -EINVAL;
 
     rc = sio_unlock(sio);
     if (rc)
@@ -166,7 +173,7 @@ done:
         perror("sio_lock");
     }
 
-    return rc ? rc : len;
+    return rc ? rc : (ssize_t)len;
 }
 
 /* Little-endian */

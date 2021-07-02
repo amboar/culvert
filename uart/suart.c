@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <sys/epoll.h>
@@ -521,11 +522,14 @@ ssize_t suart_fill(struct suart *ctx, char *buf, size_t len)
 
 ssize_t suart_fill_until(struct suart *ctx, char *buf, size_t len, char term)
 {
-    ssize_t remaining = len;
+    ssize_t remaining;
     ssize_t consumed = 0;
 
+    if (len > SSIZE_MAX)
+        return -EINVAL;
+
     /* Condition is broken when reading bursts of multiple characters */
-    while ((remaining < len && *(buf - 1) != term) || remaining) {
+    while ((remaining < (ssize_t)len && *(buf - 1) != term) || remaining) {
         consumed = suart_read(ctx, buf, remaining);
         if (consumed < 0)
             return consumed;

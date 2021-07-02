@@ -219,11 +219,12 @@ static int sfc_cmd_wr(struct sfc *ctrl, uint8_t cmd,
 			 uint32_t size)
 {
     struct sfc_data *ct = container_of(ctrl, struct sfc_data, ops);
-    int rc;
+    ssize_t rc;
 
     rc = sfc_start_cmd(ct, cmd);
     if (rc)
 	goto bail;
+
     if (has_addr) {
 	rc = sfc_send_addr(ct, addr);
 	if (rc)
@@ -234,7 +235,7 @@ static int sfc_cmd_wr(struct sfc *ctrl, uint8_t cmd,
 bail:
     sfc_end_cmd(ct);
 
-    return rc == size ? 0 : rc;
+    return rc == (ssize_t)size ? 0 : rc;
 }
 
 static int sfc_set_4b(struct sfc *ctrl, bool enable)

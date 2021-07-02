@@ -66,7 +66,7 @@ static int ast_pci_status(struct ahb *ctx, struct ast_cap_pci *pci)
 {
     struct ahb_range *r;
     uint32_t val;
-    uint32_t rev;
+    int64_t rev;
     int rc;
 
     rc = ahb_readl(ctx, AST_G5_SCU | SCU_PCIE_CONFIG, &val);
@@ -189,7 +189,7 @@ static int ast_pci_status(struct ahb *ctx, struct ast_cap_pci *pci)
 static int ast_debug_status(struct ahb *ctx, struct ast_cap_uart *uart)
 {
     uint32_t val;
-    uint32_t rev;
+    int64_t rev;
     int rc;
 
     rev = rev_probe(ctx);
@@ -230,7 +230,7 @@ static int ast_kernel_status(struct ahb *ctx, struct ast_cap_kernel *kernel)
 static int ast_xdma_status(struct ahb *ctx, struct ast_cap_xdma *xdma)
 {
     uint32_t val;
-    uint32_t rev;
+    int64_t rev;
     int rc;
 
     rev = rev_probe(ctx);
@@ -401,6 +401,7 @@ int ast_ahb_init(struct ahb *ahb, bool rw)
     bool enabled_rw_p2ab;
     struct ast_interfaces state;
     uint32_t val;
+    int64_t rev;
     int rc;
 
     enabled_rw_p2ab = false;
@@ -494,10 +495,10 @@ int ast_ahb_init(struct ahb *ahb, bool rw)
     if (state.lpc.superio != ip_state_enabled) {
         logi("Enabling %s interface via %s\n",
              ahb_interface_names[ahb_ilpcb], ahb_interface_names[ahb_p2ab]);
-        val = rev_probe(ahb);
-        if (val < 0) { rc = val; goto cleanup_ahb; }
+        rev = rev_probe(ahb);
+        if (rev < 0) { rc = rev; goto cleanup_ahb; }
 
-        if (rev_is_generation(val, ast_g6)) { rc = 0; goto cleanup_ahb; }
+        if (rev_is_generation(rev, ast_g6)) { rc = 0; goto cleanup_ahb; }
 
         val = SCU_HW_STRAP_SIO_DEC;
 
@@ -551,7 +552,8 @@ int ast_ahb_from_args(struct ahb *ahb, int argc, char *argv[])
                     argv[3], argv[4]);
 }
 
-int ast_ahb_access(const char *name, int argc, char *argv[], struct ahb *ahb)
+int ast_ahb_access(const char *name __unused, int argc, char *argv[],
+                   struct ahb *ahb)
 {
     uint32_t address, data;
     bool action_read;

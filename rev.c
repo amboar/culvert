@@ -32,7 +32,7 @@ int64_t rev_probe(struct ahb *ahb)
     uint32_t probe[2], rev;
     bool is_g6;
     int rc;
-    int i;
+    size_t i;
 
     logd("Probing for SoC revision registers\n");
 
@@ -135,7 +135,7 @@ int64_t rev_probe(struct ahb *ahb)
 
 bool rev_is_supported(uint32_t rev)
 {
-    int i;
+    size_t i;
 
     for (i = 0; i < ARRAY_SIZE(bmc_silicon_revs); i++) {
         if (rev == bmc_silicon_revs[i].rev)
@@ -146,7 +146,7 @@ bool rev_is_supported(uint32_t rev)
 }
 
 const char *rev_name(uint32_t rev) {
-    int i;
+    size_t i;
 
     for (i = 0; i < ARRAY_SIZE(bmc_silicon_revs); i++) {
         if (rev == bmc_silicon_revs[i].rev)

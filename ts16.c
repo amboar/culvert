@@ -2,6 +2,7 @@
 // Copyright (C) 2020 IBM Corp.
 
 #define _GNU_SOURCE
+#include "compiler.h"
 #include "log.h"
 #include "prompt.h"
 #include "ts16.h"
@@ -20,8 +21,9 @@
 
 #define to_ts16(console) container_of(console, struct ts16, console)
 
-static int ts16_control_init(struct ts16 *ctx, const char *ip, int port,
-                             const char *username, const char *password)
+static int ts16_control_init(struct ts16 *ctx, const char *ip,
+                             int port __unused, const char *username,
+                             const char *password)
 {
     struct sockaddr_in concentrator_addr;
     int concentrator;
@@ -130,7 +132,8 @@ static int ts16_control_destroy(struct ts16 *ctx)
     return prompt_destroy(&ctx->concentrator);
 }
 
-static int ts16_console_init(struct ts16 *ctx, const char *ip, int port)
+static int ts16_console_init(struct ts16 *ctx __unused, const char *ip,
+                             int port)
 {
     struct sockaddr_in console_addr;
     int console;

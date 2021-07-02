@@ -5,6 +5,7 @@
 #include "prompt.h"
 
 #include <errno.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -64,7 +65,7 @@ int prompt_expect_into(struct prompt *ctx, const char *str, char *prior,
 
         cursor += ingress;
     } while(!(res = memmem(prior, cursor - prior, str, strlen(str))) &&
-            len > (cursor - prior));
+            (ptrdiff_t)len > (cursor - prior));
 
     if (prompt)
         *prompt = res;

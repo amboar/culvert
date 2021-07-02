@@ -14,7 +14,7 @@ endif
 CC ?= $(CROSS_COMPILE)gcc
 HOST := $(shell $(CC) -dumpmachine | cut -d- -f1)
 
-CFLAGS = -O2 -flto -Werror -Wall -std=gnu99 -DVERSION='"$(VERSION)"'
+CFLAGS = -O2 -flto -Werror -Wall -Wextra -std=gnu99 -DVERSION='"$(VERSION)"'
 CFLAGS += -DNDEBUG -I.
 ifneq (,$(wildcard arch/$(HOST)))
 CFLAGS += -Iarch/$(HOST)
