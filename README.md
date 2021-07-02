@@ -79,20 +79,18 @@ and runtime environments.
 
 * Also supports the Linux `/dev/mem` interface for execution on the BMC itself
 
-## Compiling
+## Building
 
-The tool compiles for multiple architectures, and at least the following have
-been tested:
+The can be built for multiple architectures. It's known to run on the following:
 
-* x86_64
+* x86\_64
 * powerpc64, powerpc64le
 * armv6
 
-Building is a matter of issuing `make`, while cross compilation is performed by
-setting `CROSS_COMPILE` in the make environment, e.g:
+It can be built with:
 
 ```
-$ make CROSS_COMPILE=powerpc64le-linux-gnu-
+$ meson setup build && meson compile -C build
 ```
 
 ## Execution and Example output
