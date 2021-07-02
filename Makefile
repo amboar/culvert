@@ -48,11 +48,14 @@ dist: version
 
 doit: $(OBJS)
 
-$(SRCS): version
+$(OBJS): version
 
-.PHONY: version
-version:
+.PHONY: version.tmp
+version.tmp:
 	echo $(VERSION) > $@
+
+version: version.tmp
+	cmp $< $@ && rm $< || mv $< $@
 
 cscope: $(SRCS)
 	git ls-files | grep '\.[ch]$$' | xargs cscope -b
