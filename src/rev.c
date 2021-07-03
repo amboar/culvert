@@ -162,6 +162,20 @@ static const uint8_t bmc_silicon_gens[] = {
     [ast_g6] = 0x05,
 };
 
+enum ast_generation rev_generation(uint32_t rev)
+{
+    switch ((rev >> 24) & 0xff) {
+    case 0x02:
+        return ast_g4;
+    case 0x04:
+        return ast_g5;
+    case 0x05:
+        return ast_g6;
+    default:
+        return -EINVAL;
+    }
+}
+
 bool rev_is_generation(uint32_t rev, enum ast_generation gen)
 {
     assert(gen < ARRAY_SIZE(bmc_silicon_gens));

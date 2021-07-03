@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2021 IBM Corp.
+
+/dts-v1/;
+
+/ {
+	compatible = "aspeed,ast2600";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x80000000 0x80000000>;
+	};
+
+	ahb {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		sram: sram@10000000 {
+			compatible = "mmio-sram";
+			reg = <0x10000000 0x10000>;	// 64K
+		};
+
+		bus-controller@1e600000 {
+			compatible = "aspeed,ast2600-ahb-controller";
+			reg = <0x1e600000 0x10000>;
+		};
+
+		apb {
+			compatible = "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			syscon: syscon@1e6e2000 {
+				compatible = "aspeed,ast2600-scu", "syscon", "simple-mfd";
+				reg = <0x1e6e2000 0x1000>;
+			};
+		};
+	};
+};

@@ -35,6 +35,7 @@ src = [ 'ahb.c',
 	'sfc.c',
 	'shell.c',
 	'sio.c',
+	'soc.c',
 	'trace.c',
 	'ts16.c',
 	'tty.c',
@@ -67,4 +68,8 @@ configure_file(input: 'config.h.in',
 	       output: 'config.h',
 	       configuration: conf_data)
 
-executable('doit', src, include_directories : incdirs)
+subdir('devicetree')
+
+executable('doit', src, dtbos,
+	   include_directories: incdirs,
+	   dependencies: [ libfdt_dep ])
