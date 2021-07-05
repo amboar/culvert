@@ -15,7 +15,7 @@ struct bmc_silicon_rev {
     const char *name;
 };
 
-static const struct bmc_silicon_rev bmc_silicon_revs[] = {
+static const struct bmc_silicon_rev ast_silicon_revs[] = {
     { 0x02000303, "AST2400 A0" },
     { 0x02010303, "AST2400 A1" },
     { 0x04000303, "AST2500 A0" },
@@ -123,8 +123,8 @@ int64_t rev_probe(struct ahb *ahb)
     logd("Found revision 0x%x\n", rev);
 
     /* Is it a supported revision? */
-    for (i = 0; i < ARRAY_SIZE(bmc_silicon_revs); i++) {
-        if (rev == bmc_silicon_revs[i].rev)
+    for (i = 0; i < ARRAY_SIZE(ast_silicon_revs); i++) {
+        if (rev == ast_silicon_revs[i].rev)
             return rev;
     }
 
@@ -137,8 +137,8 @@ bool rev_is_supported(uint32_t rev)
 {
     size_t i;
 
-    for (i = 0; i < ARRAY_SIZE(bmc_silicon_revs); i++) {
-        if (rev == bmc_silicon_revs[i].rev)
+    for (i = 0; i < ARRAY_SIZE(ast_silicon_revs); i++) {
+        if (rev == ast_silicon_revs[i].rev)
             return true;
     }
 
@@ -148,9 +148,9 @@ bool rev_is_supported(uint32_t rev)
 const char *rev_name(uint32_t rev) {
     size_t i;
 
-    for (i = 0; i < ARRAY_SIZE(bmc_silicon_revs); i++) {
-        if (rev == bmc_silicon_revs[i].rev)
-            return bmc_silicon_revs[i].name;
+    for (i = 0; i < ARRAY_SIZE(ast_silicon_revs); i++) {
+        if (rev == ast_silicon_revs[i].rev)
+            return ast_silicon_revs[i].name;
     }
 
     return NULL;
