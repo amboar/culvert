@@ -100,9 +100,6 @@ static int trace_style(int width, int offset)
     return -EINVAL;
 }
 
-#define TRACE_BUF_BASE  AST_G6_SRAM
-#define TRACE_BUF_SIZE  (32 * 1024)
-
 static int ahbc_readl(struct ahb *ahb, uint32_t off, uint32_t *val)
 {
     return ahb_readl(ahb, AST_G6_AHBC + off, val);
@@ -113,10 +110,20 @@ static int ahbc_writel(struct ahb *ahb, uint32_t off, uint32_t val)
     return ahb_writel(ahb, AST_G6_AHBC + off, val);
 }
 
-int trace_start(struct ahb *ahb, uint32_t addr, int width, int offset,
+int trace_init(struct trace *ctx, struct ahb *ahb)
+{
+    ctx->buf = AST_G6_SRAM;
+    ctx->size = (32 * 1024);
+    ctx->ahb = ahb;
+
+    return 0;
+}
+
+int trace_start(struct trace *ctx, uint32_t addr, int width, int offset,
                 enum trace_mode mode)
 {
     uint32_t csr, buf;
+    size_t i;
     int rc;
 
     logd("%s: 0x%08" PRIx32 " %d:%d %d\n", __func__, addr, width, offset, mode);
@@ -125,18 +132,18 @@ int trace_start(struct ahb *ahb, uint32_t addr, int width, int offset,
     csr = AHBC_BCR_CSR_BUF_LEN_32K << AHBC_BCR_CSR_BUF_LEN_SHIFT;
     csr |= AHBC_BCR_CSR_POLL_MODE * mode;
 
-    if ((rc = ahbc_writel(ahb, R_AHBC_BCR_CSR, csr)))
+    if ((rc = ahbc_writel(ctx->ahb, R_AHBC_BCR_CSR, csr)))
         return rc;
 
-    if ((rc = ahbc_writel(ahb, R_AHBC_BCR_ADDR, addr)))
+    if ((rc = ahbc_writel(ctx->ahb, R_AHBC_BCR_ADDR, addr)))
         return rc;
 
-    for (int i = 0; i < (TRACE_BUF_SIZE / 4); i++) {
-        ahb_writel(ahb, 4 * i + TRACE_BUF_BASE, 0);
+    for (i = 0; i < (ctx->size / 4); i++) {
+        ahb_writel(ctx->ahb, 4 * i + ctx->buf, 0);
     }
 
-    buf = TRACE_BUF_BASE | AHBC_BCR_BUF_WRAP;
-    if ((rc = ahbc_writel(ahb, R_AHBC_BCR_BUF, buf)))
+    buf = ctx->buf | AHBC_BCR_BUF_WRAP;
+    if ((rc = ahbc_writel(ctx->ahb, R_AHBC_BCR_BUF, buf)))
         return rc;
 
     if ((rc = trace_style(width, offset)) < 0)
@@ -146,7 +153,7 @@ int trace_start(struct ahb *ahb, uint32_t addr, int width, int offset,
     csr |= AHBC_BCR_CSR_FLUSH;
     csr |= AHBC_BCR_CSR_POLL_EN;
 
-    if ((rc = ahbc_writel(ahb, R_AHBC_BCR_CSR, csr)))
+    if ((rc = ahbc_writel(ctx->ahb, R_AHBC_BCR_CSR, csr)))
         return rc;
 
     logi("Started AHB trace for 0x%08" PRIx32 "\n", addr);
@@ -154,24 +161,24 @@ int trace_start(struct ahb *ahb, uint32_t addr, int width, int offset,
     return 0;
 }
 
-int trace_stop(struct ahb *ahb)
+int trace_stop(struct trace *ctx)
 {
     uint32_t csr;
     int rc;
 
-    if ((rc = ahbc_readl(ahb, R_AHBC_BCR_CSR, &csr)))
+    if ((rc = ahbc_readl(ctx->ahb, R_AHBC_BCR_CSR, &csr)))
         return rc;
 
     logt("%s: csr: 0x%08" PRIx32 "\n", __func__, csr);
 
     /* Note: This won't flush the tail values if they don't form a full word */
     csr |= AHBC_BCR_CSR_FLUSH;
-    if ((rc = ahbc_writel(ahb, R_AHBC_BCR_CSR, csr)))
+    if ((rc = ahbc_writel(ctx->ahb, R_AHBC_BCR_CSR, csr)))
         return rc;
 
     csr &= ~(AHBC_BCR_CSR_POLL_EN | AHBC_BCR_CSR_FLUSH);
 
-    if ((rc = ahbc_writel(ahb, R_AHBC_BCR_CSR, csr)))
+    if ((rc = ahbc_writel(ctx->ahb, R_AHBC_BCR_CSR, csr)))
         return rc;
 
     logi("Stopped AHB trace\n");
@@ -179,7 +186,7 @@ int trace_stop(struct ahb *ahb)
     return 0;
 }
 
-int trace_dump(struct ahb *ahb, int outfd)
+int trace_dump(struct trace *ctx, int outfd)
 {
     uint32_t buf_len, write_ptr;
     uint32_t csr, buf;
@@ -188,12 +195,12 @@ int trace_dump(struct ahb *ahb, int outfd)
     ssize_t rc;
     size_t len;
 
-    if ((rc = ahbc_readl(ahb, R_AHBC_BCR_CSR, &csr)))
+    if ((rc = ahbc_readl(ctx->ahb, R_AHBC_BCR_CSR, &csr)))
         return rc;
 
     logt("%s: csr: 0x%08" PRIx32 "\n", __func__, csr);
 
-    if ((rc = ahbc_readl(ahb, R_AHBC_BCR_BUF, &buf)))
+    if ((rc = ahbc_readl(ctx->ahb, R_AHBC_BCR_BUF, &buf)))
         return rc;
 
     logt("%s: buf: 0x%08" PRIx32 "\n", __func__, buf);
@@ -210,7 +217,7 @@ int trace_dump(struct ahb *ahb, int outfd)
 
         logd("Ring buffer has wrapped, dumping trace buffer from write pointer at 0x%" PRIx32 " for %zu\n",
              buf, len);
-        if ((rc = ahb_siphon_in(ahb, buf, len, outfd)))
+        if ((rc = ahb_siphon_in(ctx->ahb, buf, len, outfd)))
             return rc;
     }
 
@@ -218,7 +225,7 @@ int trace_dump(struct ahb *ahb, int outfd)
 
     logd("Dumping from trace buffer at 0x%" PRIx32 " for %zu\n", base, len);
 
-    if ((rc = ahb_siphon_in(ahb, base, len, outfd)))
+    if ((rc = ahb_siphon_in(ctx->ahb, base, len, outfd)))
         return rc;
 
     return rc;
