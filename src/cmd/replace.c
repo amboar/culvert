@@ -105,7 +105,7 @@ int cmd_replace(const char *name, int argc, char *argv[])
                 errno = -rc;
                 perror("l2ab_write");
                 break;
-            } else if (rc != strlen(argv[2])) {
+            } else if ((size_t)rc != strlen(argv[2])) {
                 loge("Short write: %d\n", rc);
                 break;
             }

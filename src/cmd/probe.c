@@ -9,13 +9,16 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "compiler.h"
+
 #include "ahb.h"
 #include "array.h"
 #include "ast.h"
 #include "log.h"
 #include "priv.h"
 
-static void cmd_probe_help(const char *name, int argc, char *argv[])
+static void
+cmd_probe_help(const char *name, int argc __unused, char *argv[] __unused)
 {
     static const char *probe_help =
         "Usage:\n"
@@ -31,7 +34,7 @@ const char *ahb_interfaces[] = { "ilpc", "p2a", "xdma", "debug" };
 
 static void cmd_probe_list_interfaces(void)
 {
-    int i;
+    size_t i;
 
     for (i = 0; i < ARRAY_SIZE(ahb_interfaces); i++)
         printf("%s\n", ahb_interfaces[i]);
@@ -39,7 +42,7 @@ static void cmd_probe_list_interfaces(void)
 
 static bool cmd_probe_validate_interface(const char *iface)
 {
-    int i;
+    size_t i;
 
     for (i = 0; i < ARRAY_SIZE(ahb_interfaces); i++)
         if (!strcmp(ahb_interfaces[i], iface))

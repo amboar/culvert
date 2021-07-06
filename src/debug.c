@@ -280,7 +280,7 @@ static int debug_read_fixed(struct debug *ctx, char mode, uint32_t phys,
     /* Extract the data */
     errno = 0;
     parsed = strtoul(response, NULL, 16);
-    if (errno == ERANGE && (parsed == LONG_MAX || parsed == LONG_MIN))
+    if (errno == ERANGE && (parsed == ULONG_MAX))
         return -errno;
 
     *val = parsed;

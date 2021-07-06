@@ -79,3 +79,6 @@
 #define HAVE_UCONTEXT 1
 #define HAVE_POINTER_SAFE_MAKECONTEXT 1
 #endif /* CCAN_CONFIG_H */
+
+#define HAVE_LPC @have_lpc@
+#define VERSION @version@

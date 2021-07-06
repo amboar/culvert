@@ -528,7 +528,7 @@ static int flash_identify(struct flash_chip *c)
 	       id[0], id[1], id[2], iid);
 
 	/* Lookup in flash_info */
-	for (i = 0; i < ARRAY_SIZE(flash_info); i++) {
+	for (i = 0; (size_t)i < ARRAY_SIZE(flash_info); i++) {
 		info = &flash_info[i];
 		if (info->id == iid)
 			break;		

@@ -2,6 +2,7 @@
 // Copyright (C) 2018,2019 IBM Corp.
 
 #include "ahb.h"
+#include "compiler.h"
 #include "log.h"
 #include "mb.h"
 #include "mmio.h"
@@ -102,7 +103,7 @@ int p2ab_probe(struct p2ab *ctx)
     return rc < 0 ? rc : 1;
 }
 
-int64_t p2ab_map(struct p2ab *ctx, uint32_t phys, size_t len)
+int64_t p2ab_map(struct p2ab *ctx, uint32_t phys, size_t len __unused)
 {
     uint32_t rbar;
     uint32_t offset;
