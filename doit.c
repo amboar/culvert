@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
 {
     const struct command *cmd = &cmds[0];
     bool show_help = false;
+    bool quiet = false;
     int verbose = 0;
-    int quiet;
 
     while (1) {
         static struct option long_options[] = {
