@@ -3,53 +3,60 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "flash.h"
 #include "log.h"
 #include "priv.h"
 #include "sdmc.h"
+#include "sfc.h"
 #include "soc.h"
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define BMC_FLASH_LEN   (32 << 20)
-
 static int cmd_dump_firmware(struct soc *soc)
 {
-    uint32_t restore_tsr, sfc_tsr, sfc_wafcr;
+    struct soc_region flash;
+    struct flash_chip *chip;
+    struct sfc *sfc;
+    uint32_t wp;
     int cleanup;
     int rc;
 
-    logi("Testing BMC SFC write filter configuration\n");
-    rc = soc_readl(soc, 0x1e6200a4, &sfc_wafcr);
-    if (rc) { errno = -rc; perror("soc_readl"); return rc; }
+    logi("Initialising flash controller\n");
+    if ((rc = sfc_init(&sfc, soc, "fmc")))
+        return rc;
 
-    if (sfc_wafcr) {
-        loge("Found write filter configuration 0x%x\n", sfc_wafcr);
-        loge("BMC has selective write filtering enabled, bailing!\n");
-        return -ENOTSUP;
-    }
+    logi("Intialising flash chip\n");
+    if ((rc = flash_init(sfc, &chip)))
+        goto cleanup_sfc;
 
-    /* Disable writes to CE0 - chip enables are swapped for alt boot */
-    logi("Write-protecting BMC SFC\n");
-    rc = soc_readl(soc, 0x1e620000, &sfc_tsr);
-    if (rc) { errno = -rc; perror("soc_readl"); return rc; }
+    logi("Write-protecting all chip-selects\n");
+    if ((rc = sfc_write_protect_save(sfc, true, &wp)))
+        goto cleanup_chip;
 
-    restore_tsr = sfc_tsr;
-    sfc_tsr &= ~(1 << 16);
-
-    rc = soc_writel(soc, 0x1e620000, sfc_tsr);
-    if (rc) { errno = -rc; perror("soc_writel"); goto cleanup_sfc; }
+    if ((rc = sfc_get_flash(sfc, &flash)) < 0)
+        goto cleanup_chip;
 
     logi("Exfiltrating BMC flash to stdout\n\n");
-    rc = soc_siphon_in(soc, AST_G5_BMC_FLASH, BMC_FLASH_LEN, 1);
+    rc = soc_siphon_in(soc, flash.start, chip->info.size, 1);
     if (rc) { errno = -rc; perror("soc_siphon_in"); }
 
+    if ((cleanup = sfc_write_protect_restore(sfc, wp)) < 0) {
+        errno = -rc;
+        perror("sfc_write_protect_restore");
+    }
+
+cleanup_chip:
+    flash_destroy(chip);
+
 cleanup_sfc:
-    logi("Clearing BMC SFC write protect state\n");
-    cleanup = soc_writel(soc, 0x1e620000, restore_tsr);
-    if (cleanup) { errno = -cleanup; perror("soc_writel"); }
+    if ((cleanup = sfc_destroy(sfc)) < 0) {
+        errno = -cleanup;
+        perror("sfc_destroy");
+    }
 
     return rc;
 }
@@ -110,8 +117,7 @@ int cmd_read(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    rc = soc_probe(soc, ahb);
-    if (rc < 0)
+    if ((rc = soc_probe(soc, ahb)) < 0)
         goto cleanup_ahb;
 
     if (!strcmp("firmware", argv[0]))

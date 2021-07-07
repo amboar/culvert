@@ -14,15 +14,6 @@ enum ast_generation { ast_g4, ast_g5, ast_g6 };
 #define AST_G5_SOC_IO			0x1e600000
 #define AST_G5_SOC_IO_LEN		0x00200000
 
-#define AST_G5_FMC			0x1e620000
-#define   FMC_CE_TYPE			0x00
-#define   FMC_CE_CTRL			0x04
-#define   FMC_CE0_CTRL			0x10
-#define   FMC_TIMING			0x94
-#define AST_G5_SMC			0x1e630000
-#define   SMC_CONF			0x00
-#define   SMC_CE0_CTRL			0x10
-#define   SMC_TIMING			0x94
 #define AST_G5_SCU			0x1e6e2000
 #define   SCU_MISC			0x2c
 #define     SCU_MISC_G4_P2A_DRAM_RO	(1 << 25)
@@ -65,8 +56,6 @@ enum ast_generation { ast_g4, ast_g5, ast_g6 };
 #define     LPC_HICRA_SEL1IO		(0b111 << 0)
 #define   LPC_HICRB			0x100
 #define     LPC_HICRB_ILPC_RO		(1 << 6)
-#define AST_G5_BMC_FLASH  		0x20000000
-#define AST_G5_HOST_FLASH		0x30000000
 
 enum ast_ip_state {
     ip_state_unknown,

@@ -109,7 +109,7 @@ int cmd_write(const char *name, int argc, char *argv[])
     }
 
     logi("Initialising flash subsystem\n");
-    rc = sfc_init(&sfc, ahb, SFC_TYPE_FMC);
+    rc = sfc_init(&sfc, soc, "fmc");
     if (rc < 0)
         goto cleanup_vuart;
 

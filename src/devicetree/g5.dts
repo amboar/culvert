@@ -9,10 +9,13 @@
 	#size-cells = <1>;
 
 	aliases {
-		vuart = &vuart;
+		fmc = &fmc;
+		spi1 = &spi1;
+		spi2 = &spi2;
 		wdt1 = &wdt1;
 		wdt2 = &wdt2;
 		wdt3 = &wdt3;
+		vuart = &vuart;
 	};
 
 	memory@80000000 {
@@ -40,6 +43,24 @@
 			compatible = "simple-bus";
 			#address-cells = <1>;
 			#size-cells = <1>;
+
+			fmc: spi@1e620000 {
+				reg = <0x1e620000 0xc4
+				       0x20000000 0x10000000>;
+				compatible = "aspeed,ast2500-fmc";
+			};
+
+			spi1: spi@1e630000 {
+				reg = <0x1e630000 0xc4
+				       0x30000000 0x08000000>;
+				compatible = "aspeed,ast2500-spi";
+			};
+
+			spi2: spi@1e631000 {
+				reg = <0x1e631000 0xc4
+				       0x38000000 0x08000000>;
+				compatible = "aspeed,ast2500-spi";
+			};
 
 			sdmc: memory-controller@1e6e0000 {
 				compatible = "aspeed,ast2500-sdram-controller";

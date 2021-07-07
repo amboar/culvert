@@ -236,8 +236,9 @@ int soc_device_from_type(struct soc *ctx, const char *type,
 	return -ENOENT;
 }
 
-int soc_device_get_memory(struct soc *ctx, const struct soc_device_node *dn,
-			  struct soc_region *region)
+int soc_device_get_memory_index(struct soc *ctx,
+				const struct soc_device_node *dn, int index,
+				struct soc_region *region)
 {
 	const uint32_t *reg;
 	int len;
@@ -261,11 +262,12 @@ int soc_device_get_memory(struct soc *ctx, const struct soc_device_node *dn,
 	}
 
 	/* FIXME: Assumes #address-cells = <1>, #size-cells = <1> */
-	/* <address, size> */
-	assert(len >= 8);
+	if (len < (8 * (index + 1)))
+		return -EINVAL;
 
-	region->start = be32toh(reg[0]);
-	region->length = be32toh(reg[1]);
+	/* <address, size> */
+	region->start = be32toh(reg[index + 0]);
+	region->length = be32toh(reg[index + 1]);
 
 	return 0;
 }

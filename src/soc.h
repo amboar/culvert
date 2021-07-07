@@ -24,6 +24,18 @@ int soc_probe(struct soc *ctx, struct ahb *ahb);
 
 void soc_destroy(struct soc *ctx);
 
+static inline ssize_t
+soc_read(struct soc *ctx, uint32_t phys, void *buf, size_t len)
+{
+	return ahb_read(ctx->ahb, phys, buf, len);
+}
+
+static inline ssize_t
+soc_write(struct soc *ctx, uint32_t phys, const void *buf, size_t len)
+{
+	return ahb_write(ctx->ahb, phys, buf, len);
+}
+
 static inline int soc_readl(struct soc *ctx, uint32_t phys, uint32_t *val)
 {
 	return ahb_readl(ctx->ahb, phys, val);
@@ -78,6 +90,14 @@ struct soc_region {
 	uint32_t length;
 };
 
-int soc_device_get_memory(struct soc *ctx, const struct soc_device_node *dn,
-			  struct soc_region *region);
+int
+soc_device_get_memory_index(struct soc *ctx, const struct soc_device_node *dn,
+			    int index, struct soc_region *region);
+
+static inline int
+soc_device_get_memory(struct soc *ctx, const struct soc_device_node *dn,
+		      struct soc_region *region)
+{
+	return soc_device_get_memory_index(ctx, dn, 0, region);
+}
 #endif
