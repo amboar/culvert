@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 
-enum clksrc { clk_arm, clk_ahb };
+enum clksrc { clk_arm, clk_ahb, clk_uart3 };
 
 struct clk {
 	struct soc *soc;

@@ -11,20 +11,19 @@
 #include <strings.h>
 #include <sys/types.h>
 
-#define AST_G5_LPC			0x1e789000
-#define   LPC_HICR9			0x98
-#define     LPC_HICR9_SEL6IO		(0b1111 << 8)
-#define   LPC_HICRA			0x9c
-#define     LPC_HICRA_SEL5DW		(0b1111 << 28)
-#define     LPC_HICRA_SEL4DW		(0b111 << 25)
-#define     LPC_HICRA_SEL3DW		(0b111 << 22)
-#define     LPC_HICRA_SEL2DW		(0b111 << 19)
-#define     LPC_HICRA_SEL1DW		(0b111 << 16)
-#define     LPC_HICRA_SEL5IO		(0b111 << 12)
-#define     LPC_HICRA_SEL4IO		(0b111 << 9)
-#define     LPC_HICRA_SEL3IO		(0b111 << 6)
-#define     LPC_HICRA_SEL2IO		(0b111 << 3)
-#define     LPC_HICRA_SEL1IO		(0b111 << 0)
+#define LPC_HICR9			0x98
+#define   LPC_HICR9_SEL6IO		(0b1111 << 8)
+#define LPC_HICRA			0x9c
+#define   LPC_HICRA_SEL5DW		(0b1111 << 28)
+#define   LPC_HICRA_SEL4DW		(0b111 << 25)
+#define   LPC_HICRA_SEL3DW		(0b111 << 22)
+#define   LPC_HICRA_SEL2DW		(0b111 << 19)
+#define   LPC_HICRA_SEL1DW		(0b111 << 16)
+#define   LPC_HICRA_SEL5IO		(0b111 << 12)
+#define   LPC_HICRA_SEL4IO		(0b111 << 9)
+#define   LPC_HICRA_SEL3IO		(0b111 << 6)
+#define   LPC_HICRA_SEL2IO		(0b111 << 3)
+#define   LPC_HICRA_SEL1IO		(0b111 << 0)
 
 const struct mux_obj _mux_obj_io1 = { .type = mux_io, .io = io1 },
                      *mux_obj_io1 = &_mux_obj_io1;
@@ -49,7 +48,6 @@ struct mux_desc {
 struct mux_lookup {
     struct mux_desc lookup[mux_io_count][mux_io_count];
 };
-
 
 static const struct mux_lookup mux_lookup[2][2] = {
     [mux_uart] = {
@@ -209,21 +207,41 @@ static const struct mux_lookup mux_lookup[2][2] = {
     },
 };
 
-int uart_mux_init(struct uart_mux *ctx, struct ahb *ahb)
+static int lpc_readl(struct uart_mux *ctx, uint32_t offset, uint32_t *val)
 {
+    return soc_readl(ctx->soc, ctx->lpc.start + offset, val);
+}
+
+static int lpc_writel(struct uart_mux *ctx, uint32_t offset, uint32_t val)
+{
+    return soc_writel(ctx->soc, ctx->lpc.start + offset, val);
+}
+
+static const struct soc_device_id lpc_match[] = {
+    { .compatible = "aspeed,ast2500-lpc-v2" },
+    { },
+};
+
+int uart_mux_init(struct uart_mux *ctx, struct soc *soc)
+{
+    struct soc_device_node dn;
     uint32_t val;
     int rc;
 
-    ctx->ahb = ahb;
+    if ((rc = soc_device_match_node(soc, lpc_match, &dn)) < 0)
+        return rc;
 
-    rc = ahb_readl(ctx->ahb, AST_G5_LPC | LPC_HICR9, &val);
-    if (rc)
+    if ((rc = soc_device_get_memory(soc, &dn, &ctx->lpc)) < 0)
+        return rc;
+
+    ctx->soc = soc;
+
+    if ((rc = lpc_readl(ctx, LPC_HICR9, &val)) < 0)
         return rc;
 
     ctx->hicr9 = val;
 
-    rc = ahb_readl(ctx->ahb, AST_G5_LPC | LPC_HICRA, &val);
-    if (rc)
+    if ((rc = lpc_readl(ctx, LPC_HICRA, &val)) < 0)
         return rc;
 
     ctx->hicra = val;
@@ -235,13 +253,13 @@ int uart_mux_restore(struct uart_mux *ctx)
 {
     int rc;
 
-    rc = ahb_writel(ctx->ahb, AST_G5_LPC | LPC_HICR9, ctx->hicr9);
-    if (rc)
+    if ((rc = lpc_writel(ctx, LPC_HICR9, ctx->hicr9)) < 0)
         return rc;
 
-    rc = ahb_writel(ctx->ahb, AST_G5_LPC | LPC_HICRA, ctx->hicra);
+    if ((rc = lpc_writel(ctx, LPC_HICRA, ctx->hicra)) < 0)
+        return rc;
 
-    return rc;
+    return 0;
 }
 
 int uart_mux_route(struct uart_mux *ctx, const struct mux_obj *s,
@@ -258,15 +276,13 @@ int uart_mux_route(struct uart_mux *ctx, const struct mux_obj *s,
     if (!md->mask)
         return -EINVAL;
 
-    rc = ahb_readl(ctx->ahb, AST_G5_LPC | md->reg, &val);
-    if (rc)
+    if ((rc = lpc_readl(ctx, md->reg, &val)) < 0)
         return rc;
 
     val &= ~(md->mask);
     val |= md->val << (ffs(md->mask) - 1);
 
-    rc = ahb_writel(ctx->ahb, AST_G5_LPC | md->reg, val);
-    if (rc)
+    if ((rc = lpc_writel(ctx, md->reg, val)) < 0)
         return rc;
 
     return 0;
@@ -277,9 +293,16 @@ int uart_mux_connect(struct uart_mux *ctx, const struct mux_obj *a,
 {
     int rc;
 
-    rc = uart_mux_route(ctx, a, b);
-    if (rc)
+    if ((rc = uart_mux_route(ctx, a, b)) < 0)
         return rc;
 
-    return uart_mux_route(ctx, b, a);
+    if ((rc = uart_mux_route(ctx, b, a)) < 0)
+        return rc;
+
+    return 0;
+}
+
+void uart_mux_destroy(struct uart_mux *ctx)
+{
+    ctx->soc = NULL;
 }

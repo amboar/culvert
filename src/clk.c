@@ -3,6 +3,7 @@
 
 #include "compiler.h"
 
+#include "bits.h"
 #include "clk.h"
 #include "soc.h"
 
@@ -10,6 +11,9 @@
 #include <errno.h>
 #include <stdint.h>
 
+
+#define SCU_CLK_STOP                    0x0c
+#define   SCU_CLK_STOP_UART3            BIT(25)
 #define SCU_HW_STRAP			0x70
 #define   SCU_HW_STRAP_UART_DBG_SEL	(1 << 29)
 #define   SCU_HW_STRAP_SIO_DEC          (1 << 20)
@@ -42,9 +46,14 @@ void clk_destroy(struct clk *ctx)
     ctx->soc = NULL;
 }
 
-static int clk_readl(struct clk *ctx, uint32_t offset, uint32_t *val)
+static int scu_readl(struct clk *ctx, uint32_t offset, uint32_t *val)
 {
     return soc_readl(ctx->soc, ctx->scu.start + offset, val);
+}
+
+static int scu_writel(struct clk *ctx, uint32_t offset, uint32_t val)
+{
+    return soc_writel(ctx->soc, ctx->scu.start + offset, val);
 }
 
 static int64_t clk_rate_ahb(struct clk *ctx)
@@ -66,7 +75,7 @@ static int64_t clk_rate_ahb(struct clk *ctx)
     int rc;
 
     /* HW strapping gives us the CPU freq and AHB divisor */
-    if ((rc = clk_readl(ctx, SCU_HW_STRAP, &strap)) < 0)
+    if ((rc = scu_readl(ctx, SCU_HW_STRAP, &strap)) < 0)
         return rc;
 
     if (strap & 0x00800000)
@@ -89,18 +98,50 @@ int64_t clk_get_rate(struct clk *ctx, enum clksrc src)
 
 int clk_disable(struct clk *ctx, enum clksrc src)
 {
-    if (src != clk_arm)
-        return -ENOTSUP;
+    uint32_t reg;
+    int rc;
 
-    return soc_writel(ctx->soc, ctx->scu.start | SCU_HW_STRAP,
-                      SCU_HW_STRAP_ARM_CLK);
+    switch (src) {
+    case clk_arm:
+        return scu_writel(ctx, SCU_HW_STRAP, SCU_HW_STRAP_ARM_CLK);
+    case clk_uart3:
+        if ((rc = scu_readl(ctx, SCU_CLK_STOP, &reg)) < 0)
+            return rc;
+
+        reg |= SCU_CLK_STOP_UART3;
+
+        if ((rc = scu_writel(ctx, SCU_CLK_STOP, reg)) < 0)
+            return rc;
+
+        return 0;
+    default:
+        break;
+    }
+
+    return -ENOTSUP;
 }
 
 int clk_enable(struct clk *ctx, enum clksrc src)
 {
-    if (src != clk_arm)
-        return -ENOTSUP;
+    uint32_t reg;
+    int rc;
 
-    return soc_writel(ctx->soc, ctx->scu.start | SCU_SILICON_REVISION,
-                      SCU_HW_STRAP_ARM_CLK);
+    switch (src) {
+    case clk_arm:
+        return scu_writel(ctx, SCU_SILICON_REVISION, SCU_HW_STRAP_ARM_CLK);
+    case clk_uart3:
+        if ((rc = scu_readl(ctx, SCU_CLK_STOP, &reg)) < 0)
+            return rc;
+
+        reg &= ~SCU_CLK_STOP_UART3;
+
+        if ((rc = scu_writel(ctx, SCU_CLK_STOP, reg)) < 0)
+            return rc;
+
+        return 0;
+    default:
+        break;
+    }
+
+    return -ENOTSUP;
 }
