@@ -125,6 +125,66 @@ int soc_device_match_node(struct soc *ctx,
 	return -ENOENT;
 }
 
+int soc_device_is_compatible(struct soc *ctx,
+			     const struct soc_device_id table[],
+			     struct soc_device_node *dn)
+{
+
+	while (table->compatible) {
+		int rc;
+
+		rc = fdt_node_check_compatible(ctx->fdt.start, dn->offset,
+					       table->compatible);
+
+		/* Bad node */
+		if (rc < 0) {
+			loge("fdt: Failed to look up compatible: %d\n", rc);
+			return -EUCLEAN;
+		}
+
+		/* Found it */
+		if (rc == 0)
+			return 1;
+
+		/* Have a compatible property but no match, keep looking */
+		assert(rc == 1);
+		table++;
+	}
+
+	/* Failed to find it */
+	return 0;
+}
+
+int soc_device_from_name(struct soc *ctx, const char *name,
+			 struct soc_device_node *dn)
+{
+	const char *path;
+	int rc;
+
+	logd("fdt: Looking up device name '%s'\n", name);
+
+	path = fdt_get_alias(ctx->fdt.start, name);
+	if (!path)
+		path = name;
+
+	logd("fdt: Locating node with device path '%s'\n", path);
+
+	rc = fdt_path_offset(ctx->fdt.start, path);
+	if (rc < 0) {
+		if (rc == -FDT_ERR_BADPATH)
+			return -EINVAL;
+
+		if (rc == -FDT_ERR_NOTFOUND)
+			return -ENOENT;
+
+		return -EUCLEAN;
+	}
+
+	dn->offset = rc;
+
+	return 0;
+}
+
 int soc_device_get_memory(struct soc *ctx, const struct soc_device_node *dn,
 			  struct soc_region *region)
 {

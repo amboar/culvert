@@ -8,6 +8,12 @@
 	#address-cells = <1>;
 	#size-cells = <1>;
 
+	aliases {
+		vuart = &vuart1;
+		vuart1 = &vuart1;
+		vuart2 = &vuart2;
+	};
+
 	memory@80000000 {
 		device_type = "memory";
 		reg = <0x80000000 0x80000000>;
@@ -37,6 +43,16 @@
 			syscon: syscon@1e6e2000 {
 				compatible = "aspeed,ast2600-scu", "syscon", "simple-mfd";
 				reg = <0x1e6e2000 0x1000>;
+			};
+
+			vuart1: serial@1e787000 {
+				compatible = "aspeed,ast2600-vuart";
+				reg = <0x1e787000 0x40>;
+			};
+
+			vuart2: serial@1e788000 {
+				compatible = "aspeed,ast2600-vuart";
+				reg = <0x1e788000 0x40>;
 			};
 		};
 	};

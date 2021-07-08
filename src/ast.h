@@ -67,9 +67,6 @@ enum ast_generation { ast_g4, ast_g5, ast_g6 };
 #define     WDT_CTRL_SYS_RESET		(1 << 1)
 #define     WDT_CTRL_ENABLE		(1 << 0)
 #define   WDT_RESET_MASK		0x1c
-#define AST_G5_VUART                    0x1e787000
-#define   VUART_GCRA                    0x20
-#define     VUART_GCRA_TX_DISCARD       (1 << 5)
 #define AST_G5_LPC			0x1e789000
 #define   LPC_HICR9			0x98
 #define     LPC_HICR9_SEL6IO		(0b1111 << 8)

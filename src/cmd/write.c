@@ -21,7 +21,9 @@
 
 int cmd_write(const char *name, int argc, char *argv[])
 {
+    struct vuart _vuart, *vuart = &_vuart;
     struct ahb _ahb, *ahb = &_ahb;
+    struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
     bool live = false;
     ssize_t ingress;
@@ -76,6 +78,13 @@ int cmd_write(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    rc = soc_probe(soc, ahb);
+    if (rc < 0) {
+        errno = -rc;
+        perror("soc_probe");
+        exit(EXIT_FAILURE);
+    }
+
     if (ahb->bridge == ahb_devmem)
         loge("I hope you know what you are doing\n");
     else if (live) {
@@ -89,8 +98,12 @@ int cmd_write(const char *name, int argc, char *argv[])
         if (rc < 0)
             goto cleanup_soc;
 
+        rc = vuart_init(vuart, soc, "vuart");
+        if (rc < 0)
+            goto cleanup_clk;
+
         logi("Configuring VUART for host Tx discard\n");
-        rc = vuart_set_host_tx_discard(ahb, discard_enable);
+        rc = vuart_set_host_tx_discard(vuart, discard_enable);
         if (rc < 0)
             goto cleanup_clk;
     }
@@ -160,8 +173,10 @@ cleanup_soc:
 cleanup_vuart:
     if (live) {
         logi("Deconfiguring VUART host Tx discard\n");
-        cleanup = vuart_set_host_tx_discard(ahb, discard_enable);
+        cleanup = vuart_set_host_tx_discard(vuart, discard_disable);
         if (cleanup) { errno = -cleanup; perror("vuart_set_host_tx_discard"); }
+
+        vuart_destroy(vuart);
     }
 
 cleanup_clk:
@@ -172,6 +187,8 @@ cleanup_clk:
     }
 
 cleanup_ahb:
+    soc_destroy(soc);
+
     cleanup = ahb_cleanup(ahb);
     if (cleanup) { errno = -cleanup; perror("ahb_cleanup"); }
 
