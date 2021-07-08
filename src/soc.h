@@ -30,6 +30,11 @@ static inline enum ast_generation soc_generation(struct soc *ctx)
 	return rev_generation(ctx->rev);
 }
 
+static inline int soc_stepping(struct soc *ctx)
+{
+	return rev_stepping(ctx->rev);
+}
+
 static inline ssize_t
 soc_read(struct soc *ctx, uint32_t phys, void *buf, size_t len)
 {

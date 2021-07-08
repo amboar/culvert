@@ -7,28 +7,28 @@
 #include "log.h"
 #include "otp.h"
 #include "rev.h"
+#include "soc.h"
 
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
-#define OTP_PASSWD			    0x349fe38a
+#define OTP_PASSWD		0x349fe38a
 #define OTP_TRIGGER_PROGRAM     0x23b1e364
 #define OTP_TRIGGER_READ        0x23b1e361
 #define OTP_TRIGGER_WRITE_REG   0x23b1e362
 
-#define OTP_BASE        0x1e6f2000
-#define OTP_PROTECT_KEY OTP_BASE
-#define OTP_COMMAND     (OTP_BASE + 0x4)
-#define OTP_TIMING      (OTP_BASE + 0x8)
-#define OTP_ADDR        (OTP_BASE + 0x10)
-#define OTP_STATUS      (OTP_BASE + 0x14)
-#define  OTP_STATUS_IDLE 0x6
-#define OTP_COMPARE_1   (OTP_BASE + 0x20)
-#define OTP_COMPARE_2   (OTP_BASE + 0x24)
-#define OTP_COMPARE_3   (OTP_BASE + 0x28)
-#define OTP_COMPARE_4   (OTP_BASE + 0x2c)
+#define OTP_PROTECT_KEY         0x00
+#define OTP_COMMAND             0x04
+#define OTP_TIMING              0x08
+#define OTP_ADDR                0x10
+#define OTP_STATUS              0x14
+#define  OTP_STATUS_IDLE        0x6
+#define OTP_COMPARE_1           0x20
+#define OTP_COMPARE_2           0x24
+#define OTP_COMPARE_3           0x28
+#define OTP_COMPARE_4           0x2c
 
 #define NUM_OTP_CONF    16
 #define NUM_PROG_TRIES  16
@@ -41,31 +41,32 @@ struct otpstrap_status {
     uint8_t protected;
 };
 
+static int otp_readl(struct otp *otp, uint32_t offset, uint32_t *val)
+{
+    int rc = soc_readl(otp->soc, otp->iomem.start + offset, val);
+
 #ifdef _OTP_DEBUG
-static int otp_readl(struct ahb *ahb, uint32_t phys, uint32_t *val)
-{
-    int rc = ahb_readl(ahb, phys, val);
-
     if (rc)
-        printf("otp rd %02x failed: %d\n", phys - OTP_BASE, rc);
+        printf("otp rd %02x failed: %d\n", offset, rc);
     else
-        printf("otp rd %02x:%08x\n", phys - OTP_BASE, *val);
-    return rc;
-}
-static int otp_writel(struct ahb *ahb, uint32_t phys, uint32_t val)
-{
-    int rc = ahb_writel(ahb, phys, val);
-
-    if (rc)
-        printf("otp wr %02x failed: %d\n", phys - OTP_BASE, rc);
-    else
-        printf("otp wr %02x:%08x\n", phys - OTP_BASE, val);
-    return rc;
-}
-#else
-#define otp_readl ahb_readl
-#define otp_writel ahb_writel
+        printf("otp rd %02x:%08x\n", offset, *val);
 #endif
+
+    return rc;
+}
+static int otp_writel(struct otp *otp, uint32_t offset, uint32_t val)
+{
+    int rc = soc_writel(otp->soc, otp->iomem.start + offset, val);
+
+#ifdef _OTP_DEBUG
+    if (rc)
+        printf("otp wr %02x failed: %d\n", offset, rc);
+    else
+        printf("otp wr %02x:%08x\n", offset, val);
+#endif
+
+    return rc;
+}
 
 static void diff_timespec(const struct timespec *start,
                           const struct timespec *end, struct timespec *diff)
@@ -78,7 +79,7 @@ static void diff_timespec(const struct timespec *start,
     }
 }
 
-static int otp_wait_complete(struct ahb *ahb)
+static int otp_wait_complete(struct otp *otp)
 {
     int rc;
     uint32_t reg = 0;
@@ -89,7 +90,7 @@ static int otp_wait_complete(struct ahb *ahb)
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     do {
-        rc = otp_readl(ahb, OTP_STATUS, &reg);
+        rc = otp_readl(otp, OTP_STATUS, &reg);
         if (rc)
             return rc;
 
@@ -107,72 +108,65 @@ static int otp_wait_complete(struct ahb *ahb)
     return -ETIMEDOUT;
 }
 
-static int otp_program(struct ahb *ahb, uint32_t addr, uint32_t val)
+static int otp_program(struct otp *otp, uint32_t addr, uint32_t val)
 {
-    int rc = otp_writel(ahb, OTP_ADDR, addr);
+    int rc;
 
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_ADDR, addr)) < 0)
         return rc;
 
-    rc = otp_writel(ahb, OTP_COMPARE_1, val);
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_COMPARE_1, val)) < 0)
         return rc;
 
-    rc = otp_writel(ahb, OTP_COMMAND, OTP_TRIGGER_PROGRAM);
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_COMMAND, OTP_TRIGGER_PROGRAM)) < 0)
         return rc;
 
-    return otp_wait_complete(ahb);
+    return otp_wait_complete(otp);
 }
 
-static int otp_read_reg(struct ahb *ahb, uint32_t addr, uint32_t *val)
+static int otp_read_reg(struct otp *otp, uint32_t addr, uint32_t *val)
 {
-    int rc = otp_writel(ahb, OTP_ADDR, addr);
+    int rc;
 
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_ADDR, addr)) < 0)
         return rc;
 
-    rc = otp_writel(ahb, OTP_COMMAND, OTP_TRIGGER_READ);
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_COMMAND, OTP_TRIGGER_READ)) < 0)
         return rc;
 
-    rc = otp_wait_complete(ahb);
-    if (rc)
+    if ((rc = otp_wait_complete(otp)) < 0)
         return rc;
 
-    rc = otp_readl(ahb, OTP_COMPARE_1, val);
-    if (rc)
+    if ((rc = otp_readl(otp, OTP_COMPARE_1, val)) < 0)
         return rc;
 
     return 0;
 }
 
-static int otp_read_config(struct ahb *ahb, int offset, uint32_t *val)
+static int otp_read_config(struct otp *otp, int offset, uint32_t *val)
 {
     uint32_t config_offset = 0x800;
 
     config_offset |= (offset / 8) * 0x200;
     config_offset |= (offset % 8) * 2;
 
-    return otp_read_reg(ahb, config_offset, val);
+    return otp_read_reg(otp, config_offset, val);
 }
 
-static int otp_write_reg(struct ahb *ahb, uint32_t addr, uint32_t val)
+static int otp_write_reg(struct otp *otp, uint32_t addr, uint32_t val)
 {
-    int rc = otp_writel(ahb, OTP_ADDR, addr);
+    int rc;
 
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_ADDR, addr)) < 0)
         return rc;
 
-    rc = otp_writel(ahb, OTP_COMPARE_1, val);
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_COMPARE_1, val)) < 0)
         return rc;
 
-    rc = otp_writel(ahb, OTP_COMMAND, OTP_TRIGGER_WRITE_REG);
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_COMMAND, OTP_TRIGGER_WRITE_REG)) < 0)
         return rc;
 
-    return otp_wait_complete(ahb);
+    return otp_wait_complete(otp);
 }
 
 static int otp_set_soak(struct otp *otp, unsigned int soak)
@@ -182,19 +176,19 @@ static int otp_set_soak(struct otp *otp, unsigned int soak)
     if (soak > 2)
         return -EINVAL;
 
-    rc = otp_write_reg(otp->ahb, 0x3000, otp->soak_parameters[soak][0]);
-    if (rc)
+    if ((rc = otp_write_reg(otp, 0x3000, otp->soak_parameters[soak][0])) < 0)
         return rc;
 
-    rc = otp_write_reg(otp->ahb, 0x5000, otp->soak_parameters[soak][1]);
-    if (rc)
+    if ((rc = otp_write_reg(otp, 0x5000, otp->soak_parameters[soak][1])) < 0)
         return rc;
 
-    rc = otp_write_reg(otp->ahb, 0x1000, otp->soak_parameters[soak][2]);
-    if (rc)
+    if ((rc = otp_write_reg(otp, 0x1000, otp->soak_parameters[soak][2])) < 0)
         return rc;
 
-    return otp_writel(otp->ahb, OTP_TIMING, otp->timings[soak]);
+    if ((rc = otp_writel(otp, OTP_TIMING, otp->timings[soak])) < 0)
+        return rc;
+
+    return 0;
 }
 
 static int otp_confirm()
@@ -224,29 +218,24 @@ static int otp_write(struct otp *otp, uint32_t address, uint32_t bitmask)
     uint32_t prog;
     uint32_t readback;
 
-    rc = otp_set_soak(otp, 1);
-    if (rc)
+    if ((rc = otp_set_soak(otp, 1)) < 0)
         return rc;
 
     prog = ~bitmask;
-    rc = otp_program(otp->ahb, address, prog);
-    if (rc)
+    if ((rc = otp_program(otp, address, prog)) < 0)
         goto undo_soak;
 
     do {
-        rc = otp_read_reg(otp->ahb, address, &readback);
-        if (rc)
+        if ((rc = otp_read_reg(otp, address, &readback)) < 0)
             goto undo_soak;
 
         if (readback & bitmask)
             break;
 
-        rc = otp_set_soak(otp, (tries % 2) ? 1 : 2);
-        if (rc)
+        if ((rc = otp_set_soak(otp, (tries % 2) ? 1 : 2)) < 0)
             goto undo_soak;
 
-        rc = otp_program(otp->ahb, address, prog);
-        if (rc)
+        if ((rc = otp_program(otp, address, prog)) < 0)
             goto undo_soak;
     } while (tries++ < NUM_PROG_TRIES);
 
@@ -262,20 +251,25 @@ undo_soak:
     return rc;
 }
 
-int otp_init(struct otp *otp, struct ahb *ahb)
+static const struct soc_device_id otp_match[] = {
+    { .compatible = "aspeed,ast2600-secure-boot-controller" },
+    { },
+};
+
+int otp_init(struct otp *otp, struct soc *soc)
 {
-    int64_t rev;
+    struct soc_device_node dn;
+    int rc;
 
-    otp->ahb = ahb;
+    if ((rc = soc_device_match_node(soc, otp_match, &dn)) < 0)
+        return rc;
 
-    rev = rev_probe(ahb);
-    if (rev < 0)
-        return (int)rev;
+    if ((rc = soc_device_get_memory(soc, &dn, &otp->iomem)) < 0)
+        return rc;
 
-    if (!rev_is_generation((uint32_t)rev, ast_g6))
-        return -EOPNOTSUPP;
+    otp->soc = soc;
 
-    if (rev_stepping((uint32_t)rev) >= 2) {
+    if (soc_stepping(soc) >= 2) {
         logi("Detected AST2600 A2\n");
 
         otp->timings[0] = 0x04190760;
@@ -320,8 +314,7 @@ int otp_read(struct otp *otp, enum otp_region reg)
 {
     int rc;
 
-    rc = otp_writel(otp->ahb, OTP_PROTECT_KEY, OTP_PASSWD);
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_PROTECT_KEY, OTP_PASSWD)) < 0)
         return rc;
 
     if (reg == otp_region_strap) {
@@ -331,31 +324,25 @@ int otp_read(struct otp *otp, enum otp_region reg)
         uint32_t protect[2];
         uint32_t scu_protect[2];
 
-        rc = otp_read_config(otp->ahb, 28, &scu_protect[0]);
-        if (rc)
+        if ((rc = otp_read_config(otp, 28, &scu_protect[0])) < 0)
             goto done;
 
-        rc = otp_read_config(otp->ahb, 29, &scu_protect[1]);
-        if (rc)
+        if ((rc = otp_read_config(otp, 29, &scu_protect[1])) < 0)
             goto done;
 
-        rc = otp_read_config(otp->ahb, 30, &protect[0]);
-        if (rc)
+        if ((rc = otp_read_config(otp, 30, &protect[0])) < 0)
             goto done;
 
-        rc = otp_read_config(otp->ahb, 31, &protect[1]);
-        if (rc)
+        if ((rc = otp_read_config(otp, 31, &protect[1])) < 0)
             goto done;
 
         for (i = 0; i < 6; ++i) {
             int o = 16 + (i * 2);
 
-            rc = otp_read_config(otp->ahb, o, &strap[i][0]);
-            if (rc)
+            if ((rc = otp_read_config(otp, o, &strap[i][0])) < 0)
                 goto done;
 
-            rc = otp_read_config(otp->ahb, o + 1, &strap[i][1]);
-            if (rc)
+            if ((rc = otp_read_config(otp, o + 1, &strap[i][1])) < 0)
                     goto done;
 
             res[0] ^= strap[i][0];
@@ -375,8 +362,7 @@ int otp_read(struct otp *otp, enum otp_region reg)
         uint32_t conf[NUM_OTP_CONF];
 
         for (i = 0; i < NUM_OTP_CONF; ++i) {
-            rc = otp_read_config(otp->ahb, i, &conf[i]);
-            if (rc)
+            if ((rc = otp_read_config(otp, i, &conf[i])) < 0)
                 goto done;
         }
 
@@ -386,7 +372,8 @@ int otp_read(struct otp *otp, enum otp_region reg)
     }
 
 done:
-    otp_writel(otp->ahb, OTP_PROTECT_KEY, 0);
+    otp_writel(otp, OTP_PROTECT_KEY, 0);
+
     return rc;
 }
 
@@ -402,12 +389,10 @@ int otp_write_conf(struct otp *otp, unsigned int word, unsigned int bit)
 
     bitmask = 1 << bit;
 
-    rc = otp_writel(otp->ahb, OTP_PROTECT_KEY, OTP_PASSWD);
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_PROTECT_KEY, OTP_PASSWD)) < 0)
         return rc;
 
-    rc = otp_read_config(otp->ahb, word, &conf);
-    if (rc)
+    if ((rc = otp_read_config(otp, word, &conf)) < 0)
         goto done;
 
     if (conf & bitmask) {
@@ -421,14 +406,13 @@ int otp_write_conf(struct otp *otp, unsigned int word, unsigned int bit)
     address |= (word % 8) * 2;
 
     logi("Writing configuration at OTP %04x with %08x\n", address, bitmask);
-    rc = otp_confirm();
-    if (rc)
+    if ((rc = otp_confirm()) < 0)
         goto done;
 
     rc = otp_write(otp, address, bitmask);
 
 done:
-    otp_writel(otp->ahb, OTP_PROTECT_KEY, 0);
+    otp_writel(otp, OTP_PROTECT_KEY, 0);
     return rc;
 }
 
@@ -447,8 +431,7 @@ int otp_write_strap(struct otp *otp, unsigned int bit, unsigned int val)
     if (bit >= 64 || val > 1)
         return -EINVAL;
 
-    rc = otp_writel(otp->ahb, OTP_PROTECT_KEY, OTP_PASSWD);
-    if (rc)
+    if ((rc = otp_writel(otp, OTP_PROTECT_KEY, OTP_PASSWD)) < 0)
         return rc;
 
     if (bit > 31) {
@@ -458,8 +441,7 @@ int otp_write_strap(struct otp *otp, unsigned int bit, unsigned int val)
 
     bitmask = 1 << bit;
 
-    rc = otp_read_config(otp->ahb, 30 + word, &protect);
-    if (rc)
+    if ((rc = otp_read_config(otp, 30 + word, &protect)) < 0)
         goto done;
 
     if (protect & bitmask) {
@@ -471,8 +453,7 @@ int otp_write_strap(struct otp *otp, unsigned int bit, unsigned int val)
     for (i = 0; i < 6; ++i) {
         uint32_t o = 16 + (i * 2);
 
-        rc = otp_read_config(otp->ahb, o + word, &strap[i]);
-        if (rc)
+        if ((rc = otp_read_config(otp, o + word, &strap[i])) < 0)
             goto done;
 
         res ^= strap[i];
@@ -498,13 +479,13 @@ int otp_write_strap(struct otp *otp, unsigned int bit, unsigned int val)
     address |= (i % 8) * 2;
 
     logi("Writing strap at OTP %04x with %08x\n", address, bitmask);
-    rc = otp_confirm();
-    if (rc)
+    if ((rc = otp_confirm()) < 0)
         goto done;
 
     rc = otp_write(otp, address, bitmask);
 
 done:
-    otp_writel(otp->ahb, OTP_PROTECT_KEY, 0);
+    otp_writel(otp, OTP_PROTECT_KEY, 0);
+
     return rc;
 }

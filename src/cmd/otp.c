@@ -15,6 +15,7 @@ int cmd_otp(const char *name, int argc, char *argv[])
 {
     enum otp_region reg = otp_region_conf;
     struct ahb _ahb, *ahb = &_ahb;
+    struct soc _soc, *soc = &_soc;
     struct otp _otp, *otp = &_otp;
     bool rd = true;
     int argo = 2;
@@ -48,8 +49,7 @@ int cmd_otp(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    rc = ast_ahb_from_args(ahb, argc - argo, &argv[argo]);
-    if (rc < 0) {
+    if ((rc = ast_ahb_from_args(ahb, argc - argo, &argv[argo])) < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
             priv_print_unprivileged(name);
@@ -62,12 +62,16 @@ int cmd_otp(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    rc = otp_init(otp, ahb);
-    if (rc < 0) {
+    if ((rc = soc_probe(soc, ahb)) < 0) {
+        errno = -rc;
+        perror("soc_probe");
+        goto cleanup_ahb;
+    }
+
+    if ((rc = otp_init(otp, soc)) < 0) {
         errno = -rc;
         perror("otp_init");
-        cleanup = ahb_destroy(ahb);
-        exit(EXIT_FAILURE);
+        goto cleanup_soc;
     }
 
     if (rd)
@@ -92,6 +96,10 @@ int cmd_otp(const char *name, int argc, char *argv[])
         }
     }
 
+cleanup_soc:
+    soc_destroy(soc);
+
+cleanup_ahb:
     cleanup = ahb_destroy(ahb);
     if (cleanup < 0) { errno = -cleanup; perror("ahb_destroy"); }
 
