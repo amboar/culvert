@@ -4,6 +4,7 @@
 #ifndef _WDT_H
 #define _WDT_H
 
+#include "clk.h"
 #include "soc.h"
 
 int wdt_prevent_reset(struct soc *soc);
@@ -11,6 +12,7 @@ int wdt_prevent_reset(struct soc *soc);
 struct wdt {
 	struct soc *soc;
 	struct soc_region iomem;
+	struct clk clk;
 };
 
 int wdt_init(struct wdt *ctx, struct soc *soc, const char *name);

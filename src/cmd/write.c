@@ -23,6 +23,7 @@ int cmd_write(const char *name, int argc, char *argv[])
 {
     struct vuart _vuart, *vuart = &_vuart;
     struct ahb _ahb, *ahb = &_ahb;
+    struct clk _clk, *clk = &_clk;
     struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
     bool live = false;
@@ -78,34 +79,35 @@ int cmd_write(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    rc = soc_probe(soc, ahb);
-    if (rc < 0) {
+    if ((rc = soc_probe(soc, ahb)) < 0) {
         errno = -rc;
         perror("soc_probe");
-        exit(EXIT_FAILURE);
+        goto cleanup_ahb;
     }
+
+    if ((rc = clk_init(clk, soc))) {
+        errno = -rc;
+        perror("clk_init");
+        goto cleanup_soc;
+    }
+
+    if ((rc = vuart_init(vuart, soc, "vuart")) < 0)
+        goto cleanup_clk;
 
     if (ahb->bridge == ahb_devmem)
         loge("I hope you know what you are doing\n");
     else if (live) {
         logi("Preventing system reset\n");
-        rc = wdt_prevent_reset(soc);
-        if (rc < 0)
-            goto cleanup_ahb;
+        if ((rc = wdt_prevent_reset(soc)) < 0)
+            goto cleanup_state;
 
         logi("Gating ARM clock\n");
-        rc = clk_disable(ahb, clk_arm);
-        if (rc < 0)
-            goto cleanup_soc;
-
-        rc = vuart_init(vuart, soc, "vuart");
-        if (rc < 0)
-            goto cleanup_clk;
+        if ((rc = clk_disable(clk, clk_arm)) < 0)
+            goto cleanup_state;
 
         logi("Configuring VUART for host Tx discard\n");
-        rc = vuart_set_host_tx_discard(vuart, discard_enable);
-        if (rc < 0)
-            goto cleanup_clk;
+        if ((rc = vuart_set_host_tx_discard(vuart, discard_enable)) < 0)
+            goto cleanup_state;
     }
 
     logi("Initialising flash subsystem\n");
@@ -133,21 +135,23 @@ int cmd_write(const char *name, int argc, char *argv[])
         do {
             if (ingress < SFC_FLASH_WIN) {
                 loge("Unexpected ingress value: 0x%zx\n", ingress);
-                goto cleanup_flash;
+                goto cleanup_buf;
             }
 
             rc = flash_erase(chip, phys, ingress);
             if (rc < 0)
-                goto cleanup_flash;
+                goto cleanup_buf;
 
             rc = flash_write(chip, phys, buf, ingress, true);
-            if (rc < 0)
-                break;
         } while (rc == -EREMOTEIO); /* Miscompare */
+
+        if (rc)
+            break;
 
         phys += ingress;
     }
 
+cleanup_buf:
     free(buf);
 
 cleanup_flash:
@@ -156,54 +160,60 @@ cleanup_flash:
 cleanup_sfc:
     sfc_destroy(sfc);
 
-cleanup_soc:
-    if (live && !rc && ahb->bridge != ahb_devmem) {
-        struct wdt _wdt, *wdt = &_wdt;
-        int64_t wait;
+cleanup_state:
+    if (live) {
+        if (rc == 0) {
+            if (ahb->bridge != ahb_devmem) {
+                struct wdt _wdt, *wdt = &_wdt;
+                int64_t wait;
 
-        logi("Performing SoC reset\n");
-        rc = wdt_init(wdt, soc, "wdt2");
-        if (rc < 0) {
-            goto cleanup_clk;
+                logi("Performing SoC reset\n");
+                rc = wdt_init(wdt, soc, "wdt2");
+                if (rc < 0) {
+                    goto cleanup_clk;
+                }
+
+                wait = wdt_perform_reset(wdt);
+
+                wdt_destroy(wdt);
+
+                if (wait < 0) {
+                    rc = wait;
+                    goto cleanup_clk;
+                }
+
+                usleep(wait);
+            }
+        } else {
+            logi("Deconfiguring VUART host Tx discard\n");
+            if ((cleanup = vuart_set_host_tx_discard(vuart, discard_disable))) {
+                errno = -cleanup;
+                perror("vuart_set_host_tx_discard");
+            }
+
+            logi("Ungating ARM clock\n");
+            if ((cleanup = clk_enable(clk, clk_arm))) {
+                errno = -cleanup;
+                perror("clk_enable");
+            }
         }
-
-        wait = wdt_perform_reset(wdt);
-
-        wdt_destroy(wdt);
-
-        if (wait < 0) {
-            rc = wait;
-            goto cleanup_clk;
-        }
-
-        usleep(wait);
     }
 
 cleanup_vuart:
-    if (live) {
-        logi("Deconfiguring VUART host Tx discard\n");
-        cleanup = vuart_set_host_tx_discard(vuart, discard_disable);
-        if (cleanup) { errno = -cleanup; perror("vuart_set_host_tx_discard"); }
-
-        vuart_destroy(vuart);
-    }
+    vuart_destroy(vuart);
 
 cleanup_clk:
-    if (live && rc < 0) {
-        logi("Ungating ARM clock\n");
-        cleanup = clk_enable(ahb, clk_arm);
-        if (cleanup) { errno = -cleanup; perror("clk_enable"); }
-    }
+    clk_destroy(clk);
 
-cleanup_ahb:
+cleanup_soc:
     soc_destroy(soc);
 
-    cleanup = ahb_cleanup(ahb);
-    if (cleanup) { errno = -cleanup; perror("ahb_cleanup"); }
+cleanup_ahb:
+    if ((cleanup = ahb_cleanup(ahb))) {
+        errno = -cleanup;
+        perror("ahb_cleanup");
+    }
 
-    if (rc < 0)
-        exit(EXIT_FAILURE);
-
-    return 0;
+    return rc;
 }
 

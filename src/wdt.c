@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
 
-#include "ast.h"
 #include "log.h"
 #include "wdt.h"
 
@@ -34,8 +33,7 @@ int wdt_init(struct wdt *ctx, struct soc *soc, const char *name)
     struct soc_device_node dn;
     int rc;
 
-    rc = soc_device_from_name(soc, name, &dn);
-    if (rc < 0) {
+    if ((rc = soc_device_from_name(soc, name, &dn)) < 0) {
         loge("wdt: Failed to find device by name '%s': %d\n", name, rc);
         return rc;
     }
@@ -54,6 +52,9 @@ int wdt_init(struct wdt *ctx, struct soc *soc, const char *name)
     if ((rc = soc_device_get_memory(soc, &dn, &ctx->iomem)) < 0)
         return rc;
 
+    if ((rc = clk_init(&ctx->clk, soc)) < 0)
+        return rc;
+
     ctx->soc = soc;
 
     return 0;
@@ -61,6 +62,7 @@ int wdt_init(struct wdt *ctx, struct soc *soc, const char *name)
 
 void wdt_destroy(struct wdt *ctx)
 {
+    clk_destroy(&ctx->clk);
     ctx->soc = NULL;
 }
 
@@ -189,9 +191,7 @@ int64_t wdt_perform_reset(struct wdt *ctx)
         return rc;
 
     /* The ARM clock gate is sticky on reset?! Ensure it's clear  */
-    rc = soc_writel(ctx->soc, AST_G5_SCU | SCU_SILICON_REVISION,
-                    SCU_HW_STRAP_ARM_CLK);
-    if (rc < 0)
+    if ((rc = clk_enable(&ctx->clk, clk_arm)) < 0)
         return rc;
 
     rc = wdt_writel(ctx, WDT_RELOAD, 0);

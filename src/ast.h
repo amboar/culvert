@@ -30,7 +30,6 @@ enum ast_generation { ast_g4, ast_g5, ast_g6 };
 #define   SCU_HW_STRAP			0x70
 #define     SCU_HW_STRAP_UART_DBG_SEL	(1 << 29)
 #define     SCU_HW_STRAP_SIO_DEC	(1 << 20)
-#define     SCU_HW_STRAP_ARM_CLK	(1 <<  0)
 #define   SCU_SILICON_REVISION		0x7c
 #define   SCU_PCIE_CONFIG		0x180
 #define     SCU_PCIE_CONFIG_BMC_XDMA    (1 << 14)

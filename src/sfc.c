@@ -6,6 +6,7 @@
 #define _GNU_SOURCE
 #include "ast.h"
 #include "bits.h"
+#include "clk.h"
 #include "log.h"
 #include "sfc.h"
 
@@ -47,6 +48,7 @@ struct sfc_data {
     struct soc *soc;
     struct soc_region iomem;
     struct soc_region flash;
+    struct clk clk;
 
     /* We have 2 controllers, one for the BMC flash, one for the PNOR */
     uint8_t    type;
@@ -335,40 +337,10 @@ static int sfc_read(struct sfc *ctrl, uint32_t pos, void *buf, uint32_t len)
 
 static void ast2500_get_ahb_freq(struct sfc_data *ct)
 {
-    static const uint32_t cpu_freqs_24_48[] = {
-	384000000,
-	360000000,
-	336000000,
-	408000000
-    };
-    static const uint32_t cpu_freqs_25[] = {
-	400000000,
-	375000000,
-	350000000,
-	425000000
-    };
-    static const uint32_t ahb_div[] = { 1, 2, 4, 3 };
-    uint32_t strap, cpu_clk, div;
-    int rc;
-
     if (ast_ahb_freq)
 	return;
 
-    /* HW strapping gives us the CPU freq and AHB divisor */
-    rc = soc_readl(ct->soc, AST_G5_SCU | SCU_HW_STRAP, &strap);
-    if (rc < 0) { errno = -rc; perror("soc_readl"); return; }
-
-    if (strap & 0x00800000) {
-	SFC_INF("AST: CLKIN 25Mhz\n");
-	cpu_clk = cpu_freqs_25[(strap >> 8) & 3];
-    } else {
-	SFC_INF("AST: CLKIN 24/48Mhz\n");
-	cpu_clk = cpu_freqs_24_48[(strap >> 8) & 3];
-    }
-    SFC_INF("AST: CPU frequency: %d Mhz\n", cpu_clk / 1000000);
-    div = ahb_div[(strap >> 10) & 3];
-    ast_ahb_freq = cpu_clk / div;
-    SFC_INF("AST: AHB frequency: %d Mhz\n", ast_ahb_freq / 1000000);
+    ast_ahb_freq = clk_get_rate(&ct->clk, clk_ahb);
 }
 
 static int sfc_check_reads(struct sfc_data *ct,
