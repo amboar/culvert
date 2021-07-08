@@ -5,6 +5,7 @@
 #define _SOC_H
 
 #include "ahb.h"
+#include "rev.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -23,6 +24,11 @@ struct soc {
 int soc_probe(struct soc *ctx, struct ahb *ahb);
 
 void soc_destroy(struct soc *ctx);
+
+static inline enum ast_generation soc_generation(struct soc *ctx)
+{
+	return rev_generation(ctx->rev);
+}
 
 static inline ssize_t
 soc_read(struct soc *ctx, uint32_t phys, void *buf, size_t len)
