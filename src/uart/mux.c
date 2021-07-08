@@ -1,15 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
 
+#include "../ast.h"
+#include "../mb.h"
+
+#include "mux.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <strings.h>
 #include <sys/types.h>
 
-#include "../ast.h"
-#include "../mb.h"
-
-#include "mux.h"
+#define AST_G5_LPC			0x1e789000
+#define   LPC_HICR9			0x98
+#define     LPC_HICR9_SEL6IO		(0b1111 << 8)
+#define   LPC_HICRA			0x9c
+#define     LPC_HICRA_SEL5DW		(0b1111 << 28)
+#define     LPC_HICRA_SEL4DW		(0b111 << 25)
+#define     LPC_HICRA_SEL3DW		(0b111 << 22)
+#define     LPC_HICRA_SEL2DW		(0b111 << 19)
+#define     LPC_HICRA_SEL1DW		(0b111 << 16)
+#define     LPC_HICRA_SEL5IO		(0b111 << 12)
+#define     LPC_HICRA_SEL4IO		(0b111 << 9)
+#define     LPC_HICRA_SEL3IO		(0b111 << 6)
+#define     LPC_HICRA_SEL2IO		(0b111 << 3)
+#define     LPC_HICRA_SEL1IO		(0b111 << 0)
 
 const struct mux_obj _mux_obj_io1 = { .type = mux_io, .io = io1 },
                      *mux_obj_io1 = &_mux_obj_io1;

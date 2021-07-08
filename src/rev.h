@@ -4,11 +4,12 @@
 #ifndef _REV_H
 #define _REV_H
 
-#include "ast.h"
 #include "ahb.h"
 
 #include <stdbool.h>
 #include <stdint.h>
+
+enum ast_generation { ast_g4, ast_g5, ast_g6 };
 
 int64_t rev_probe(struct ahb *ahb);
 bool rev_is_supported(uint32_t rev);
