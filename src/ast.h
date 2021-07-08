@@ -53,20 +53,6 @@ enum ast_generation { ast_g4, ast_g5, ast_g6 };
 #define     SCU_PCIE_CONFIG_VGA_MMIO	(1 << 1)
 #define     SCU_PCIE_CONFIG_VGA		(1 << 0)
 #define   SCU_PCIE_MMIO_CONFIG		0x184
-#define AST_G5_WDT			0x1e785000
-#define   WDT_SIZE			0x20
-#define	  WDT_RELOAD			0x04
-#define   WDT_RESTART                   0x08
-#define   WDT_CTRL			0x0c
-#define     WDT_CTRL_BOOT_1             (0 << 7)
-#define     WDT_CTRL_BOOT_2             (1 << 7)
-#define     WDT_CTRL_RESET_SOC          (0b00 << 5)
-#define     WDT_CTRL_RESET_SYS          (0b01 << 5)
-#define     WDT_CTRL_RESET_CPU          (0b10 << 5)
-#define	    WDT_CTRL_CLK_1MHZ		(1 << 4)
-#define     WDT_CTRL_SYS_RESET		(1 << 1)
-#define     WDT_CTRL_ENABLE		(1 << 0)
-#define   WDT_RESET_MASK		0x1c
 #define AST_G5_LPC			0x1e789000
 #define   LPC_HICR9			0x98
 #define     LPC_HICR9_SEL6IO		(0b1111 << 8)

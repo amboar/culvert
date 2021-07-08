@@ -10,6 +10,9 @@
 
 	aliases {
 		vuart = &vuart;
+		wdt1 = &wdt1;
+		wdt2 = &wdt2;
+		wdt3 = &wdt3;
 	};
 
 	memory@80000000 {
@@ -41,6 +44,21 @@
 			syscon: syscon@1e6e2000 {
 				compatible = "aspeed,ast2500-scu", "syscon", "simple-mfd";
 				reg = <0x1e6e2000 0x1a8>;
+			};
+
+			wdt1: watchdog@1e785000 {
+				compatible = "aspeed,ast2500-wdt";
+				reg = <0x1e785000 0x20>;
+			};
+
+			wdt2: watchdog@1e785020 {
+				compatible = "aspeed,ast2500-wdt";
+				reg = <0x1e785020 0x20>;
+			};
+
+			wdt3: watchdog@1e785040 {
+				compatible = "aspeed,ast2500-wdt";
+				reg = <0x1e785040 0x20>;
 			};
 
 			vuart: serial@1e787000 {

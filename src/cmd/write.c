@@ -89,7 +89,7 @@ int cmd_write(const char *name, int argc, char *argv[])
         loge("I hope you know what you are doing\n");
     else if (live) {
         logi("Preventing system reset\n");
-        rc = wdt_prevent_reset(ahb);
+        rc = wdt_prevent_reset(soc);
         if (rc < 0)
             goto cleanup_ahb;
 
@@ -158,10 +158,19 @@ cleanup_sfc:
 
 cleanup_soc:
     if (live && !rc && ahb->bridge != ahb_devmem) {
+        struct wdt _wdt, *wdt = &_wdt;
         int64_t wait;
 
         logi("Performing SoC reset\n");
-        wait = wdt_perform_reset(ahb);
+        rc = wdt_init(wdt, soc, "wdt2");
+        if (rc < 0) {
+            goto cleanup_clk;
+        }
+
+        wait = wdt_perform_reset(wdt);
+
+        wdt_destroy(wdt);
+
         if (wait < 0) {
             rc = wait;
             goto cleanup_clk;
