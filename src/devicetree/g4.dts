@@ -40,6 +40,11 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
+			sdmc: memory-controller@1e6e0000 {
+				compatible = "aspeed,ast2400-sdram-controller";
+				reg = <0x1e6e0000 0x174>;
+			};
+
 			syscon: syscon@1e6e2000 {
 				compatible = "aspeed,ast2400-scu", "syscon", "simple-mfd";
 				reg = <0x1e6e2000 0x1a8>;

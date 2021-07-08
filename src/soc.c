@@ -127,9 +127,8 @@ int soc_device_match_node(struct soc *ctx,
 
 int soc_device_is_compatible(struct soc *ctx,
 			     const struct soc_device_id table[],
-			     struct soc_device_node *dn)
+			     const struct soc_device_node *dn)
 {
-
 	while (table->compatible) {
 		int rc;
 
@@ -153,6 +152,35 @@ int soc_device_is_compatible(struct soc *ctx,
 
 	/* Failed to find it */
 	return 0;
+}
+
+const void *soc_device_get_match_data(struct soc *ctx,
+				      const struct soc_device_id table[],
+				      const struct soc_device_node *dn)
+{
+	while (table->compatible) {
+		int rc;
+
+		rc = fdt_node_check_compatible(ctx->fdt.start, dn->offset,
+					       table->compatible);
+
+		/* Bad node */
+		if (rc < 0) {
+			loge("fdt: Failed to look up compatible: %d\n", rc);
+			return NULL;
+		}
+
+		/* Found it */
+		if (rc == 0)
+			return table->data;
+
+		/* Have a compatible property but no match, keep looking */
+		assert(rc == 1);
+		table++;
+	}
+
+	/* Failed to find it */
+	return NULL;
 }
 
 int soc_device_from_name(struct soc *ctx, const char *name,
@@ -183,6 +211,29 @@ int soc_device_from_name(struct soc *ctx, const char *name,
 	dn->offset = rc;
 
 	return 0;
+}
+
+int soc_device_from_type(struct soc *ctx, const char *type,
+			 struct soc_device_node *dn)
+{
+	int node;
+
+	logd("fdt: Searching devicetree for type '%s'\n", type);
+
+	fdt_for_each_subnode(node, ctx->fdt.start, 0) {
+		const char *found;
+
+		found = fdt_getprop(ctx->fdt.start, node, "device_type", NULL);
+		if (found && !strcmp(type, found)) {
+			dn->offset = node;
+			return 0;
+		}
+	}
+
+	if ((node < 0) && (node != -FDT_ERR_NOTFOUND))
+		return -EUCLEAN;
+
+	return -ENOENT;
 }
 
 int soc_device_get_memory(struct soc *ctx, const struct soc_device_node *dn,

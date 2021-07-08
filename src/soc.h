@@ -59,15 +59,19 @@ int soc_device_match_node(struct soc *ctx,
 			  const struct soc_device_id table[],
 			  struct soc_device_node *dn);
 
-int soc_device_is_compatible(struct soc *ctx,
-			     const struct soc_device_id table[],
-			     struct soc_device_node *dn);
-
-const void *
-soc_device_get_match_data(struct soc *ctx, const struct soc_device_id table[]);
-
 int soc_device_from_name(struct soc *ctx, const char *name,
 			 struct soc_device_node *dn);
+
+int soc_device_from_type(struct soc *ctx, const char *type,
+			 struct soc_device_node *dn);
+
+int soc_device_is_compatible(struct soc *ctx,
+			     const struct soc_device_id table[],
+			     const struct soc_device_node *dn);
+
+const void *soc_device_get_match_data(struct soc *ctx,
+				      const struct soc_device_id table[],
+				      const struct soc_device_node *dn);
 
 struct soc_region {
 	uint32_t start;

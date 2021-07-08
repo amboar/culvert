@@ -16,21 +16,9 @@
 #include "mb.h"
 #include "p2a.h"
 #include "priv.h"
+#include "sdmc.h"
+#include "soc.h"
 #include "rev.h"
-
-const uint32_t bmc_dram_sizes[4] = {
-    [0b00] = 128  << 20,
-    [0b01] = 256  << 20,
-    [0b10] = 512  << 20,
-    [0b11] = 1024 << 20,
-};
-
-const uint32_t bmc_vram_sizes[4] = {
-    [0b00] = 8  << 20,
-    [0b01] = 16 << 20,
-    [0b10] = 32 << 20,
-    [0b11] = 64 << 20,
-};
 
 const char *ast_ip_state_desc[4] = {
     [ip_state_unknown] = "Unknown",
@@ -227,32 +215,30 @@ static int ast_kernel_status(struct ahb *ctx, struct ast_cap_kernel *kernel)
     return 0;
 }
 
-static int ast_xdma_status(struct ahb *ctx, struct ast_cap_xdma *xdma)
+static int ast_xdma_status(struct ahb *ahb, struct ast_cap_xdma *xdma)
 {
-    uint32_t val;
-    int64_t rev;
+    struct sdmc _sdmc, *sdmc = &_sdmc;
+    struct soc _soc, *soc = &_soc;
     int rc;
 
-    rev = rev_probe(ctx);
-    if (rev < 0)
-        return rev;
-
-    if (rev_is_generation(rev, ast_g6))
-        return 0;
-
-    rc = ahb_readl(ctx, AST_G5_SDMC | SDMC_GMP, &val);
-    if (rc)
+    if ((rc = soc_probe(soc, ahb)) < 0)
         return rc;
 
-    if (rev_is_generation(rev, ast_g4)) {
-        xdma->unconstrained = !(val & SDMC_GMP_G4_XDMA);
-    } else if (rev_is_generation(rev, ast_g5)) {
-        xdma->unconstrained = !(val & SDMC_GMP_G5_XDMA);
-    } else {
-        return -ENOTSUP;
-    }
+    if ((rc = sdmc_init(sdmc, soc)) < 0)
+        goto cleanup_soc;
 
-    return 0;
+    if ((rc = sdmc_constrains_xdma(sdmc)) < 0)
+        goto cleanup_sdmc;
+
+    xdma->unconstrained = !rc;
+
+cleanup_sdmc:
+    sdmc_destroy(sdmc);
+
+cleanup_soc:
+    soc_destroy(soc);
+
+    return rc;
 }
 
 int ast_ahb_bridge_probe(struct ast_interfaces *state)

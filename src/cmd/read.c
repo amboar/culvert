@@ -1,26 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "ahb.h"
 #include "ast.h"
 #include "log.h"
 #include "priv.h"
+#include "sdmc.h"
+#include "soc.h"
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define BMC_FLASH_LEN   (32 << 20)
 
-static int cmd_dump_firmware(struct ahb *ahb)
+static int cmd_dump_firmware(struct soc *soc)
 {
     uint32_t restore_tsr, sfc_tsr, sfc_wafcr;
     int cleanup;
     int rc;
 
     logi("Testing BMC SFC write filter configuration\n");
-    rc = ahb_readl(ahb, 0x1e6200a4, &sfc_wafcr);
-    if (rc) { errno = -rc; perror("ahb_readl"); return rc; }
+    rc = soc_readl(soc, 0x1e6200a4, &sfc_wafcr);
+    if (rc) { errno = -rc; perror("soc_readl"); return rc; }
 
     if (sfc_wafcr) {
         loge("Found write filter configuration 0x%x\n", sfc_wafcr);
@@ -30,64 +33,60 @@ static int cmd_dump_firmware(struct ahb *ahb)
 
     /* Disable writes to CE0 - chip enables are swapped for alt boot */
     logi("Write-protecting BMC SFC\n");
-    rc = ahb_readl(ahb, 0x1e620000, &sfc_tsr);
-    if (rc) { errno = -rc; perror("ahb_readl"); return rc; }
+    rc = soc_readl(soc, 0x1e620000, &sfc_tsr);
+    if (rc) { errno = -rc; perror("soc_readl"); return rc; }
 
     restore_tsr = sfc_tsr;
     sfc_tsr &= ~(1 << 16);
 
-    rc = ahb_writel(ahb, 0x1e620000, sfc_tsr);
-    if (rc) { errno = -rc; perror("ahb_writel"); goto cleanup_sfc; }
+    rc = soc_writel(soc, 0x1e620000, sfc_tsr);
+    if (rc) { errno = -rc; perror("soc_writel"); goto cleanup_sfc; }
 
     logi("Exfiltrating BMC flash to stdout\n\n");
-    rc = ahb_siphon_in(ahb, AST_G5_BMC_FLASH, BMC_FLASH_LEN, 1);
-    if (rc) { errno = -rc; perror("ahb_siphon_in"); }
+    rc = soc_siphon_in(soc, AST_G5_BMC_FLASH, BMC_FLASH_LEN, 1);
+    if (rc) { errno = -rc; perror("soc_siphon_in"); }
 
 cleanup_sfc:
     logi("Clearing BMC SFC write protect state\n");
-    cleanup = ahb_writel(ahb, 0x1e620000, restore_tsr);
-    if (cleanup) { errno = -cleanup; perror("ahb_writel"); }
+    cleanup = soc_writel(soc, 0x1e620000, restore_tsr);
+    if (cleanup) { errno = -cleanup; perror("soc_writel"); }
 
     return rc;
 }
 
-static int cmd_dump_ram(struct ahb *ahb)
+static int cmd_dump_ram(struct soc *soc)
 {
-    uint32_t scu_rev, sdmc_conf;
-    uint32_t dram, vram, aram;
+    struct sdmc _sdmc, *sdmc = &_sdmc;
+    struct soc_region dram, vram;
     int rc;
 
-    /* Test BMC silicon revision to make sure we use the right memory map */
-    logi("Checking ASPEED BMC silicon revision\n");
-    rc = ahb_readl(ahb, 0x1e6e207c, &scu_rev);
-    if (rc) { errno = -rc; perror("ahb_readl"); return rc; }
+    if ((rc = sdmc_init(sdmc, soc)))
+        return rc;
 
-    if ((scu_rev >> 24) != 0x04) {
-        loge("Unsupported BMC revision: 0x%08x\n", scu_rev);
-        return -ENOTSUP;
-    }
+    if ((rc = sdmc_get_dram(sdmc, &dram)))
+        return rc;
 
-    logi("Found AST2500-family BMC\n");
-
-    rc = ahb_readl(ahb, 0x1e6e0004, &sdmc_conf);
-    if (rc) { errno = -rc; perror("ahb_readl"); return rc; }
-
-    dram = bmc_dram_sizes[sdmc_conf & 0x03];
-    vram = bmc_vram_sizes[(sdmc_conf >> 2) & 0x03];
-    aram = dram - vram; /* Accessible DRAM */
+    if ((rc = sdmc_get_vram(sdmc, &vram)))
+        return rc;
 
     logi("%dMiB DRAM with %dMiB VRAM; dumping %dMiB (0x%x-0x%08x)\n",
-         dram >> 20, vram >> 20, aram >> 20, AST_G5_DRAM,
-         AST_G5_DRAM + aram - 1);
+         dram.length >> 20, vram.length >> 20,
+         (dram.length - vram.length) >> 20, dram.start, vram.start - 1);
 
-    rc = ahb_siphon_in(ahb, AST_G5_DRAM, aram, 1);
-    if (rc) { errno = -rc; perror("ahb_siphon_in"); }
+    rc = soc_siphon_in(soc, dram.start, dram.length - vram.length, 1);
+    if (rc) {
+        errno = -rc;
+        perror("soc_siphon_in");
+    }
+
+    sdmc_destroy(sdmc);
 
     return rc;
 }
 
 int cmd_read(const char *name, int argc, char *argv[])
 {
+    struct soc _soc, *soc = &_soc;
     struct ahb _ahb, *ahb = &_ahb;
     int rc, cleanup;
 
@@ -111,15 +110,22 @@ int cmd_read(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    rc = soc_probe(soc, ahb);
+    if (rc < 0)
+        goto cleanup_ahb;
+
     if (!strcmp("firmware", argv[0]))
-        rc = cmd_dump_firmware(ahb);
+        rc = cmd_dump_firmware(soc);
     else if (!strcmp("ram", argv[0]))
-        rc = cmd_dump_ram(ahb);
+        rc = cmd_dump_ram(soc);
     else {
         loge("Unsupported read type '%s'", argv[0]);
         rc = -EINVAL;
     }
 
+    soc_destroy(soc);
+
+cleanup_ahb:
     cleanup = ahb_destroy(ahb);
     if (cleanup) { errno = -cleanup; perror("ahb_destroy"); }
 

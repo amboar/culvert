@@ -23,10 +23,6 @@ enum ast_generation { ast_g4, ast_g5, ast_g6 };
 #define   SMC_CONF			0x00
 #define   SMC_CE0_CTRL			0x10
 #define   SMC_TIMING			0x94
-#define AST_G5_SDMC                     0x1e6e0000
-#define   SDMC_GMP                      0x08
-#define     SDMC_GMP_G5_XDMA            (1 << 17)
-#define     SDMC_GMP_G4_XDMA            (1 << 16)
 #define AST_G5_SCU			0x1e6e2000
 #define   SCU_MISC			0x2c
 #define     SCU_MISC_G4_P2A_DRAM_RO	(1 << 25)
@@ -71,10 +67,6 @@ enum ast_generation { ast_g4, ast_g5, ast_g6 };
 #define     LPC_HICRB_ILPC_RO		(1 << 6)
 #define AST_G5_BMC_FLASH  		0x20000000
 #define AST_G5_HOST_FLASH		0x30000000
-#define AST_G5_DRAM       		0x80000000
-
-extern const uint32_t bmc_dram_sizes[4];
-extern const uint32_t bmc_vram_sizes[4];
 
 enum ast_ip_state {
     ip_state_unknown,
