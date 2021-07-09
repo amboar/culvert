@@ -43,7 +43,7 @@ static void help(const char *name)
     printf("%s read ram [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s replace ram MATCH REPLACE\n", name);
-    printf("%s reset TYPE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);

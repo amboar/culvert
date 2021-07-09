@@ -20,6 +20,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define AST_SOC_IO	0x1e600000
+#define AST_SOC_IO_LEN	0x00200000
+
 int devmem_init(struct devmem *ctx)
 {
     int cleanup;
@@ -140,8 +143,8 @@ int devmem_readl(struct devmem *ctx, uint32_t phys, uint32_t *val)
     if (phys & 0x3)
         return -EINVAL;
 
-    if (phys >= AST_G5_SOC_IO && phys < (AST_G5_SOC_IO + AST_G5_SOC_IO_LEN)) {
-        off_t offset = phys - AST_G5_SOC_IO;
+    if (phys >= AST_SOC_IO && phys < (AST_SOC_IO + AST_SOC_IO_LEN)) {
+        off_t offset = phys - AST_SOC_IO;
         container = *((volatile uint32_t *)(((char *)ctx->io) + offset));
     } else {
         int64_t woff;
@@ -165,8 +168,8 @@ int devmem_writel(struct devmem *ctx, uint32_t phys, uint32_t val)
 
     val = htole32(val);
 
-    if (phys >= AST_G5_SOC_IO && phys < (AST_G5_SOC_IO + AST_G5_SOC_IO_LEN)) {
-        off_t offset = phys - AST_G5_SOC_IO;
+    if (phys >= AST_SOC_IO && phys < (AST_SOC_IO + AST_SOC_IO_LEN)) {
+        off_t offset = phys - AST_SOC_IO;
         *(volatile uint32_t *)(((char *)ctx->io) + offset) = val;
     } else {
         int64_t woff;

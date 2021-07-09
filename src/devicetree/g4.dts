@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2021 IBM Corp.
+
+/dts-v1/;
+
+/ {
+	compatible = "aspeed,ast2400";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	aliases {
+		vuart = &vuart;
+		wdt1 = &wdt1;
+		wdt2 = &wdt2;
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x40000000 0x20000000>;
+	};
+
+	ahb {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		sram: sram@1e720000 {
+			compatible = "mmio-sram";
+			reg = <0x1e720000 0x8000>;	// 32K
+		};
+
+		bus-controller@1e600000 {
+			compatible = "aspeed,ast2400-ahb-controller";
+			reg = <0x1e600000 0x20000>;
+		};
+
+		apb {
+			compatible = "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			sdmc: memory-controller@1e6e0000 {
+				compatible = "aspeed,ast2400-sdram-controller";
+				reg = <0x1e6e0000 0x174>;
+			};
+
+			syscon: syscon@1e6e2000 {
+				compatible = "aspeed,ast2400-scu", "syscon", "simple-mfd";
+				reg = <0x1e6e2000 0x1a8>;
+			};
+
+			wdt1: watchdog@1e785000 {
+				compatible = "aspeed,ast2400-wdt";
+				reg = <0x1e785000 0x20>;
+			};
+
+			wdt2: watchdog@1e785020 {
+				compatible = "aspeed,ast2400-wdt";
+				reg = <0x1e785020 0x20>;
+			};
+
+			vuart: serial@1e787000 {
+				compatible = "aspeed,ast2400-vuart";
+				reg = <0x1e787000 0x40>;
+			};
+
+			lpc: lpc@1e789000 {
+				compatible = "aspeed,ast2400-lpc-v2";
+				reg = <0x1e789000 0x1000>;
+			};
+		};
+	};
+};

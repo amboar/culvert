@@ -10,14 +10,17 @@
 #include "ast.h"
 #include "log.h"
 #include "priv.h"
+#include "sdmc.h"
+#include "soc.h"
 
 #define DUMP_RAM_WIN  (8 << 20)
 
 int cmd_replace(const char *name, int argc, char *argv[])
 {
+    struct sdmc _sdmc, *sdmc = &_sdmc;
+    struct soc _soc, *soc = &_soc;
     struct ahb _ahb, *ahb = &_ahb;
-    uint32_t scu_rev, sdmc_conf;
-    uint32_t dram, vram, aram;
+    struct soc_region dram, vram;
     size_t replace_len;
     size_t ram_cursor;
     void *win_chunk;
@@ -58,28 +61,21 @@ int cmd_replace(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    /* Test BMC silicon revision to make sure we use the right memory map */
-    logi("Checking ASPEED BMC silicon revision\n");
-    rc = ahb_readl(ahb, 0x1e6e207c, &scu_rev);
-    if (rc) { errno = -rc; perror("ahb_readl"); goto ahb_cleanup; }
-
-    if ((scu_rev >> 24) != 0x04) {
-        loge("Unsupported BMC revision: 0x%08x\n", scu_rev);
+    if ((rc = soc_probe(soc, ahb)))
         goto ahb_cleanup;
-    }
 
-    logi("Found AST2500-family BMC\n");
+    if ((rc = sdmc_init(sdmc, soc)))
+        goto soc_cleanup;
 
-    rc = ahb_readl(ahb, 0x1e6e0004, &sdmc_conf);
-    if (rc) { errno = -rc; perror("ahb_readl"); goto ahb_cleanup; }
+    if ((rc = sdmc_get_dram(sdmc, &dram)))
+        goto sdmc_cleanup;
 
-    dram = bmc_dram_sizes[sdmc_conf & 0x03];
-    vram = bmc_vram_sizes[(sdmc_conf >> 2) & 0x03];
-    aram = dram - vram; /* Accessible DRAM */
+    if ((rc = sdmc_get_vram(sdmc, &vram)))
+        goto sdmc_cleanup;
 
     replace_len = strlen(argv[1]);
-    for (ram_cursor = AST_G5_DRAM;
-         ram_cursor < AST_G5_DRAM + aram;
+    for (ram_cursor = dram.start;
+         ram_cursor < vram.start;
          ram_cursor += DUMP_RAM_WIN) {
         logi("Scanning BMC RAM in range 0x%08zx-0x%08zx\n",
              ram_cursor, ram_cursor + DUMP_RAM_WIN - 1);
@@ -116,6 +112,12 @@ int cmd_replace(const char *name, int argc, char *argv[])
             needle += replace_len;
         }
     }
+
+sdmc_cleanup:
+    sdmc_destroy(sdmc);
+
+soc_cleanup:
+    soc_destroy(soc);
 
 ahb_cleanup:
     cleanup = ahb_destroy(ahb);

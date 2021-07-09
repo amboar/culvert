@@ -4,12 +4,12 @@
 #ifndef _SFC_H
 #define _SFC_H
 
-#include "ahb.h"
+#include "soc.h"
 
 #include <stdbool.h>
 
-#define SFC_TYPE_FMC 		0
-#define SFC_TYPE_SMC 		1
+#define SFC_TYPE_FMC 		1U
+#define SFC_TYPE_SMC 		2U
 
 /* Flash commands */
 #define CMD_BE			0xd8	/* Block (64K) Erase */
@@ -74,7 +74,12 @@ struct sfc {
 	void *priv;
 };
 
-int sfc_init(struct sfc **ctrl, struct ahb *ahb, uint8_t type);
+int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name);
 int sfc_destroy(struct sfc *ctrl);
+
+int sfc_write_protect_save(struct sfc *ctrl, bool enable, uint32_t *save);
+int sfc_write_protect_restore(struct sfc *ctrl, uint32_t save);
+
+int sfc_get_flash(struct sfc *ctrl, struct soc_region *flash);
 
 #endif

@@ -464,7 +464,12 @@ int debug_writel(struct debug *ctx, uint32_t phys, uint32_t val)
     if (rc < 0)
         return rc;
 
+    /* XXX: This kludge is super annoying */
+#define AST_G5_WDT	0x1e785000
+#define   WDT_RELOAD	0x04
     if (!((phys & ~0x20) == (AST_G5_WDT | WDT_RELOAD) && val == 0)) {
+#undef AST_G5_WDT
+#undef    WDT_RELOAD
         rc = prompt_expect(&ctx->prompt, "$ ");
         if (rc < 0)
             return rc;

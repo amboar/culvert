@@ -6,10 +6,12 @@
 
 #include <stdint.h>
 
-#include "../ahb.h"
+#include "../soc.h"
 
 struct uart_mux {
-    struct ahb *ahb;
+    struct soc *soc;
+    struct soc_region lpc;
+
     uint32_t hicr9;
     uint32_t hicra;
 };
@@ -33,7 +35,8 @@ extern const struct mux_obj *mux_obj_uart2;
 extern const struct mux_obj *mux_obj_uart3;
 extern const struct mux_obj *mux_obj_uart5;
 
-int uart_mux_init(struct uart_mux *ctx, struct ahb *ahb);
+int uart_mux_init(struct uart_mux *ctx, struct soc *soc);
+void uart_mux_destroy(struct uart_mux *ctx);
 
 int uart_mux_restore(struct uart_mux *ctx);
 

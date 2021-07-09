@@ -20,6 +20,7 @@ enum flash_op { flash_op_read, flash_op_write, flash_op_erase };
 int cmd_sfc(const char *name, int argc, char *argv[])
 {
     struct ahb _ahb, *ahb = &_ahb;
+    struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
     uint32_t offset, len;
     enum flash_op op;
@@ -65,9 +66,13 @@ int cmd_sfc(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    rc = sfc_init(&sfc, ahb, SFC_TYPE_FMC);
+    rc = soc_probe(soc, ahb);
     if (rc < 0)
         goto cleanup_ahb;
+
+    rc = sfc_init(&sfc, soc, "fmc");
+    if (rc < 0)
+        goto cleanup_soc;
 
     rc = flash_init(sfc, &chip);
     if (rc < 0)
@@ -119,6 +124,9 @@ cleanup_flash:
 
 cleanup_sfc:
     sfc_destroy(sfc);
+
+cleanup_soc:
+    soc_destroy(soc);
 
 cleanup_ahb:
     cleanup = ahb_destroy(ahb);

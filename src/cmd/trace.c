@@ -9,9 +9,10 @@
 #include <string.h>
 
 #include "ahb.h"
+#include "ast.h"
 #include "log.h"
 #include "priv.h"
-#include "rev.h"
+#include "soc.h"
 #include "trace.h"
 
 //doit trace ADDRESS WIDTH:OFFSET MODE
@@ -20,12 +21,13 @@
 //doit trace 0x1e788000 4:0 write
 int cmd_trace(const char *name, int argc, char *argv[])
 {
+    struct trace _trace, *trace = &_trace;
     struct ahb _ahb, *ahb = &_ahb;
+    struct soc _soc, *soc = &_soc;
     enum trace_mode mode;
     int width, offset;
     uint32_t addr;
     sigset_t set;
-    int64_t rev;
     char *style;
     int sig;
     int rc;
@@ -66,8 +68,7 @@ int cmd_trace(const char *name, int argc, char *argv[])
         return rc;
     }
 
-    rc = ast_ahb_from_args(ahb, argc - 3, &argv[3]);
-    if (rc < 0) {
+    if ((rc = ast_ahb_from_args(ahb, argc - 3, &argv[3])) < 0) {
         bool denied = (rc == -EACCES || rc == -EPERM);
         if (denied && !priv_am_root()) {
             priv_print_unprivileged(name);
@@ -80,35 +81,38 @@ int cmd_trace(const char *name, int argc, char *argv[])
         return rc;
     }
 
-    rev = rev_probe(ahb);
-    if (rev < 0) {
-        rc = rev;
+    ;
+    if ((rc = soc_probe(soc, ahb)) < 0)
         goto cleanup_ahb;
+
+    if ((rc = trace_init(trace, soc))) {
+        loge("Unable to initialise trace object\n");
+        goto cleanup_soc;
     }
 
-    if (!rev_is_generation((uint32_t)rev, ast_g6))
-        goto cleanup_ahb;
-
-    if ((rc = trace_start(ahb, addr, width, offset, mode))) {
+    if ((rc = trace_start(trace, addr, width, offset, mode))) {
         loge("Unable to start trace for 0x%08x %d:%d %s: %d\n",
              addr, width, offset, mode, rc);
-        goto cleanup_ahb;
+        goto cleanup_soc;
     }
 
     sigprocmask(SIG_BLOCK, &set, NULL);
     if ((rc = sigwait(&set, &sig))) {
         rc = -rc;
         loge("Unable to wait for SIGINT: %d\n", rc);
-        goto cleanup_ahb;
+        goto cleanup_soc;
     }
 
-    if ((rc = trace_stop(ahb))) {
+    if ((rc = trace_stop(trace))) {
         loge("Unable to stop trace: %d\n");
-        goto cleanup_ahb;
+        goto cleanup_soc;
     }
 
-    if ((rc = trace_dump(ahb, 1)))
+    if ((rc = trace_dump(trace, 1)))
         loge("Unable to dump trace to stdout: %d\n", rc);
+
+cleanup_soc:
+    soc_destroy(soc);
 
 cleanup_ahb:
     ahb_destroy(ahb);

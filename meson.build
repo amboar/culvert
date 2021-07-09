@@ -1,12 +1,23 @@
 project('cve-2019-6260', 'c',
 	default_options: [
 		'buildtype=debugoptimized',
+		'default_library=static',
 		'warning_level=2',
-		'werror=true',
 		'c_std=gnu99',
 		'b_lto=true',
 		'b_ndebug=true',
 		],
 	version: 'v0.3.0')
+
+libfdt_dep = dependency('libfdt',
+			default_options: [ 'warning_level=1', ],
+			fallback: [ 'dtc', 'libfdt_dep' ],
+			required: true)
+
+libfdt_native_dep = dependency('dtc',
+		     native: true,
+		     default_options: [ 'tools=enable' ],
+		     fallback: [ 'dtc', 'libfdt_dep' ],
+		     required: true)
 
 subdir('src')

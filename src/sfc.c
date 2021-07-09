@@ -5,6 +5,8 @@
 
 #define _GNU_SOURCE
 #include "ast.h"
+#include "bits.h"
+#include "clk.h"
 #include "log.h"
 #include "sfc.h"
 
@@ -28,13 +30,31 @@
 #define SFC_INF(fmt, ...) logi(fmt, ##__VA_ARGS__)
 #define SFC_DBG(fmt, ...) logd(fmt, ##__VA_ARGS__)
 
+/* Firmware Flash Memory Controller */
+#define   FMC_CE_TYPE			0x00
+#define	     FMC_CE_TYPE_CE2_WP		BIT(18)
+#define	     FMC_CE_TYPE_CE1_WP		BIT(17)
+#define	     FMC_CE_TYPE_CE0_WP		BIT(16)
+#define   FMC_CE_CTRL			0x04
+#define   FMC_CE0_CTRL			0x10
+#define   FMC_TIMING			0x94
+
+/* SPI (Host) Flash Memory Controller */
+#define   SMC_CONF			0x00
+#define   SMC_CE0_CTRL			0x10
+#define   SMC_TIMING			0x94
+
 struct sfc_data {
-    struct ahb *ahb;
+    struct soc *soc;
+    struct soc_region iomem;
+    struct soc_region flash;
+    struct clk clk;
 
     /* We have 2 controllers, one for the BMC flash, one for the PNOR */
     uint8_t    type;
 
     uint32_t type_reg;
+    uint32_t type_wp_mask;
 
     /* Address and previous value of the ctrl register */
     uint32_t ctl_reg;
@@ -49,15 +69,36 @@ struct sfc_data {
     uint32_t fread_timing_reg;
     uint32_t fread_timing_val;
 
-    /* Address of the flash mapping */
-    uint32_t flash;
-
     /* Current 4b mode */
     bool mode_4b;
 
     /* Callbacks */
     struct sfc ops;
 };
+
+static inline int
+sfc_readl(struct sfc_data *ctx, uint32_t offset, uint32_t *val)
+{
+    return soc_readl(ctx->soc, ctx->iomem.start + offset, val);
+}
+
+static inline int
+sfc_writel(struct sfc_data *ctx, uint32_t offset, uint32_t val)
+{
+    return soc_writel(ctx->soc, ctx->iomem.start + offset, val);
+}
+
+static inline ssize_t
+flash_read(struct sfc_data *ctx, uint32_t offset, void *buf, size_t len)
+{
+    return soc_read(ctx->soc, ctx->flash.start + offset, buf, len);
+}
+
+static inline ssize_t
+flash_write(struct sfc_data *ctx, uint32_t offset, const void *buf, size_t len)
+{
+    return soc_write(ctx->soc, ctx->flash.start + offset, buf, len);
+}
 
 static uint32_t ast_ahb_freq;
 
@@ -136,17 +177,17 @@ static int sfc_start_cmd(struct sfc_data *ct, uint8_t cmd)
     int rc;
 
     /* Switch to user mode, CE# dropped */
-    rc = ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_val | 7);
+    rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_val | 7);
     if (rc < 0)
 	return rc;
 
     /* user mode, CE# active */
-    rc = ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_val | 3);
+    rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_val | 3);
     if (rc < 0)
 	return rc;
 
     /* write cmd */
-    rc = ahb_write(ct->ahb, ct->flash, &cmd, 1);
+    rc = flash_write(ct, 0, &cmd, 1);
 
     return rc == 1 ? 0 : rc;
 }
@@ -156,12 +197,12 @@ static void sfc_end_cmd(struct sfc_data *ct)
     int rc;
 
     /* clear CE# */
-    rc = ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_val | 7);
-    if (rc < 0) { errno = -rc; perror("ahb_writel"); return; }
+    rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_val | 7);
+    if (rc < 0) { errno = -rc; perror("sfc_writel"); return; }
 
     /* Switch back to read mode */
-    rc = ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
-    if (rc < 0) { errno = -rc; perror("ahb_writel"); return; }
+    rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
+    if (rc < 0) { errno = -rc; perror("sfc_writel"); return; }
 }
 
 static int sfc_send_addr(struct sfc_data *ct, uint32_t addr)
@@ -177,10 +218,10 @@ static int sfc_send_addr(struct sfc_data *ct, uint32_t addr)
 
     if (ct->mode_4b) {
 	len = 4;
-	rc = ahb_write(ct->ahb, ct->flash, ap, len);
+	rc = flash_write(ct, 0, ap, len);
     } else {
 	len = 3;
-	rc = ahb_write(ct->ahb, ct->flash, ap + 1, len);
+	rc = flash_write(ct, 0, ap + 1, len);
     }
 
     return rc == len ? 0 : rc;
@@ -202,7 +243,7 @@ static int sfc_cmd_rd(struct sfc *ctrl, uint8_t cmd,
 	    goto bail;
     }
     if (buffer && size) {
-	rc = ahb_read(ct->ahb, ct->flash, buffer, size);
+	rc = flash_read(ct, 0, buffer, size);
 	if (rc < 0)
 	    goto bail;
 	rc = 0;
@@ -231,7 +272,7 @@ static int sfc_cmd_wr(struct sfc *ctrl, uint8_t cmd,
 	    goto bail;
     }
     if (buffer && size)
-	rc = ahb_write(ct->ahb, ct->flash, buffer, size);
+	rc = flash_write(ct, 0, buffer, size);
 bail:
     sfc_end_cmd(ct);
 
@@ -245,7 +286,7 @@ static int sfc_set_4b(struct sfc *ctrl, bool enable)
     int rc;
 
     if (ct->type == SFC_TYPE_FMC && ct->ops.finfo->size > 0x1000000) {
-	rc = ahb_readl(ct->ahb, AST_G5_FMC | FMC_CE_CTRL, &ce_ctrl);
+	rc = sfc_readl(ct, FMC_CE_CTRL, &ce_ctrl);
 	if (rc < 0)
 	    return rc;
     } else if (ct->type != SFC_TYPE_SMC)
@@ -268,18 +309,17 @@ static int sfc_set_4b(struct sfc *ctrl, bool enable)
     ct->mode_4b = enable;
 
     /* Update read mode */
-    rc = ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+    rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
     if (rc < 0)
 	return rc;
 
     if (ce_ctrl && ct->type == SFC_TYPE_FMC)
-	return ahb_writel(ct->ahb, AST_G5_FMC | FMC_CE_CTRL, ce_ctrl);
+	return sfc_writel(ct, FMC_CE_CTRL, ce_ctrl);
 
     return 0;
 }
 
-static int sfc_read(struct sfc *ctrl, uint32_t pos,
-		       void *buf, uint32_t len)
+static int sfc_read(struct sfc *ctrl, uint32_t pos, void *buf, uint32_t len)
 {
     ssize_t rc;
 
@@ -289,47 +329,18 @@ static int sfc_read(struct sfc *ctrl, uint32_t pos,
      * We are in read mode by default. We don't yet support fancy
      * things like fast read or X2 mode
      */
-    rc = ahb_read(ct->ahb, ct->flash + pos, buf, len);
+    if ((rc = flash_read(ct, pos, buf, len)) < 0)
+	return rc;
 
-    return rc == len ? 0 : rc;
+    return (uint32_t)rc == len ? 0 : rc;
 }
 
-static void ast_get_ahb_freq(struct sfc_data *ct)
+static void ast2500_get_ahb_freq(struct sfc_data *ct)
 {
-    static const uint32_t cpu_freqs_24_48[] = {
-	384000000,
-	360000000,
-	336000000,
-	408000000
-    };
-    static const uint32_t cpu_freqs_25[] = {
-	400000000,
-	375000000,
-	350000000,
-	425000000
-    };
-    static const uint32_t ahb_div[] = { 1, 2, 4, 3 };
-    uint32_t strap, cpu_clk, div;
-    int rc;
-
     if (ast_ahb_freq)
 	return;
 
-    /* HW strapping gives us the CPU freq and AHB divisor */
-    rc = ahb_readl(ct->ahb, AST_G5_SCU | SCU_HW_STRAP, &strap);
-    if (rc < 0) { errno = -rc; perror("ahb_readl"); return; }
-
-    if (strap & 0x00800000) {
-	SFC_INF("AST: CLKIN 25Mhz\n");
-	cpu_clk = cpu_freqs_25[(strap >> 8) & 3];
-    } else {
-	SFC_INF("AST: CLKIN 24/48Mhz\n");
-	cpu_clk = cpu_freqs_24_48[(strap >> 8) & 3];
-    }
-    SFC_INF("AST: CPU frequency: %d Mhz\n", cpu_clk / 1000000);
-    div = ahb_div[(strap >> 10) & 3];
-    ast_ahb_freq = cpu_clk / div;
-    SFC_INF("AST: AHB frequency: %d Mhz\n", ast_ahb_freq / 1000000);
+    ast_ahb_freq = clk_get_rate(&ct->clk, clk_ahb);
 }
 
 static int sfc_check_reads(struct sfc_data *ct,
@@ -338,7 +349,7 @@ static int sfc_check_reads(struct sfc_data *ct,
     int i, rc;
 
     for (i = 0; i < 10; i++) {
-	rc = ahb_read(ct->ahb, ct->flash, test_buf, CALIBRATE_BUF_SIZE);
+	rc = flash_read(ct, 0, test_buf, CALIBRATE_BUF_SIZE);
 	if (rc)
 	    return rc;
 	if (memcmp(test_buf, golden_buf, CALIBRATE_BUF_SIZE) != 0)
@@ -365,7 +376,7 @@ static int sfc_calibrate_reads(struct sfc_data *ct, uint32_t hdiv,
 
 	ct->fread_timing_val &= mask;
 	ct->fread_timing_val |= FREAD_TPASS(i) << shift;
-	rc = ahb_writel(ct->ahb, ct->fread_timing_reg, ct->fread_timing_val);
+	rc = sfc_writel(ct, ct->fread_timing_reg, ct->fread_timing_val);
 	if (rc < 0)
 	    return rc;
 
@@ -392,7 +403,7 @@ static int sfc_calibrate_reads(struct sfc_data *ct, uint32_t hdiv,
     /* We have at least one pass of margin, let's use first pass */
     ct->fread_timing_val &= mask;
     ct->fread_timing_val |= FREAD_TPASS(good_pass) << shift;
-    rc = ahb_writel(ct->ahb, ct->fread_timing_reg, ct->fread_timing_val);
+    rc = sfc_writel(ct, ct->fread_timing_reg, ct->fread_timing_val);
     if (rc < 0)
 	return rc;
 
@@ -438,9 +449,9 @@ static int sfc_optimize_reads(struct sfc_data *ct,
 	(0x00 <<  8) | /* HCLK/16 */
 	(0x00 <<  6) | /* no dummy cycle */
 	(0x00);        /* normal read */
-    ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+    sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
 
-    rc = ahb_read(ct->ahb, ct->flash, golden_buf, CALIBRATE_BUF_SIZE);
+    rc = flash_read(ct, 0, golden_buf, CALIBRATE_BUF_SIZE);
     if (rc) {
 	free(test_buf);
 	return rc;
@@ -453,7 +464,7 @@ static int sfc_optimize_reads(struct sfc_data *ct,
     if (!ast_calib_data_usable(golden_buf, CALIBRATE_BUF_SIZE)) {
 	SFC_DBG("AST: Calibration area too uniform, "
 		"using low speed\n");
-	rc = ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+	rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
 	free(test_buf);
 	return rc;
     }
@@ -469,7 +480,7 @@ static int sfc_optimize_reads(struct sfc_data *ct,
 
 	/* Set the timing */
 	tv = ct->ctl_read_val | (ast_ct_hclk_divs[i - 1] << 8);
-	rc = ahb_writel(ct->ahb, ct->ctl_reg, tv);
+	rc = sfc_writel(ct, ct->ctl_reg, tv);
 	if (rc < 0) {
 	    free(test_buf);
 	    return rc;
@@ -494,7 +505,7 @@ static int sfc_optimize_reads(struct sfc_data *ct,
 	SFC_INF("AST: Found good read timings at HCLK/%d\n", best_div);
 	ct->ctl_read_val |= (ast_ct_hclk_divs[best_div - 1] << 8);
     }
-    return ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+    return sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
 }
 
 static int sfc_get_hclk(uint32_t *ctl_val, uint32_t max_freq)
@@ -618,7 +629,7 @@ static int sfc_setup_macronix(struct sfc_data *ct, struct flash_info *info)
     SFC_INF("AST: Command timing set to HCLK/%d\n", div);
 
     /* Update chip with current read config */
-    return ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+    return sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
 }
 
 static int sfc_setup_winbond(struct sfc_data *ct, struct flash_info *info)
@@ -666,7 +677,7 @@ static int sfc_setup_winbond(struct sfc_data *ct, struct flash_info *info)
     SFC_ERR("AST: Command timing set to HCLK/%d\n", div);
 
     /* Update chip with current read config */
-    return ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+    return sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
 }
 
 static int sfc_setup_micron(struct sfc_data *ct, struct flash_info *info)
@@ -766,7 +777,7 @@ static int sfc_setup_micron(struct sfc_data *ct, struct flash_info *info)
     SFC_INF("AST: Command timing set to HCLK/%d\n", div);
 
     /* Update chip with current read config */
-    return ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+    return sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
 
 dumb:
     ct->ctl_val = ct->ctl_read_val = (ct->ctl_read_val & 0x2000) |
@@ -778,7 +789,7 @@ dumb:
 	(0x00);	       /* normal read */
 
     /* Update chip with current read config */
-    return ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+    return sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
 }
 
 static int sfc_setup(struct sfc *ctrl, uint32_t *tsize)
@@ -822,18 +833,18 @@ static bool sfc_init_device(struct sfc_data *ct)
      * Also configure SPI clock to something safe
      * like HCLK/8 (24Mhz)
      */
-    rc = ahb_readl(ct->ahb, ct->ctl_reg, &ct->ctl_val);
+    rc = sfc_readl(ct, ct->ctl_reg, &ct->ctl_val);
     if (rc < 0 || ct->ctl_val == 0xffffffff) {
 	SFC_ERR("AST_SF: Failed read from controller control\n");
 	return false;
     }
 
     /* Enable writes for user mode */
-    rc = ahb_readl(ct->ahb, ct->type_reg, &ce_type);
-    if (rc < 0) { errno = -rc; perror("ahb_readl"); return false; }
+    rc = sfc_readl(ct, ct->type_reg, &ce_type);
+    if (rc < 0) { errno = -rc; perror("sfc_readl"); return false; }
 
-    rc = ahb_writel(ct->ahb, ct->type_reg, ce_type | (7 << 16));
-    if (rc < 0) { errno = -rc; perror("ahb_writel"); return false; }
+    rc = sfc_writel(ct, ct->type_reg, ce_type | (7 << 16));
+    if (rc < 0) { errno = -rc; perror("sfc_writel"); return false; }
 
     ct->ctl_val =
 	(0x00 << 28) | /* Single bit */
@@ -850,22 +861,77 @@ static bool sfc_init_device(struct sfc_data *ct)
     ct->fread_timing_val = 0;
 
     /* Configure for read */
-    rc = ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
-    if (rc < 0) { errno = -rc; perror("ahb_writel"); return false; }
-    rc = ahb_writel(ct->ahb, ct->fread_timing_reg, ct->fread_timing_val);
-    if (rc < 0) { errno = -rc; perror("ahb_writel"); return false; }
+    rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
+    if (rc < 0) { errno = -rc; perror("sfc_writel"); return false; }
+    rc = sfc_writel(ct, ct->fread_timing_reg, ct->fread_timing_val);
+    if (rc < 0) { errno = -rc; perror("sfc_writel"); return false; }
 
     ct->mode_4b = false;
 
     return true;
 }
 
-int sfc_init(struct sfc **ctrl, struct ahb *ahb, uint8_t type)
+int sfc_write_protect_save(struct sfc *ctrl, bool enable, uint32_t *save)
 {
-    struct sfc_data *ct;
+    struct sfc_data *ct = container_of(ctrl, struct sfc_data, ops);
+    uint32_t old_tsr, new_tsr;
+    int rc;
 
-    if (!(type == SFC_TYPE_SMC || type == SFC_TYPE_FMC))
-	return -EINVAL;
+    if ((rc = sfc_readl(ct, ct->type_reg, &old_tsr)) < 0)
+	return rc;
+
+    /* TODO: Specify which CE? */
+
+    if (enable) {
+	new_tsr = old_tsr | ct->type_wp_mask;
+    } else {
+	new_tsr = old_tsr & ~ct->type_wp_mask;
+    }
+
+    if ((rc = sfc_writel(ct, ct->type_reg, new_tsr)) < 0)
+	return rc;
+
+    *save = old_tsr & ct->type_wp_mask;
+
+    return 0;
+}
+
+int sfc_write_protect_restore(struct sfc *ctrl, uint32_t save)
+{
+    struct sfc_data *ct = container_of(ctrl, struct sfc_data, ops);
+    uint32_t tsr;
+    int rc;
+
+    if ((rc = sfc_readl(ct, ct->type_reg, &tsr)) < 0)
+	return rc;
+
+    /* TODO: Specify which CE? */
+    tsr &= ~ct->type_wp_mask;
+    tsr |= (save & ct->type_wp_mask);
+
+    return sfc_writel(ct, ct->type_reg, tsr);
+}
+
+int sfc_get_flash(struct sfc *ctrl, struct soc_region *flash)
+{
+    struct sfc_data *ct = container_of(ctrl, struct sfc_data, ops);
+
+    *flash = ct->flash;
+
+    return 0;
+}
+
+static const struct soc_device_id sfc_match[] = {
+    { .compatible = "aspeed,ast2500-fmc", .data = (void *)SFC_TYPE_FMC },
+    { .compatible = "aspeed,ast2500-spi", .data = (void *)SFC_TYPE_SMC },
+    { },
+};
+
+int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name)
+{
+    struct soc_device_node dn;
+    struct sfc_data *ct;
+    int rc;
 
     *ctrl = NULL;
     ct = malloc(sizeof(*ct));
@@ -874,11 +940,45 @@ int sfc_init(struct sfc **ctrl, struct ahb *ahb, uint8_t type)
 	return -ENOMEM;
     }
     memset(ct, 0, sizeof(*ct));
-    ct->ahb = ahb;
-    ct->type = type;
+
+    rc = soc_device_from_name(soc, name, &dn);
+    if (rc < 0) {
+        loge("sfc: Failed to find device by name '%s': %d\n", name, rc);
+	goto fail;
+    }
+
+    rc = soc_device_is_compatible(soc, sfc_match, &dn);
+    if (rc < 0) {
+        loge("sfc: Failed verify device compatibility: %d\n", rc);
+	goto fail;
+    }
+
+    if (!rc) {
+        loge("sfc: Incompatible device described by node '%s'\n", name);
+        rc = -EINVAL;
+	goto fail;
+    }
+
+    if ((rc = soc_device_get_memory_index(soc, &dn, 0, &ct->iomem)) < 0)
+	goto fail;
+
+    if ((rc = soc_device_get_memory_index(soc, &dn, 1, &ct->flash)) < 0)
+	goto fail;
+
+    ct->type = (unsigned long)(soc_device_get_match_data(soc, sfc_match, &dn));
+    if (!ct->type) {
+	loge("sfc: Failed to acquire match data for '%s'\n", name);
+	rc = -EINVAL;
+	goto fail;
+    }
+
+    if ((rc = clk_init(&ct->clk, soc)) < 0)
+	goto fail;
+
+    ct->soc = soc;
 
     /* XXX: Hack exposing the AHB instance used to the flash layer */
-    ct->ops.priv = ahb;
+    ct->ops.priv = soc->ahb;
 
     ct->ops.cmd_wr = sfc_cmd_wr;
     ct->ops.cmd_rd = sfc_cmd_rd;
@@ -886,30 +986,40 @@ int sfc_init(struct sfc **ctrl, struct ahb *ahb, uint8_t type)
     ct->ops.read = sfc_read;
     ct->ops.setup = sfc_setup;
 
-    ast_get_ahb_freq(ct);
+    ast2500_get_ahb_freq(ct);
 
-    if (type == SFC_TYPE_SMC) {
-	ct->type_reg = AST_G5_SMC | FMC_CE_TYPE;
-	ct->ctl_reg = AST_G5_SMC | SMC_CE0_CTRL;
-	ct->fread_timing_reg = AST_G5_SMC | SMC_TIMING;
-	ct->flash = AST_G5_HOST_FLASH;
-    } else if (type == SFC_TYPE_FMC) {
-	ct->type_reg = AST_G5_FMC | FMC_CE_TYPE;
-	ct->ctl_reg = AST_G5_FMC | FMC_CE0_CTRL;
-	ct->fread_timing_reg = AST_G5_FMC | FMC_TIMING;
-	ct->flash = AST_G5_BMC_FLASH;
+    /* TODO: Set these in the platform data, add platform data pointer to ct */
+    if (ct->type == SFC_TYPE_SMC) {
+	ct->type_reg = FMC_CE_TYPE;
+	ct->type_wp_mask = (FMC_CE_TYPE_CE0_WP | FMC_CE_TYPE_CE1_WP |
+			    FMC_CE_TYPE_CE2_WP);
+	ct->ctl_reg = SMC_CE0_CTRL;
+	ct->fread_timing_reg = SMC_TIMING;
+    } else if (ct->type == SFC_TYPE_FMC) {
+	ct->type_reg = FMC_CE_TYPE;
+	ct->type_wp_mask = (FMC_CE_TYPE_CE0_WP | FMC_CE_TYPE_CE1_WP);
+	ct->ctl_reg = FMC_CE0_CTRL;
+	ct->fread_timing_reg = FMC_TIMING;
+    } else {
+	rc = -EINVAL;
+	goto cleanup_clk;
     }
 
-    if (!sfc_init_device(ct))
-	goto fail;
+    if (!sfc_init_device(ct)) {
+	rc = -EIO;
+	goto cleanup_clk;
+    }
 
     *ctrl = &ct->ops;
 
     return 0;
 
+cleanup_clk:
+    clk_destroy(&ct->clk);
+
 fail:
     free(ct);
-    return -EIO;
+    return rc;
 }
 
 int sfc_destroy(struct sfc *ctrl)
@@ -918,19 +1028,19 @@ int sfc_destroy(struct sfc *ctrl)
 	int rc;
 
 	/* Restore control reg to read */
-	rc = ahb_writel(ct->ahb, ct->ctl_reg, ct->ctl_read_val);
+	rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
 	if (rc < 0)
 		return rc;
 
 	/* Additional cleanup */
 	if (ct->type == SFC_TYPE_SMC) {
 		uint32_t reg;
-		rc = ahb_readl(ct->ahb, SMC_CONF, &reg);
+		rc = sfc_readl(ct, SMC_CONF, &reg);
 		if (rc < 0)
 			return rc;
 
 		if (reg != 0xffffffff) {
-			rc = ahb_writel(ct->ahb, SMC_CONF, reg & ~1);
+			rc = sfc_writel(ct, SMC_CONF, reg & ~1);
 			if (rc < 0)
 				return rc;
 		}
