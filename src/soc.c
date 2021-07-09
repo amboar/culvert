@@ -266,8 +266,8 @@ int soc_device_get_memory_index(struct soc *ctx,
 		return -EINVAL;
 
 	/* <address, size> */
-	region->start = be32toh(reg[index + 0]);
-	region->length = be32toh(reg[index + 1]);
+	region->start = be32toh(reg[2 * index + 0]);
+	region->length = be32toh(reg[2 * index + 1]);
 
 	return 0;
 }
