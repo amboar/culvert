@@ -29,7 +29,7 @@ static int cmd_dump_firmware(struct soc *soc)
     if ((rc = sfc_init(&sfc, soc, "fmc")))
         return rc;
 
-    logi("Intialising flash chip\n");
+    logi("Initialising flash chip\n");
     if ((rc = flash_init(sfc, &chip)))
         goto cleanup_sfc;
 
