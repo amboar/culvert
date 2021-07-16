@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2021, Oracle and/or its affiliates.
+
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -147,23 +150,22 @@ int trace_init(struct trace *ctx, struct soc *soc)
     return 0;
 }
 
-int trace_start(struct trace *ctx, uint32_t addr, int width, int offset,
-                enum trace_mode mode)
+int trace_start(struct trace *ctx, uint32_t addr, int width, enum trace_mode mode)
 {
     uint32_t csr, buf;
     size_t i;
     int rc;
 
-    logd("%s: 0x%08" PRIx32 " %d:%d %d\n", __func__, addr, width, offset, mode);
+    logd("%s: 0x%08" PRIx32 " %d %d\n", __func__, addr, width, mode);
 
-    assert(ctx->sram.size >= (32 * 1024));
+    assert(ctx->sram.length >= (32 * 1024));
     csr = AHBC_BCR_CSR_BUF_LEN_32K << AHBC_BCR_CSR_BUF_LEN_SHIFT;
     csr |= AHBC_BCR_CSR_POLL_MODE * mode;
 
     if ((rc = ahbc_writel(ctx, R_AHBC_BCR_CSR, csr)))
         return rc;
 
-    if ((rc = ahbc_writel(ctx, R_AHBC_BCR_ADDR, addr)))
+    if ((rc = ahbc_writel(ctx, R_AHBC_BCR_ADDR, addr & ~3)))
         return rc;
 
     for (i = 0; i < (ctx->sram.length / 4); i++) {
@@ -174,7 +176,7 @@ int trace_start(struct trace *ctx, uint32_t addr, int width, int offset,
     if ((rc = ahbc_writel(ctx, R_AHBC_BCR_BUF, buf)))
         return rc;
 
-    if ((rc = trace_style(width, offset)) < 0)
+    if ((rc = trace_style(width, addr & 3)) < 0)
         return rc;
 
     csr |= rc << AHBC_BCR_CSR_POLL_DATA_SHIFT;
