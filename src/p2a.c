@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
+// Copyright (C) 2021, Oracle and/or its affiliates.
 
 #include "ahb.h"
 #include "compiler.h"
@@ -70,6 +71,10 @@ int p2ab_init(struct p2ab *ctx, uint16_t vid, uint16_t did)
                      ctx->res, 0);
     if (ctx->mmio == MAP_FAILED)
         return -errno;
+
+    /* ensure the HW and SW rbar values are in sync */
+    ctx->rbar = 0;
+    __p2ab_writel(ctx, P2AB_RBAR, ctx->rbar);
 
     return p2ab_unlock(ctx);
 }
