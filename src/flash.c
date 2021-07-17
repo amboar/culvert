@@ -114,8 +114,8 @@ int flash_read(struct flash_chip *c, uint64_t pos, void *buf, uint64_t len)
 	 * or we are in 4b *and* the controller supports it, then do a
 	 * high level read.
 	 */
-	if ((!c->mode_4b || ct->set_4b) && ct->read)
-		return ct->read(ct, pos, buf, len);
+	if ((!c->mode_4b || ct->set_4b) && ct->direct_read)
+		return ct->direct_read(ct, pos, buf, len);
 
 	/* Otherwise, go manual if supported */
 	if (!ct->cmd_rd)
