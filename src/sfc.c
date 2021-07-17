@@ -835,6 +835,7 @@ static int sfc_setup(struct sfc *ctrl, uint32_t *tsize)
     case 0xc2201b: /* MX66L1G45G */
 	return sfc_setup_macronix(ct, info);
     case 0xef4018: /* W25Q128BV */
+    case 0xef4019: /* W25Q256BV */
 	return sfc_setup_winbond(ct, info);
     case 0x20ba20: /* MT25Qx512xx */
 	return sfc_setup_micron(ct, info);
