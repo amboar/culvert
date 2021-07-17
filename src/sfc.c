@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /* Copyright 2013-2014 IBM Corp. */
+// Copyright (C) 2021, Oracle and/or its affiliates.
 
 /* Code shamelessly stolen from skiboot and then hacked to death */
 
@@ -243,9 +244,31 @@ static int sfc_cmd_rd(struct sfc *ctrl, uint8_t cmd,
 	    goto bail;
     }
     if (buffer && size) {
-	rc = flash_read(ct, 0, buffer, size);
-	if (rc < 0)
-	    goto bail;
+        uint32_t i = 0;
+
+        /*
+         * Some bridges (P2A and debug UART, probably others too) have a quirk
+         * where they'll generate 4 byte reads even when a 1/2 byte read is
+         * requested. When the SFC is in user mode it'll clock out one byte for each
+         * byte of the MMIO read/write size as a result if we use anything smaller than
+         * a 4 byte read we'll lose data. The easiest solution is to just use 4 byte reads
+         * for everything and extract the bytes manually when needed.
+         *
+         * Writes don't have this problem, thankfully.
+         */
+	while (size) {
+		uint8_t *buf = buffer;
+                uint32_t val = 0;
+
+                rc = soc_readl(ct->soc, ct->flash.start, &val);
+                if (rc)
+                        goto bail;
+
+                if (size) { buf[i++] = (val >>  0) & 0xff; size--; }
+                if (size) { buf[i++] = (val >>  8) & 0xff; size--; }
+                if (size) { buf[i++] = (val >> 16) & 0xff; size--; }
+                if (size) { buf[i++] = (val >> 24) & 0xff; size--; }
+	}
 	rc = 0;
     }
 
