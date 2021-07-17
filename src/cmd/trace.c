@@ -83,7 +83,6 @@ int cmd_trace(const char *name, int argc, char *argv[])
         return rc;
     }
 
-    ;
     if ((rc = soc_probe(soc, ahb)) < 0)
         goto cleanup_ahb;
 
