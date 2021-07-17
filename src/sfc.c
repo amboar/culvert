@@ -342,7 +342,7 @@ static int sfc_set_4b(struct sfc *ctrl, bool enable)
     return 0;
 }
 
-static int sfc_read(struct sfc *ctrl, uint32_t pos, void *buf, uint32_t len)
+static int sfc_direct_read(struct sfc *ctrl, uint32_t pos, void *buf, uint32_t len)
 {
     ssize_t rc;
 
@@ -1006,7 +1006,7 @@ int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name)
     ct->ops.cmd_wr = sfc_cmd_wr;
     ct->ops.cmd_rd = sfc_cmd_rd;
     ct->ops.set_4b = sfc_set_4b;
-    ct->ops.read = sfc_read;
+    ct->ops.direct_read = sfc_direct_read;
     ct->ops.setup = sfc_setup;
 
     ast2500_get_ahb_freq(ct);
