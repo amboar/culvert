@@ -106,6 +106,13 @@ int cmd_trace(const char *name, int argc, char *argv[])
     }
     sigprocmask(SIG_UNBLOCK, &set, NULL);
 
+    /*
+     * The trace app is long-lived so it's possible the bridge state has changed
+     * between when we start tracing and when we stop. Especially if other functions
+     * of this tool are being used. Work around that by re-initing the bridge.
+     */
+    ahb_init(ahb, ahb->bridge);
+
     if ((rc = trace_stop(trace))) {
         loge("Unable to stop trace: %d\n");
         goto cleanup_soc;
