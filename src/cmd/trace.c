@@ -104,6 +104,7 @@ int cmd_trace(const char *name, int argc, char *argv[])
         loge("Unable to wait for SIGINT: %d\n", rc);
         goto cleanup_soc;
     }
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
 
     if ((rc = trace_stop(trace))) {
         loge("Unable to stop trace: %d\n");
