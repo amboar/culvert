@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
+// Copyright (C) 2021, Oracle and/or its affiliates.
 
 #define _GNU_SOURCE
 #include "ast.h"
@@ -355,6 +356,8 @@ static int ast_xdma_status(struct soc *soc, struct ast_cap_xdma *cap)
         goto cleanup_sdmc;
 
     cap->unconstrained = !rc;
+    if (rc == 1)
+        rc = 0;
 
 cleanup_sdmc:
     sdmc_destroy(sdmc);

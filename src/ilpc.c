@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
+// Copyright (C) 2021, Oracle and/or its affiliates.
 
 #include "ilpc.h"
 #include "log.h"
@@ -100,6 +101,7 @@ ssize_t ilpcb_read(struct ilpcb *ctx, size_t addr, void *buf, size_t len)
             goto done;
 
         buf++;
+        addr++;
         remaining--;
     }
 

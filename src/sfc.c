@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /* Copyright 2013-2014 IBM Corp. */
+// Copyright (C) 2021, Oracle and/or its affiliates.
 
 /* Code shamelessly stolen from skiboot and then hacked to death */
 
@@ -243,10 +244,32 @@ static int sfc_cmd_rd(struct sfc *ctrl, uint8_t cmd,
 	    goto bail;
     }
     if (buffer && size) {
-	rc = flash_read(ct, 0, buffer, size);
-	if (rc < 0)
-	    goto bail;
-	rc = 0;
+        uint32_t i = 0;
+
+        /*
+         * Some bridges (P2A and debug UART, probably others too) have a quirk
+         * where they'll generate 4 byte reads even when a 1/2 byte read is
+         * requested. When the SFC is in user mode it'll clock out one byte for each
+         * byte of the MMIO read/write size as a result if we use anything smaller than
+         * a 4 byte read we'll lose data. The easiest solution is to just use 4 byte reads
+         * for everything and extract the bytes manually when needed.
+         *
+         * Writes don't have this problem, thankfully.
+         */
+        while (size) {
+            uint8_t *buf = buffer;
+            uint32_t val = 0;
+
+            rc = soc_readl(ct->soc, ct->flash.start, &val);
+            if (rc)
+                goto bail;
+
+            if (size) { buf[i++] = (val >>  0) & 0xff; size--; }
+            if (size) { buf[i++] = (val >>  8) & 0xff; size--; }
+            if (size) { buf[i++] = (val >> 16) & 0xff; size--; }
+            if (size) { buf[i++] = (val >> 24) & 0xff; size--; }
+        }
+        rc = 0;
     }
 
 bail:
@@ -319,7 +342,7 @@ static int sfc_set_4b(struct sfc *ctrl, bool enable)
     return 0;
 }
 
-static int sfc_read(struct sfc *ctrl, uint32_t pos, void *buf, uint32_t len)
+static int sfc_direct_read(struct sfc *ctrl, uint32_t pos, void *buf, uint32_t len)
 {
     ssize_t rc;
 
@@ -812,6 +835,7 @@ static int sfc_setup(struct sfc *ctrl, uint32_t *tsize)
     case 0xc2201b: /* MX66L1G45G */
 	return sfc_setup_macronix(ct, info);
     case 0xef4018: /* W25Q128BV */
+    case 0xef4019: /* W25Q256BV */
 	return sfc_setup_winbond(ct, info);
     case 0x20ba20: /* MT25Qx512xx */
 	return sfc_setup_micron(ct, info);
@@ -983,7 +1007,7 @@ int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name)
     ct->ops.cmd_wr = sfc_cmd_wr;
     ct->ops.cmd_rd = sfc_cmd_rd;
     ct->ops.set_4b = sfc_set_4b;
-    ct->ops.read = sfc_read;
+    ct->ops.direct_read = sfc_direct_read;
     ct->ops.setup = sfc_setup;
 
     ast2500_get_ahb_freq(ct);

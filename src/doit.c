@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+// Copyright (C) 2021, Oracle and/or its affiliates.
 
 #include <getopt.h>
 #include <stdbool.h>
@@ -51,7 +52,7 @@ static void help(const char *name)
     printf("%s otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s trace ADDRESS WIDTH:OFFSET MODE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
 }
 
 struct command {

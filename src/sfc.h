@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright (C) 2018,2019 IBM Corp. */
+// Copyright (C) 2021, Oracle and/or its affiliates.
 
 #ifndef _SFC_H
 #define _SFC_H
@@ -57,7 +58,7 @@ struct sfc {
 	int (*set_4b)(struct sfc *ctrl, bool enable);
 	int (*chip_id)(struct sfc *ctrl, uint8_t *id_buf,
 		       uint32_t *id_size);
-	int (*read)(struct sfc *ctrl, uint32_t addr, void *buf,
+	int (*direct_read)(struct sfc *ctrl, uint32_t addr, void *buf,
 		    uint32_t size);
 	int (*write)(struct sfc *ctrl, uint32_t addr,
 		     const void *buf, uint32_t size);

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2021, Oracle and/or its affiliates.
+
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -43,6 +46,7 @@
 #define R_AHBC_BCR_BUF                  0x44
 #define   AHBC_BCR_BUF_WRAP             BIT(0)
 #define R_AHBC_BCR_ADDR                 0x48
+#define R_AHBC_BCR_FIFO_MERGE           0x5C
 
 static const size_t ahbc_bcr_buf_len[] = {
     [AHBC_BCR_CSR_BUF_LEN_4K] = (4 * 1024),
@@ -147,23 +151,22 @@ int trace_init(struct trace *ctx, struct soc *soc)
     return 0;
 }
 
-int trace_start(struct trace *ctx, uint32_t addr, int width, int offset,
-                enum trace_mode mode)
+int trace_start(struct trace *ctx, uint32_t addr, int width, enum trace_mode mode)
 {
     uint32_t csr, buf;
     size_t i;
     int rc;
 
-    logd("%s: 0x%08" PRIx32 " %d:%d %d\n", __func__, addr, width, offset, mode);
+    logd("%s: 0x%08" PRIx32 " %d %d\n", __func__, addr, width, mode);
 
-    assert(ctx->sram.size >= (32 * 1024));
+    assert(ctx->sram.length >= (32 * 1024));
     csr = AHBC_BCR_CSR_BUF_LEN_32K << AHBC_BCR_CSR_BUF_LEN_SHIFT;
     csr |= AHBC_BCR_CSR_POLL_MODE * mode;
 
     if ((rc = ahbc_writel(ctx, R_AHBC_BCR_CSR, csr)))
         return rc;
 
-    if ((rc = ahbc_writel(ctx, R_AHBC_BCR_ADDR, addr)))
+    if ((rc = ahbc_writel(ctx, R_AHBC_BCR_ADDR, addr & ~3)))
         return rc;
 
     for (i = 0; i < (ctx->sram.length / 4); i++) {
@@ -174,7 +177,7 @@ int trace_start(struct trace *ctx, uint32_t addr, int width, int offset,
     if ((rc = ahbc_writel(ctx, R_AHBC_BCR_BUF, buf)))
         return rc;
 
-    if ((rc = trace_style(width, offset)) < 0)
+    if ((rc = trace_style(width, addr & 3)) < 0)
         return rc;
 
     csr |= rc << AHBC_BCR_CSR_POLL_DATA_SHIFT;
@@ -218,6 +221,7 @@ int trace_dump(struct trace *ctx, int outfd)
 {
     uint32_t buf_len, write_ptr;
     uint32_t csr, buf;
+    uint32_t merge;
     uint32_t base;
     bool wrapped;
     ssize_t rc;
@@ -232,6 +236,17 @@ int trace_dump(struct trace *ctx, int outfd)
         return rc;
 
     logt("%s: buf: 0x%08" PRIx32 "\n", __func__, buf);
+
+    /*
+     * 1 and 2 byte trace entries are accumulated in the merge FIFO. Once the
+     * merge FIFO has 4 bytes of data it's moved into the "real" FIFO regs and
+     * eventually flushed to the trace buffer. If you're tracing byte accesses
+     * you might not see anything flushed to the trace buffer, but it'll be in
+     * the merge FIFO.
+     */
+    rc = ahbc_readl(ctx, R_AHBC_BCR_FIFO_MERGE, &merge);
+    if (!rc)
+        logi("%s: partial trace reg: 0x%08" PRIx32 "\n", __func__, merge);
 
     wrapped = buf & AHBC_BCR_BUF_WRAP;
     buf &= ~AHBC_BCR_BUF_WRAP;

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+// Copyright (C) 2021, Oracle and/or its affiliates.
+
 #include <errno.h>
 #include <inttypes.h>
 #include <signal.h>
@@ -25,10 +27,8 @@ int cmd_trace(const char *name, int argc, char *argv[])
     struct ahb _ahb, *ahb = &_ahb;
     struct soc _soc, *soc = &_soc;
     enum trace_mode mode;
-    int width, offset;
-    uint32_t addr;
+    uint32_t addr, width;
     sigset_t set;
-    char *style;
     int sig;
     int rc;
 
@@ -38,14 +38,16 @@ int cmd_trace(const char *name, int argc, char *argv[])
     }
 
     addr = strtoul(argv[0], NULL, 0);
-
-    style = argv[1];
-    width = strtoul(style, &style, 0);
-    if (*style != ':') {
-        loge("Invalid style\n");
+    width = strtoul(argv[1], NULL, 0);
+    if (width != 1 && width != 2 && width != 4) {
+        loge("invalid access size\n");
         return -EINVAL;
     }
-    offset = strtoul(++style, NULL, 0);
+
+    if (addr & (width - 1)) {
+        loge("listening address must be aligned to the access size\n");
+        return -EINVAL;
+    }
 
     if (!strcmp("read", argv[2])) {
         mode = trace_read;
@@ -81,7 +83,6 @@ int cmd_trace(const char *name, int argc, char *argv[])
         return rc;
     }
 
-    ;
     if ((rc = soc_probe(soc, ahb)) < 0)
         goto cleanup_ahb;
 
@@ -90,9 +91,9 @@ int cmd_trace(const char *name, int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if ((rc = trace_start(trace, addr, width, offset, mode))) {
-        loge("Unable to start trace for 0x%08x %d:%d %s: %d\n",
-             addr, width, offset, mode, rc);
+    if ((rc = trace_start(trace, addr, width, mode))) {
+        loge("Unable to start trace for 0x%08x %db %s: %d\n",
+             addr, width, mode, rc);
         goto cleanup_soc;
     }
 
@@ -102,6 +103,14 @@ int cmd_trace(const char *name, int argc, char *argv[])
         loge("Unable to wait for SIGINT: %d\n", rc);
         goto cleanup_soc;
     }
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
+
+    /*
+     * The trace app is long-lived so it's possible the bridge state has changed
+     * between when we start tracing and when we stop. Especially if other functions
+     * of this tool are being used. Work around that by re-initing the bridge.
+     */
+    ahb_init(ahb, ahb->bridge);
 
     if ((rc = trace_stop(trace))) {
         loge("Unable to stop trace: %d\n");

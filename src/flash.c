@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /* Copyright 2013-2019 IBM Corp. */
+// Copyright (C) 2021, Oracle and/or its affiliates.
 
 #define _GNU_SOURCE
 #include <errno.h>
@@ -113,8 +114,8 @@ int flash_read(struct flash_chip *c, uint64_t pos, void *buf, uint64_t len)
 	 * or we are in 4b *and* the controller supports it, then do a
 	 * high level read.
 	 */
-	if ((!c->mode_4b || ct->set_4b) && ct->read)
-		return ct->read(ct, pos, buf, len);
+	if ((!c->mode_4b || ct->set_4b) && ct->direct_read)
+		return ct->direct_read(ct, pos, buf, len);
 
 	/* Otherwise, go manual if supported */
 	if (!ct->cmd_rd)
@@ -494,35 +495,10 @@ static int flash_identify(struct flash_chip *c)
 	if (id_size < 3)
 		return -ENXIO;
 
-	if (((struct ahb *)ct->priv)->bridge == ahb_p2ab ||
-			((struct ahb *)ct->priv)->bridge == ahb_debug) {
-		/* The debug and P2A interfaces appear to do a 4-byte read
-		 * to the flash memory and then return the bytes in
-		 * little-endian order, while the flash ID is returned from the
-		 * device big-endian. This leads to broken flash IDs. Further,
-		 * it seems the returned pattern is cycled, so we still receive
-		 * 0xc2 as the first byte for a Macronix chip, so simply
-		 * reversing the bytes isn't a solution. The 4-byte sequence
-		 * for a MX25L25635F looks like
-		 *
-		 *      0    1    2    3
-		 *    -------------------
-		 *    0xc2 0x19 0x20 0xc2
-		 *
-		 * Switch bytes 1 and 2 so we get a legitimate flash ID.
-		 *
-		 * XXX: Other data may be corrupted too!
-		 * TODO: Check writes!
-		 */
-		iid = id[0];
-		iid = (iid << 8) | id[2];
-		iid = (iid << 8) | id[1];
-	} else {
-		/* Convert to a dword for lookup */
-		iid = id[0];
-		iid = (iid << 8) | id[1];
-		iid = (iid << 8) | id[2];
-	}
+	/* Convert to a dword for lookup */
+	iid = id[0];
+	iid = (iid << 8) | id[1];
+	iid = (iid << 8) | id[2];
 
 	FL_DBG("LIBFLASH: Flash ID: %02x.%02x.%02x (%06x)\n",
 	       id[0], id[1], id[2], iid);
