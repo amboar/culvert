@@ -710,7 +710,7 @@ int ast_ahb_access(const char *name __unused, int argc, char *argv[],
     int rc;
 
     if (argc < 2) {
-        loge("Not enough arguments for ilpc command\n");
+        loge("Not enough arguments for AHB access\n");
         exit(EXIT_FAILURE);
     }
 
@@ -725,28 +725,43 @@ int ast_ahb_access(const char *name __unused, int argc, char *argv[],
 
     address = strtoul(argv[1], NULL, 0);
 
-    if (!action_read) {
-        if (argc < 3) {
-            loge("Not enough arguments for ilpc write command\n");
-            exit(EXIT_FAILURE);
-        }
-        data = strtoul(argv[2], NULL, 0);
-    }
-
     if (action_read) {
-        rc = ahb_readl(ahb, address, &data);
-        if (rc) {
-            errno = -rc;
-            perror("ahb_readl");
-            exit(EXIT_FAILURE);
+        unsigned long len = 4;
+
+        if (argc >= 3) {
+            len = strtoul(argv[2], NULL, 0);
         }
-        printf("0x%08x: 0x%08x\n", address, le32toh(data));
+
+        if (len > 4) {
+            if ((rc = ahb_siphon_in(ahb, address, len, 1))) {
+                errno = -rc;
+                perror("ahb_siphon_in");
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            if ((rc = ahb_readl(ahb, address, &data))) {
+                errno = -rc;
+                perror("ahb_readl");
+                exit(EXIT_FAILURE);
+            }
+            printf("0x%08x: 0x%08x\n", address, le32toh(data));
+        }
     } else {
-        rc = ahb_writel(ahb, address, htole32(data));
-        if (rc) {
-            errno = -rc;
-            perror("ahb_writel");
-            exit(EXIT_FAILURE);
+        unsigned long data;
+
+        if (argc >= 3) {
+            data = strtoul(argv[2], NULL, 0);
+            if ((rc = ahb_writel(ahb, address, htole32(data)))) {
+                errno = -rc;
+                perror("ahb_writel");
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            if ((rc = ahb_siphon_out(ahb, address, 0))) {
+                errno = -rc;
+                perror("ahb_writel");
+                exit(EXIT_FAILURE);
+            }
         }
     }
 
