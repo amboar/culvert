@@ -710,7 +710,7 @@ int ast_ahb_access(const char *name __unused, int argc, char *argv[],
     int rc;
 
     if (argc < 2) {
-        loge("Not enough arguments for ilpc command\n");
+        loge("Not enough arguments for AHB access\n");
         exit(EXIT_FAILURE);
     }
 
@@ -727,7 +727,7 @@ int ast_ahb_access(const char *name __unused, int argc, char *argv[],
 
     if (!action_read) {
         if (argc < 3) {
-            loge("Not enough arguments for ilpc write command\n");
+            loge("Not enough arguments for AHB write command\n");
             exit(EXIT_FAILURE);
         }
         data = strtoul(argv[2], NULL, 0);
