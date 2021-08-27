@@ -73,4 +73,5 @@ subdir('devicetree')
 
 executable('doit', src, dtbos,
 	   include_directories: incdirs,
-	   dependencies: [ libfdt_dep ])
+	   dependencies: [ libfdt_dep ],
+	   install: true)
