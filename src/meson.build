@@ -18,9 +18,9 @@ src = [ 'ahb.c',
 	'cmd/sfc.c',
 	'cmd/trace.c',
 	'cmd/write.c',
+	'culvert.c',
 	'debug.c',
 	'devmem.c',
-	'doit.c',
 	'flash.c',
 	'ilpc.c',
 	'l2a.c',
@@ -73,7 +73,7 @@ configure_file(input: 'config.h.in',
 
 subdir('devicetree')
 
-executable('doit', src, dtbos,
+executable('culvert', src, dtbos,
 	   include_directories: incdirs,
 	   dependencies: [ libfdt_dep ],
 	   install: true)
