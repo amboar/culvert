@@ -1,4 +1,4 @@
-project('cve-2019-6260', 'c',
+project('culvert', 'c',
 	default_options: [
 		'buildtype=debugoptimized',
 		'default_library=static',

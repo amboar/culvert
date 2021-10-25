@@ -1,4 +1,4 @@
-# A Test and Debug Tool for ASPEED BMC AHB Interfaces
+# `culvert` - A test and debug tool for BMC AHB bridges
 
 ## Warning
 
@@ -96,32 +96,32 @@ $ meson setup build && meson compile -C build
 ## Execution and Example output
 
 ```
-$ ./doit
+$ ./culvert
 Not enough arguments
 Usage:
 
-./doit probe [INTERFACE [IP PORT USERNAME PASSWORD]]
-./doit ilpc read ADDRESS
-./doit ilpc write ADDRESS VALUE
-./doit p2a vga read ADDRESS
-./doit p2a vga write ADDRESS VALUE
-./doit debug read ADDRESS INTERFACE [IP PORT USERNAME PASSWORD]
-./doit debug write ADDRESS VALUE INTERFACE [IP PORT USERNAME PASSWORD]
-./doit devmem read ADDRESS
-./doit devmem write ADDRESS VALUE
-./doit console HOST_UART BMC_UART BAUD USER PASSWORD
-./doit read firmware
-./doit read ram
-./doit write firmware
-./doit replace ram MATCH REPLACE
-./doit reset TYPE [INTERFACE [IP PORT USERNAME PASSWORD]]
-./doit sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-./doit sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-./doit sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+./culvert probe [INTERFACE [IP PORT USERNAME PASSWORD]]
+./culvert ilpc read ADDRESS
+./culvert ilpc write ADDRESS VALUE
+./culvert p2a vga read ADDRESS
+./culvert p2a vga write ADDRESS VALUE
+./culvert debug read ADDRESS INTERFACE [IP PORT USERNAME PASSWORD]
+./culvert debug write ADDRESS VALUE INTERFACE [IP PORT USERNAME PASSWORD]
+./culvert devmem read ADDRESS
+./culvert devmem write ADDRESS VALUE
+./culvert console HOST_UART BMC_UART BAUD USER PASSWORD
+./culvert read firmware
+./culvert read ram
+./culvert write firmware
+./culvert replace ram MATCH REPLACE
+./culvert reset TYPE [INTERFACE [IP PORT USERNAME PASSWORD]]
+./culvert sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+./culvert sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+./culvert sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
 ```
 
 ```
-$ ./doit probe --require confidentiality digi,portserver-ts-16 <IP> <PORT> <USER> <PASSWORD>
+$ ./culvert probe --require confidentiality digi,portserver-ts-16 <IP> <PORT> <USER> <PASSWORD>
 Connecting to Digi Portserver TS 16 at <IP>:23
 Logging into Digi Portserver TS
 Configuring binary mode on port 4
