@@ -7,6 +7,7 @@ project('cve-2019-6260', 'c',
 		'b_lto=true',
 		'b_ndebug=true',
 		],
+	meson_version: '>=0.53.0',
 	version: 'v0.3.0')
 
 libfdt_dep = dependency('libfdt',
