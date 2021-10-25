@@ -54,12 +54,14 @@ conf_data.set_quoted('version', version)
 
 # Architecture-specific capabilities
 host = host_machine.cpu_family()
-if fs.is_dir(f'arch/@host@')
-	incdirs += [ f'arch/@host@' ]
+host_inc = 'arch/@0@'.format(host)
+if fs.is_dir(host_inc)
+	incdirs += [ host_inc ]
 endif
 
-if fs.is_file(f'arch/@host@/lpc.c')
-	src += [ f'arch/@host@/lpc.c' ]
+host_lpc = 'arch/@0@/lpc.c'.format(host)
+if fs.is_file(host_lpc)
+	src += [ host_lpc ]
 	conf_data.set10('have_lpc', 1)
 else
 	conf_data.set10('have_lpc', 0)
