@@ -11,13 +11,13 @@ project('culvert', 'c',
 	version: 'v0.4.0')
 
 libfdt_dep = dependency('libfdt',
-			default_options: [ 'warning_level=1', ],
+			default_options: [ 'warning_level=1', 'default_library=shared'],
 			fallback: [ 'dtc', 'libfdt_dep' ],
 			required: true)
 
 libfdt_native_dep = dependency('dtc',
 		     native: true,
-		     default_options: [ 'tools=enable' ],
+		     default_options: [ 'tools=enable', 'default_library=shared' ],
 		     fallback: [ 'dtc', 'libfdt_dep' ],
 		     required: true)
 
