@@ -93,6 +93,11 @@ It can be built with:
 $ meson setup build && meson compile -C build
 ```
 
+or to cross compile:
+```
+$ meson setup build-arm --cross-file meson/arm-linux-gnueabi-gcc.ini && meson compile -C build-arm
+```
+
 ## Execution and Example output
 
 ```
