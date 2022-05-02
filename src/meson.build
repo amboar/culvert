@@ -62,9 +62,9 @@ endif
 host_lpc = 'arch/@0@/lpc.c'.format(host)
 if fs.is_file(host_lpc)
 	src += [ host_lpc ]
-	conf_data.set10('have_lpc', 1)
+	conf_data.set10('have_lpc', true)
 else
-	conf_data.set10('have_lpc', 0)
+	conf_data.set10('have_lpc', false)
 endif
 
 configure_file(input: 'config.h.in',
