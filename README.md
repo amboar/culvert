@@ -101,28 +101,33 @@ $ meson setup build-arm --cross-file meson/arm-linux-gnueabi-gcc.ini && meson co
 ## Execution and Example output
 
 ```
-$ ./culvert
-Not enough arguments
+$ ./build/src/culvert -h
+culvert: v0.4.0-10-gb30b8364b75a
 Usage:
 
-./culvert probe [INTERFACE [IP PORT USERNAME PASSWORD]]
-./culvert ilpc read ADDRESS
-./culvert ilpc write ADDRESS VALUE
-./culvert p2a vga read ADDRESS
-./culvert p2a vga write ADDRESS VALUE
-./culvert debug read ADDRESS INTERFACE [IP PORT USERNAME PASSWORD]
-./culvert debug write ADDRESS VALUE INTERFACE [IP PORT USERNAME PASSWORD]
-./culvert devmem read ADDRESS
-./culvert devmem write ADDRESS VALUE
-./culvert console HOST_UART BMC_UART BAUD USER PASSWORD
-./culvert read firmware
-./culvert read ram
-./culvert write firmware
-./culvert replace ram MATCH REPLACE
-./culvert reset TYPE [INTERFACE [IP PORT USERNAME PASSWORD]]
-./culvert sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-./culvert sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-./culvert sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert probe [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert ilpc read ADDRESS
+culvert ilpc write ADDRESS VALUE
+culvert p2a vga read ADDRESS
+culvert p2a vga write ADDRESS VALUE
+culvert debug read ADDRESS INTERFACE [IP PORT USERNAME PASSWORD]
+culvert debug write ADDRESS VALUE INTERFACE [IP PORT USERNAME PASSWORD]
+culvert devmem read ADDRESS
+culvert devmem write ADDRESS VALUE
+culvert console HOST_UART BMC_UART BAUD USER PASSWORD
+culvert read firmware [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert read ram [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert replace ram MATCH REPLACE
+culvert reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert otp read conf [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]
 ```
 
 ```
