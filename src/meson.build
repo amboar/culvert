@@ -58,6 +58,7 @@ host_inc = 'arch/@0@'.format(host)
 if fs.is_dir(host_inc)
 	incdirs += [ host_inc ]
 endif
+incdirs = include_directories(incdirs)
 
 host_lpc = 'arch/@0@/lpc.c'.format(host)
 if fs.is_file(host_lpc)
@@ -71,9 +72,11 @@ configure_file(input: 'config.h.in',
 	       output: 'config.h',
 	       configuration: conf_data)
 
+subdir('ccan')
 subdir('devicetree')
 
 executable('culvert', src, dtbos,
 	   include_directories: incdirs,
 	   dependencies: [ libfdt_dep ],
+	   link_with: [ libccan ],
 	   install: true)
