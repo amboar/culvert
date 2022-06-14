@@ -7,6 +7,9 @@
 #include "ahb.h"
 #include "rev.h"
 
+#include "ccan/autodata/autodata.h"
+#include "ccan/list/list.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -19,6 +22,7 @@ struct soc {
 	uint32_t rev;
 	struct soc_fdt fdt;
 	struct ahb *ahb;
+	struct list_head devices;
 };
 
 int soc_probe(struct soc *ctx, struct ahb *ahb);
@@ -74,6 +78,25 @@ struct soc_device_node {
 	int offset;
 };
 
+struct soc_device {
+	struct list_node entry;
+	struct soc_device_node node;
+	const struct soc_driver *driver;
+	void *drvdata;
+};
+
+static inline void soc_device_set_drvdata(struct soc_device *dev, void *drvdata)
+{
+	assert(!dev->drvdata);
+	dev->drvdata = drvdata;
+}
+
+static inline void *soc_device_get_drvdata(struct soc_device *dev)
+{
+	assert(dev->drvdata);
+	return dev->drvdata;
+}
+
 struct soc_device_id {
 	const char *compatible;
 	const void *data;
@@ -116,4 +139,16 @@ soc_device_get_memory(struct soc *ctx, const struct soc_device_node *dn,
 int
 soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node *dn,
 				   const char *name, struct soc_region *region);
+
+struct soc_driver {
+	const char* name;
+	const struct soc_device_id *matches;
+	int (*init)(struct soc *soc, struct soc_device *dev);
+	void (*destroy)(struct soc_device *dev);
+};
+
+AUTODATA_TYPE(soc_drivers, struct soc_driver);
+#define REGISTER_SOC_DRIVER(sd) AUTODATA(soc_drivers, (sd))
+
+void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match);
 #endif

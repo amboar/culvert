@@ -10,6 +10,8 @@
 #include "soc.h"
 #include "rev.h"
 
+#include "ccan/autodata/autodata.h"
+
 #include <libfdt.h>
 
 #include <assert.h>
@@ -63,7 +65,113 @@ int soc_from_rev(struct soc *ctx, struct ahb *ahb, uint32_t rev)
 
 	ctx->rev = rev;
 	ctx->ahb = ahb;
+	list_head_init(&ctx->devices);
 	return soc_align_fdt(ctx, &soc_fdts[rev_generation(rev)]);
+}
+
+/* soc_bus_enumerate_devices() and soc_device_bind_driver() mutually recurse */
+static int
+soc_bus_enumerate_devices(struct soc *ctx, int bus, struct soc_driver **drivers, size_t n_drivers);
+
+static int
+soc_device_bind_driver(struct soc *ctx, int node, struct soc_driver **drivers, size_t n_drivers)
+{
+	char path[PATH_MAX];
+	size_t i;
+	int rc;
+
+	rc = fdt_get_path(ctx->fdt.start, node, path, sizeof(path));
+	if (rc < 0) {
+		loge("Failed to extract node path for offset %d\n", node);
+	} else {
+		logt("Processing devicetree node at %s\n", path);
+	}
+
+	if (!fdt_node_check_compatible(ctx->fdt.start, node, "simple-bus")) {
+		return soc_bus_enumerate_devices(ctx, node, drivers, n_drivers);
+	}
+
+	for (i = 0; i < n_drivers; i++) {
+		const struct soc_device_id *entry;
+
+		for (entry = drivers[i]->matches; entry && entry->compatible; entry++) {
+			struct soc_device *dev;
+
+			if (fdt_node_check_compatible(ctx->fdt.start, node, entry->compatible)) {
+				continue;
+			}
+
+			dev = malloc(sizeof(*dev));
+			if (!dev) {
+				loge("malloc() failed, exiting");
+				return -ENOMEM;
+			}
+
+			dev->node.fdt = &ctx->fdt;
+			dev->node.offset = node;
+			dev->driver = drivers[i];
+			dev->drvdata = NULL;
+
+			// Binding in this case means simply associating the driver with the device,
+			// but *not* initialising it. We initialise it later, lazily, when someone
+			// requests the driver instance for the device. See soc_driver_get_drvdata()
+			logd("Bound %s driver to %s\n", drivers[i]->name, path);
+
+			list_add(&ctx->devices, &dev->entry);
+
+			return 0;
+		}
+	}
+
+	return 0;
+}
+
+static int soc_bus_enumerate_devices(struct soc *ctx, int bus, struct soc_driver **drivers, size_t n_drivers)
+{
+	int node;
+	int rc;
+
+	fdt_for_each_subnode(node, ctx->fdt.start, bus) {
+		rc = soc_device_bind_driver(ctx, node, drivers, n_drivers);
+		if (rc < 0) {
+			return rc;
+		}
+	}
+
+	if ((node < 0) && (node != -FDT_ERR_NOTFOUND))
+		return -EUCLEAN;
+
+	return 0;
+}
+
+static void soc_bind_drivers(struct soc *ctx)
+{
+	struct soc_driver **drivers;
+	size_t n_drivers;
+
+	drivers = autodata_get(soc_drivers, &n_drivers);
+
+	logd("Found %zu registered drivers\n", n_drivers);
+
+	if (drivers && n_drivers) {
+		soc_bus_enumerate_devices(ctx, 0, drivers, n_drivers);
+	}
+
+	autodata_free(drivers);
+}
+
+static void soc_unbind_drivers(struct soc *ctx)
+{
+	struct soc_device *dev, *next;
+
+	list_for_each_safe(&ctx->devices, dev, next, entry) {
+		logd("Unbound instance of driver %s\n", dev->driver->name);
+		if (dev->drvdata) {
+			dev->driver->destroy(dev);
+		}
+		list_del(&dev->entry);
+		free(dev);
+	}
 }
 
 int soc_probe(struct soc *ctx, struct ahb *ahb)
@@ -76,11 +184,21 @@ int soc_probe(struct soc *ctx, struct ahb *ahb)
 		return rc;
 	}
 
-	return soc_from_rev(ctx, ahb, (uint32_t)rc);
+	rc = soc_from_rev(ctx, ahb, (uint32_t)rc);
+	if (rc < 0) {
+		loge("Failed to initialise SoC instance: %d\n", rc);
+		return rc;
+	}
+
+	soc_bind_drivers(ctx);
+
+	return 0;
 }
 
 void soc_destroy(struct soc *ctx)
 {
+	soc_unbind_drivers(ctx);
+
 	free(ctx->fdt.start);
 }
 
@@ -278,6 +396,7 @@ soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node
 {
 	struct soc_device_node rdn;
 	const uint32_t *regions;
+	int phandle;
 	int offset;
 	int idx;
 	int len;
@@ -301,9 +420,11 @@ soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node
 		return -ERANGE;
 	}
 
-	offset = fdt_node_offset_by_phandle(ctx->fdt.start, regions[idx]);
+	phandle = be32toh(regions[idx]);
+
+	offset = fdt_node_offset_by_phandle(ctx->fdt.start, phandle);
 	if (offset < 0) {
-		loge("fdt: Failed to find node for phandle %"PRIu32": %d\n", regions[idx], offset);
+		loge("fdt: Failed to find node for phandle %"PRIu32" at index %d: %d\n", phandle, idx, offset);
 		return -EUCLEAN;
 	}
 
@@ -312,3 +433,43 @@ soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node
 
 	return soc_device_get_memory(ctx, &rdn, region);
 }
+
+static void *soc_device_init_driver(struct soc *ctx, struct soc_device *dev)
+
+{
+	int rc;
+
+	if (dev->drvdata) {
+		return dev->drvdata;
+	}
+
+	if ((rc = dev->driver->init(ctx, dev)) < 0) {
+		loge("Failed to initialise driver: %d\n", rc);
+		return NULL;
+	}
+
+	logd("Initialised %s driver\n", dev->driver->name);
+
+	return dev->drvdata;
+}
+
+void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match)
+{
+	struct soc_device *dev;
+
+	list_for_each(&soc->devices, dev, entry) {
+		if (!strcmp(dev->driver->name, match->name)) {
+			return soc_device_init_driver(soc, dev);
+		}
+	}
+
+	return NULL;
+}
+
+static const struct soc_driver null_soc_driver = {
+	.name = NULL,
+	.matches = NULL,
+	.init = NULL,
+	.destroy = NULL,
+};
+REGISTER_SOC_DRIVER(&null_soc_driver);
