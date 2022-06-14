@@ -367,7 +367,7 @@ static inline void list_del_init_(struct list_node *n, const char *abortstr)
  *	list_del_from(&parent->children, &child->list);
  *	parent->num_children--;
  */
-static inline void list_del_from(struct list_head *h, struct list_node *n)
+static inline void list_del_from(struct list_head *h __attribute__((unused)), struct list_node *n)
 {
 #ifdef CCAN_LIST_DEBUG
 	{
