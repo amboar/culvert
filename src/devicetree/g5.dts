@@ -37,6 +37,11 @@
 		bus-controller@1e600000 {
 			compatible = "aspeed,ast2500-ahb-controller";
 			reg = <0x1e600000 0x20000>;
+
+			memory-region-names = "trace-buffer";
+			// Technically should point to a node under reserved-memory, but SRAM isn't
+			// mapped anyway which is why we're using it.
+			memory-region = <&sram>;
 		};
 
 		apb {
