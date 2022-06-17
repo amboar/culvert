@@ -121,11 +121,6 @@ static const struct soc_device_id ahbc_match[] = {
     { },
 };
 
-static const struct soc_device_id sram_match[] = {
-    { .compatible = "mmio-sram" },
-    { },
-};
-
 int trace_init(struct trace *ctx, struct soc *soc)
 {
     struct soc_device_node dn;
@@ -137,10 +132,7 @@ int trace_init(struct trace *ctx, struct soc *soc)
     if ((rc = soc_device_get_memory(soc, &dn, &ctx->ahbc)) < 0)
         return rc;
 
-    if ((rc = soc_device_match_node(soc, sram_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->sram)) < 0)
+    if ((rc = soc_device_get_memory_region_named(soc, &dn, "trace-buffer", &ctx->sram)) < 0)
         return rc;
 
     logi("Found AHBC at 0x%" PRIx32 " and SRAM at 0x%" PRIx32 "\n",
