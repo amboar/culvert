@@ -7,13 +7,9 @@
 
 #include "soc.h"
 
-struct trace {
-	struct soc *soc;
-	struct soc_region ahbc;
-	struct soc_region sram;
-};
-
 enum trace_mode { trace_read = 0, trace_write };
+
+struct trace;
 
 int trace_init(struct trace *ctx, struct soc *soc);
 int trace_start(struct trace *ctx, uint32_t addr, int width,

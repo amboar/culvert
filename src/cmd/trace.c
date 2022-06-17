@@ -25,11 +25,11 @@
 //doit trace 0x1e788000 4:0 write
 int cmd_trace(const char *name __unused, int argc, char *argv[])
 {
-    struct trace _trace, *trace = &_trace;
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     enum trace_mode mode;
     uint32_t addr, width;
+    struct trace *trace;
     struct ahb *ahb;
     sigset_t set;
     int sig;
@@ -87,8 +87,8 @@ int cmd_trace(const char *name __unused, int argc, char *argv[])
     if ((rc = soc_probe(soc, ahb)) < 0)
         goto cleanup_host;
 
-    if ((rc = trace_init(trace, soc))) {
-        loge("Unable to initialise trace object\n");
+    if (!(trace = trace_get(soc))) {
+        loge("Unable to acquire trace controller\n");
         goto cleanup_soc;
     }
 

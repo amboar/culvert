@@ -48,6 +48,12 @@
 #define R_AHBC_BCR_ADDR                 0x48
 #define R_AHBC_BCR_FIFO_MERGE           0x5C
 
+struct trace {
+	struct soc *soc;
+	struct soc_region ahbc;
+	struct soc_region sram;
+};
+
 static const size_t ahbc_bcr_buf_len[] = {
     [AHBC_BCR_CSR_BUF_LEN_4K] = (4 * 1024),
     [AHBC_BCR_CSR_BUF_LEN_8K] = (8 * 1024),
