@@ -272,3 +272,49 @@ int trace_dump(struct trace *ctx, int outfd)
 
     return rc;
 }
+
+static int trace_driver_init(struct soc *soc, struct soc_device *dev)
+{
+    struct trace *ctx;
+    int rc;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return -ENOMEM;
+    }
+
+    if ((rc = trace_init(ctx, soc)) < 0) {
+        goto cleanup_ctx;
+    }
+
+    soc_device_set_drvdata(dev, ctx);
+
+    if ((rc = trace_stop(ctx)) < 0) {
+        loge("Failed to stop trace: %d\n", rc);
+    }
+
+    return 0;
+
+cleanup_ctx:
+    free(ctx);
+
+    return rc;
+}
+
+static void trace_driver_destroy(struct soc_device *dev)
+{
+    free(soc_device_get_drvdata(dev));
+}
+
+static const struct soc_driver trace_driver = {
+    .name = "trace",
+    .matches = ahbc_match,
+    .init = trace_driver_init,
+    .destroy = trace_driver_destroy
+};
+REGISTER_SOC_DRIVER(&trace_driver);
+
+struct trace *trace_get(struct soc *soc)
+{
+    return soc_driver_get_drvdata(soc, &trace_driver);
+}

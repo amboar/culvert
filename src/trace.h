@@ -21,4 +21,6 @@ int trace_start(struct trace *ctx, uint32_t addr, int width,
 int trace_stop(struct trace *ctx);
 int trace_dump(struct trace *ctx, int outfd);
 
+struct trace *trace_get(struct soc *soc);
+
 #endif

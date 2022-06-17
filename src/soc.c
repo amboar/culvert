@@ -465,11 +465,3 @@ void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match)
 
 	return NULL;
 }
-
-static const struct soc_driver null_soc_driver = {
-	.name = NULL,
-	.matches = NULL,
-	.init = NULL,
-	.destroy = NULL,
-};
-REGISTER_SOC_DRIVER(&null_soc_driver);
