@@ -121,34 +121,6 @@ static int ahbc_writel(struct trace *ctx, uint32_t off, uint32_t val)
     return soc_writel(ctx->soc, ctx->ahbc.start + off, val);
 }
 
-static const struct soc_device_id ahbc_match[] = {
-    { .compatible = "aspeed,ast2500-ahb-controller" },
-    { .compatible = "aspeed,ast2600-ahb-controller" },
-    { },
-};
-
-int trace_init(struct trace *ctx, struct soc *soc)
-{
-    struct soc_device_node dn;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, ahbc_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->ahbc)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory_region_named(soc, &dn, "trace-buffer", &ctx->sram)) < 0)
-        return rc;
-
-    logi("Found AHBC at 0x%" PRIx32 " and SRAM at 0x%" PRIx32 "\n",
-         ctx->ahbc.start, ctx->sram.start);
-
-    ctx->soc = soc;
-
-    return 0;
-}
-
 int trace_start(struct trace *ctx, uint32_t addr, int width, enum trace_mode mode)
 {
     uint32_t csr, buf;
@@ -279,6 +251,12 @@ int trace_dump(struct trace *ctx, int outfd)
     return rc;
 }
 
+static const struct soc_device_id ahbc_match[] = {
+    { .compatible = "aspeed,ast2500-ahb-controller" },
+    { .compatible = "aspeed,ast2600-ahb-controller" },
+    { },
+};
+
 static int trace_driver_init(struct soc *soc, struct soc_device *dev)
 {
     struct trace *ctx;
@@ -289,9 +267,20 @@ static int trace_driver_init(struct soc *soc, struct soc_device *dev)
         return -ENOMEM;
     }
 
-    if ((rc = trace_init(ctx, soc)) < 0) {
+    rc = soc_device_get_memory(soc, &dev->node, &ctx->ahbc);
+    if (rc < 0) {
         goto cleanup_ctx;
     }
+
+    rc = soc_device_get_memory_region_named(soc, &dev->node, "trace-buffer", &ctx->sram);
+    if (rc < 0) {
+        goto cleanup_ctx;
+    }
+
+    logi("Found AHBC at 0x%" PRIx32 " and SRAM at 0x%" PRIx32 "\n", ctx->ahbc.start,
+         ctx->sram.start);
+
+    ctx->soc = soc;
 
     soc_device_set_drvdata(dev, ctx);
 
