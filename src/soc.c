@@ -271,3 +271,44 @@ int soc_device_get_memory_index(struct soc *ctx,
 
 	return 0;
 }
+
+int
+soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node *dn,
+				   const char *name, struct soc_region *region)
+{
+	struct soc_device_node rdn;
+	const uint32_t *regions;
+	int offset;
+	int idx;
+	int len;
+
+	idx = fdt_stringlist_search(ctx->fdt.start, dn->offset, "memory-region-names", name);
+	if (idx < 0) {
+		loge("fdt: No memory region named '%s' for node %d: %d\n", name, dn->offset, idx);
+		return -ENOENT;
+	}
+
+	regions = fdt_getprop(ctx->fdt.start, dn->offset, "memory-region", &len);
+	if (len < 0) {
+		loge("fdt: Failed to find 'memory-region' property in node %d: %d\n",
+		     dn->offset, len);
+		return -ENOENT;
+	}
+
+	if ((sizeof(*regions) * (size_t)idx) >= (size_t)len) {
+		loge("fdt: Memory region name '%s' at index %d is out of range (%d)\n",
+		     name, idx, len);
+		return -ERANGE;
+	}
+
+	offset = fdt_node_offset_by_phandle(ctx->fdt.start, regions[idx]);
+	if (offset < 0) {
+		loge("fdt: Failed to find node for phandle %"PRIu32": %d\n", regions[idx], offset);
+		return -EUCLEAN;
+	}
+
+	rdn.fdt = &ctx->fdt;
+	rdn.offset = offset;
+
+	return soc_device_get_memory(ctx, &rdn, region);
+}

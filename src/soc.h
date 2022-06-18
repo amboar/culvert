@@ -70,6 +70,7 @@ soc_siphon_out(struct soc *ctx, uint32_t phys, int infd)
 }
 
 struct soc_device_node {
+	const struct soc_fdt *fdt;
 	int offset;
 };
 
@@ -111,4 +112,8 @@ soc_device_get_memory(struct soc *ctx, const struct soc_device_node *dn,
 {
 	return soc_device_get_memory_index(ctx, dn, 0, region);
 }
+
+int
+soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node *dn,
+				   const char *name, struct soc_region *region);
 #endif
