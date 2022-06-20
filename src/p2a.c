@@ -69,14 +69,27 @@ int p2ab_init(struct p2ab *ctx, uint16_t vid, uint16_t did)
     ctx->res = rc;
     ctx->mmio = mmap(0, AST_MMIO_LEN, PROT_READ | PROT_WRITE, MAP_SHARED,
                      ctx->res, 0);
-    if (ctx->mmio == MAP_FAILED)
-        return -errno;
+    if (ctx->mmio == MAP_FAILED) {
+        rc = -errno;
+        goto cleanup_pci;
+    }
 
     /* ensure the HW and SW rbar values are in sync */
     ctx->rbar = 0;
     __p2ab_writel(ctx, P2AB_RBAR, ctx->rbar);
 
-    return p2ab_unlock(ctx);
+    if ((rc = p2ab_unlock(ctx)) < 0)
+        goto cleanup_mmap;
+
+    return 0;
+
+cleanup_mmap:
+    munmap(ctx->mmio, AST_MMIO_LEN);
+
+cleanup_pci:
+    pci_close(ctx->res);
+
+    return rc;
 }
 
 int p2ab_destroy(struct p2ab *ctx)
