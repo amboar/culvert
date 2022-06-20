@@ -33,6 +33,15 @@ struct p2ab;
 struct debug;
 struct devmem;
 
+struct ahb;
+
+struct ahb_ops {
+    ssize_t (*read)(struct ahb *ctx, uint32_t phys, void *buf, size_t len);
+    ssize_t (*write)(struct ahb *ctx, uint32_t phys, const void *buf, size_t len);
+    int (*readl)(struct ahb *ctx, uint32_t phys, uint32_t *val);
+    int (*writel)(struct ahb *ctx, uint32_t phys, uint32_t val);
+};
+
 struct ahb {
     enum ahb_bridge bridge;
     union {
@@ -42,11 +51,15 @@ struct ahb {
         struct debug *debug;
         struct devmem *devmem;
     };
+
+    const struct ahb_ops *ops;
 };
 
 struct ahb *ahb_use(struct ahb *ctx, enum ahb_bridge type, void *bridge);
 
 int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...);
+
+void ahb_init_ops(struct ahb *ctx, const struct ahb_ops *ops);
 
 /* Tear-down the AHB interface when SoC has *not* been reset */
 int ahb_destroy(struct ahb *ctx);

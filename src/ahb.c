@@ -112,6 +112,11 @@ int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...)
     return rc;
 }
 
+void ahb_init_ops(struct ahb *ctx, const struct ahb_ops *ops)
+{
+    ctx->ops = ops;
+}
+
 int ahb_cleanup(struct ahb *ctx)
 {
     if (ctx->bridge == ahb_ilpcb || ctx->bridge == ahb_l2ab ||
