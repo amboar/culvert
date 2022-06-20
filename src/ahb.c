@@ -166,7 +166,7 @@ ssize_t ahb_read(struct ahb *ctx, uint32_t phys, void *buf, size_t len)
     else if (ctx->bridge == ahb_debug)
         return debug_read(debug_as_ahb(ctx->debug), phys, buf, len);
     else if (ctx->bridge == ahb_devmem)
-        return devmem_read(ctx->devmem, phys, buf, len);
+        return devmem_read(devmem_as_ahb(ctx->devmem), phys, buf, len);
 
     return -ENOTSUP;
 }
@@ -182,7 +182,7 @@ ssize_t ahb_write(struct ahb *ctx, uint32_t phys, const void *buf, size_t len)
     else if (ctx->bridge == ahb_debug)
         return debug_write(debug_as_ahb(ctx->debug), phys, buf, len);
     else if (ctx->bridge == ahb_devmem)
-        return devmem_write(ctx->devmem, phys, buf, len);
+        return devmem_write(devmem_as_ahb(ctx->devmem), phys, buf, len);
 
     return -ENOTSUP;
 }
@@ -198,7 +198,7 @@ int ahb_readl(struct ahb *ctx, uint32_t phys, uint32_t *val)
     else if (ctx->bridge == ahb_debug)
         return debug_readl(debug_as_ahb(ctx->debug), phys, val);
     else if (ctx->bridge == ahb_devmem)
-        return devmem_readl(ctx->devmem, phys, val);
+        return devmem_readl(devmem_as_ahb(ctx->devmem), phys, val);
 
     return -ENOTSUP;
 }
@@ -214,7 +214,7 @@ int ahb_writel(struct ahb *ctx, uint32_t phys, uint32_t val)
     else if (ctx->bridge == ahb_debug)
         return debug_writel(debug_as_ahb(ctx->debug), phys, val);
     else if (ctx->bridge == ahb_devmem)
-        return devmem_writel(ctx->devmem, phys, val);
+        return devmem_writel(devmem_as_ahb(ctx->devmem), phys, val);
 
     return -ENOTSUP;
 }

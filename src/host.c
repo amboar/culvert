@@ -5,6 +5,7 @@
 #include "bridge.h"
 #include "compiler.h"
 #include "debug.h"
+#include "devmem.h"
 #include "host.h"
 #include "ilpc.h"
 #include "l2a.h"
@@ -96,6 +97,9 @@ struct ahb *host_get_ahb(struct host *ctx __unused)
     } else if (bridge->driver->type == ahb_debug) {
         ctx->shim.bridge = bridge->driver->type;
         ctx->shim.debug = to_debug(ahb);
+    } else if (bridge->driver->type == ahb_devmem) {
+        ctx->shim.bridge = bridge->driver->type;
+        ctx->shim.devmem = to_devmem(ahb);
     } else {
         return NULL;
     }

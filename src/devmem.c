@@ -3,6 +3,8 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "bridge.h"
+#include "compiler.h"
 #include "devmem.h"
 #include "log.h"
 #include "mb.h"
@@ -22,47 +24,6 @@
 
 #define AST_SOC_IO	0x1e600000
 #define AST_SOC_IO_LEN	0x00200000
-
-int devmem_init(struct devmem *ctx)
-{
-    int cleanup;
-    int rc;
-
-    ctx->pgsize = sysconf(_SC_PAGE_SIZE);
-
-    ctx->fd = open("/dev/mem", O_RDWR | O_SYNC);
-    if (ctx->fd < 0)
-        return -errno;
-
-    ctx->io = mmap(NULL, 0x00200000, PROT_READ | PROT_WRITE, MAP_SHARED,
-                   ctx->fd, 0x1e600000);
-    if (ctx->io == MAP_FAILED) { rc = -errno; goto cleanup_fd; }
-
-    ctx->win = NULL;
-
-    return 0;
-
-cleanup_fd:
-    cleanup = close(ctx->fd);
-    if (cleanup < 0) { perror("close"); }
-
-    return rc;
-}
-
-int devmem_destroy(struct devmem *ctx)
-{
-    int rc;
-
-    assert(!ctx->win);
-
-    rc = munmap(ctx->io, 0x00200000);
-    if (rc < 0) { perror("munmap"); }
-
-    rc = close(ctx->fd);
-    if (rc < 0) { perror("close"); }
-
-    return 0;
-}
 
 int devmem_probe(struct devmem *ctx)
 {
@@ -114,8 +75,9 @@ cleanup:
     return -errno;
 }
 
-int devmem_read(struct devmem *ctx, uint32_t phys, void *buf, size_t len)
+ssize_t devmem_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len)
 {
+    struct devmem *ctx = to_devmem(ahb);
     int64_t woff;
 
     woff = devmem_setup_win(ctx, phys, len);
@@ -127,8 +89,9 @@ int devmem_read(struct devmem *ctx, uint32_t phys, void *buf, size_t len)
     return len;
 }
 
-int devmem_write(struct devmem *ctx, uint32_t phys, const void *buf, size_t len)
+ssize_t devmem_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len)
 {
+    struct devmem *ctx = to_devmem(ahb);
     int64_t woff;
 
     woff = devmem_setup_win(ctx, phys, len);
@@ -140,8 +103,9 @@ int devmem_write(struct devmem *ctx, uint32_t phys, const void *buf, size_t len)
     return len;
 }
 
-int devmem_readl(struct devmem *ctx, uint32_t phys, uint32_t *val)
+int devmem_readl(struct ahb *ahb, uint32_t phys, uint32_t *val)
 {
+    struct devmem *ctx = to_devmem(ahb);
     uint32_t container;
 
     if (phys & 0x3)
@@ -165,8 +129,10 @@ int devmem_readl(struct devmem *ctx, uint32_t phys, uint32_t *val)
     return 0;
 }
 
-int devmem_writel(struct devmem *ctx, uint32_t phys, uint32_t val)
+int devmem_writel(struct ahb *ahb, uint32_t phys, uint32_t val)
 {
+    struct devmem *ctx = to_devmem(ahb);
+
     if (phys & 0x3)
         return -EINVAL;
 
@@ -189,3 +155,109 @@ int devmem_writel(struct devmem *ctx, uint32_t phys, uint32_t val)
 
     return 0;
 }
+
+static const struct ahb_ops devmem_ahb_ops = {
+    .read = devmem_read,
+    .write = devmem_write,
+    .readl = devmem_readl,
+    .writel = devmem_writel
+};
+
+int devmem_init(struct devmem *ctx)
+{
+    int cleanup;
+    int rc;
+
+    ctx->pgsize = sysconf(_SC_PAGE_SIZE);
+
+    ctx->fd = open("/dev/mem", O_RDWR | O_SYNC);
+    if (ctx->fd < 0)
+        return -errno;
+
+    ctx->io = mmap(NULL, 0x00200000, PROT_READ | PROT_WRITE, MAP_SHARED,
+                   ctx->fd, 0x1e600000);
+    if (ctx->io == MAP_FAILED) { rc = -errno; goto cleanup_fd; }
+
+    ctx->win = NULL;
+
+    ahb_init_ops(&ctx->ahb, &devmem_ahb_ops);
+
+    return 0;
+
+cleanup_fd:
+    cleanup = close(ctx->fd);
+    if (cleanup < 0) { perror("close"); }
+
+    return rc;
+}
+
+int devmem_destroy(struct devmem *ctx)
+{
+    int rc;
+
+    assert(!ctx->win);
+
+    rc = munmap(ctx->io, 0x00200000);
+    if (rc < 0) { perror("munmap"); }
+
+    rc = close(ctx->fd);
+    if (rc < 0) { perror("close"); }
+
+    return 0;
+}
+
+static struct ahb *
+devmem_driver_probe(int argc, char *argv[] __unused)
+{
+    struct devmem *ctx;
+    int rc;
+
+    // This driver doesn't require args, so if there are any we're not trying to probe it
+    if (argc > 0) {
+        return NULL;
+    }
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return NULL;
+    }
+
+    if ((rc = devmem_init(ctx)) < 0) {
+        loge("failed to initialise devmem bridge: %d\n", rc);
+        goto cleanup_ctx;
+    }
+
+    if ((rc = devmem_probe(ctx)) < 0) {
+        loge("Failed devmem probe: %d\n", rc);
+        goto destroy_ctx;
+    }
+
+    return devmem_as_ahb(ctx);
+
+destroy_ctx:
+    devmem_destroy(ctx);
+
+cleanup_ctx:
+    free(ctx);
+
+    return NULL;
+}
+
+static void devmem_driver_destroy(struct ahb *ahb)
+{
+    struct devmem *ctx = to_devmem(ahb);
+    int rc;
+
+    if ((rc = devmem_destroy(ctx)) < 0) {
+        loge("Failed to destroy devmem bridge: %d\n", rc);
+    }
+
+    free(ctx);
+}
+
+static const struct bridge_driver devmem_driver = {
+    .type = ahb_devmem,
+    .probe = devmem_driver_probe,
+    .destroy = devmem_driver_destroy,
+};
+REGISTER_BRIDGE_DRIVER(&devmem_driver);
