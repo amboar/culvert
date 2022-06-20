@@ -3,6 +3,7 @@
 
 #define _GNU_SOURCE
 #include "ast.h"
+#include "bridge.h"
 #include "console.h"
 #include "debug.h"
 #include "log.h"
@@ -22,120 +23,6 @@
 static inline int streq(const char *a, const char *b)
 {
     return !strcmp(a, b);
-}
-
-static int ts16_console_init(struct debug *ctx, va_list args)
-{
-    const char *ip, *username, *password;
-    struct ts16 *ts16;
-    int port;
-    int fd;
-
-    ts16 = malloc(sizeof(*ts16));
-    if (!ts16)
-        return -ENOMEM;
-
-    ip = va_arg(args, const char *);
-    port = va_arg(args, int);
-    username = va_arg(args, const char *);
-    password = va_arg(args, const char *);
-
-    fd = ts16_init(ts16, ip, port, username, password);
-    if (fd < 0) { goto cleanup_free; }
-
-    ctx->console = &ts16->console;
-
-    return fd;
-
-cleanup_free:
-    free(ts16);
-
-    return fd;
-}
-
-static int tty_console_init(struct debug *ctx, const char *path)
-{
-    struct tty *tty;
-    int fd;
-
-    tty = malloc(sizeof(*tty));
-    if (!tty)
-        return -ENOMEM;
-
-    fd = tty_init(tty, path);
-    if (fd < 0) { goto cleanup_free; }
-
-    ctx->console = &tty->console;
-
-    return fd;
-
-cleanup_free:
-    free(tty);
-
-    return fd;
-}
-
-int debug_init(struct debug *ctx, ...)
-{
-    va_list args;
-    int rc;
-
-    va_start(args, ctx);
-    rc = debug_init_v(ctx, args);
-    va_end(args);
-
-    return rc;
-}
-
-int debug_init_v(struct debug *ctx, va_list args)
-{
-    const char *interface;
-    int rc, fd;
-
-    /*
-     * Sanity-check presence of the password, though we also test again below
-     * where we use it to avoid TOCTOU.
-     */
-    if (!getenv("AST_DEBUG_PASSWORD")) {
-        loge("AST_DEBUG_PASSWORD environment variable is not defined\n");
-        return -ENOTSUP;
-    }
-
-    interface = va_arg(args, const char *);
-
-    if (!interface)
-        return -EINVAL;
-
-    if (streq("digi,portserver-ts-16", interface)) {
-        fd = ts16_console_init(ctx, args);
-    } else {
-        fd = tty_console_init(ctx, interface);
-    }
-
-    if (fd < 0) {
-        loge("Failed to initialise the console (%s): %d\n", interface, fd);
-        return fd;
-    }
-
-    rc = prompt_init(&ctx->prompt, fd, "\r", false);
-    if (rc < 0) { goto cleanup_ts16; }
-
-    return 0;
-
-cleanup_ts16:
-    console_destroy(ctx->console);
-
-    return rc;
-}
-
-int debug_destroy(struct debug *ctx)
-{
-    int rc = 0;
-
-    rc |= prompt_destroy(&ctx->prompt);
-    rc |= console_destroy(ctx->console);
-
-    return rc ? -EBADF : 0;
 }
 
 int debug_enter(struct debug *ctx)
@@ -290,9 +177,10 @@ static int debug_read_fixed(struct debug *ctx, char mode, uint32_t phys,
 
 #define DEBUG_D_MAX_LEN (128 * 1024)
 
-ssize_t debug_read(struct debug *ctx, uint32_t phys, void *buf, size_t len)
+ssize_t debug_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len)
 {
     char line[2 * sizeof("20002ba0:31e01002 20433002 30813003 e1a06002\r\n")];
+    struct debug *ctx = to_debug(ahb);
     size_t remaining = len;
     size_t ingress;
     char *command;
@@ -377,8 +265,9 @@ retry:
 
 #define DEBUG_CMD_U_MAX 128
 
-ssize_t debug_write(struct debug *ctx, uint32_t phys, const void *buf, size_t len)
+ssize_t debug_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len)
 {
+    struct debug *ctx = to_debug(ahb);
     const void *cursor;
     size_t remaining;
     size_t egress;
@@ -446,13 +335,15 @@ ssize_t debug_write(struct debug *ctx, uint32_t phys, const void *buf, size_t le
     return len;
 }
 
-int debug_readl(struct debug *ctx, uint32_t phys, uint32_t *val)
+int debug_readl(struct ahb *ahb, uint32_t phys, uint32_t *val)
 {
+    struct debug *ctx = to_debug(ahb);
     return debug_read_fixed(ctx, 'r', phys, val);
 }
 
-int debug_writel(struct debug *ctx, uint32_t phys, uint32_t val)
+int debug_writel(struct ahb *ahb, uint32_t phys, uint32_t val)
 {
+    struct debug *ctx = to_debug(ahb);
     char *command;
     int rc;
 
@@ -479,3 +370,195 @@ int debug_writel(struct debug *ctx, uint32_t phys, uint32_t val)
 
     return 0;
 }
+
+static int ts16_console_init(struct debug *ctx, va_list args)
+{
+    const char *ip, *username, *password;
+    struct ts16 *ts16;
+    int port;
+    int fd;
+
+    ts16 = malloc(sizeof(*ts16));
+    if (!ts16)
+        return -ENOMEM;
+
+    ip = va_arg(args, const char *);
+    port = va_arg(args, int);
+    username = va_arg(args, const char *);
+    password = va_arg(args, const char *);
+
+    fd = ts16_init(ts16, ip, port, username, password);
+    if (fd < 0) { goto cleanup_free; }
+
+    ctx->console = &ts16->console;
+
+    return fd;
+
+cleanup_free:
+    free(ts16);
+
+    return fd;
+}
+
+static int tty_console_init(struct debug *ctx, const char *path)
+{
+    struct tty *tty;
+    int fd;
+
+    tty = malloc(sizeof(*tty));
+    if (!tty)
+        return -ENOMEM;
+
+    fd = tty_init(tty, path);
+    if (fd < 0) { goto cleanup_free; }
+
+    ctx->console = &tty->console;
+
+    return fd;
+
+cleanup_free:
+    free(tty);
+
+    return fd;
+}
+
+int debug_init(struct debug *ctx, ...)
+{
+    va_list args;
+    int rc;
+
+    va_start(args, ctx);
+    rc = debug_init_v(ctx, args);
+    va_end(args);
+
+    return rc;
+}
+
+static const struct ahb_ops debug_ahb_ops = {
+    .read = debug_read,
+    .write = debug_write,
+    .readl = debug_readl,
+    .writel = debug_writel
+};
+
+int debug_init_v(struct debug *ctx, va_list args)
+{
+    const char *interface;
+    int rc, fd;
+
+    /*
+     * Sanity-check presence of the password, though we also test again below
+     * where we use it to avoid TOCTOU.
+     */
+    if (!getenv("AST_DEBUG_PASSWORD")) {
+        loge("AST_DEBUG_PASSWORD environment variable is not defined\n");
+        return -ENOTSUP;
+    }
+
+    interface = va_arg(args, const char *);
+
+    if (!interface)
+        return -EINVAL;
+
+    if (streq("digi,portserver-ts-16", interface)) {
+        fd = ts16_console_init(ctx, args);
+    } else {
+        fd = tty_console_init(ctx, interface);
+    }
+
+    if (fd < 0) {
+        loge("Failed to initialise the console (%s): %d\n", interface, fd);
+        return fd;
+    }
+
+    rc = prompt_init(&ctx->prompt, fd, "\r", false);
+    if (rc < 0) { goto cleanup_ts16; }
+
+    ahb_init_ops(&ctx->ahb, &debug_ahb_ops);
+
+    return 0;
+
+cleanup_ts16:
+    console_destroy(ctx->console);
+
+    return rc;
+}
+
+int debug_destroy(struct debug *ctx)
+{
+    int rc = 0;
+
+    rc |= prompt_destroy(&ctx->prompt);
+    rc |= console_destroy(ctx->console);
+
+    return rc ? -EBADF : 0;
+}
+
+static struct ahb *debug_driver_probe(int argc, char *argv[])
+{
+    struct debug *ctx;
+    int rc;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return NULL;
+    }
+
+    if (argc == 1) {
+        /* Local debug interface */
+        if ((rc = debug_init(ctx, argv[0])) < 0) {
+            loge("Failed to initialise local debug interace on %s: %d\n",
+                    argv[0], rc);
+            goto cleanup_ctx;
+        }
+    } else if (argc == 5) {
+        /* Remote debug interface */
+        rc = debug_init(ctx, argv[0], argv[1], strtoul(argv[2], NULL, 0),
+                        argv[3], argv[4]);
+        if (rc < 0) {
+            loge("Failed to initialise remote debug interface: %d\n", rc);
+            goto cleanup_ctx;
+        }
+    } else {
+        logd("Unrecognised argument list for debug interface (%d)\n", argc);
+        return NULL;
+    }
+
+    if ((rc = debug_enter(ctx)) < 0) {
+        loge("Failed to enter debug UART context: %d\n", rc);
+        goto destroy_ctx;
+    }
+
+    return debug_as_ahb(ctx);
+
+destroy_ctx:
+    debug_destroy(ctx);
+
+cleanup_ctx:
+    free(ctx);
+
+    return NULL;
+}
+
+static void debug_driver_destroy(struct ahb *ahb)
+{
+    struct debug *ctx = to_debug(ahb);
+    int rc;
+
+    if ((rc = debug_exit(ctx)) < 0) {
+        loge("Failed to exit debug UART context: %d\n", rc);
+    }
+
+    if ((rc = debug_destroy(ctx)) < 0) {
+        loge("Failed to destroy debug bridge: %d\n", rc);
+    }
+
+    free(ctx);
+}
+
+static const struct bridge_driver debug_driver = {
+    .type = ahb_debug,
+    .probe = debug_driver_probe,
+    .destroy = debug_driver_destroy,
+};
+REGISTER_BRIDGE_DRIVER(&debug_driver);
