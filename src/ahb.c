@@ -160,7 +160,7 @@ ssize_t ahb_read(struct ahb *ctx, uint32_t phys, void *buf, size_t len)
     if (ctx->bridge == ahb_ilpcb)
         return ilpcb_read(ilpcb_as_ahb(ctx->ilpcb), phys, buf, len);
     else if (ctx->bridge == ahb_l2ab)
-        return l2ab_read(ctx->l2ab, phys, buf, len);
+        return l2ab_read(l2ab_as_ahb(ctx->l2ab), phys, buf, len);
     else if (ctx->bridge == ahb_p2ab)
         return p2ab_read(ctx->p2ab, phys, buf, len);
     else if (ctx->bridge == ahb_debug)
@@ -176,7 +176,7 @@ ssize_t ahb_write(struct ahb *ctx, uint32_t phys, const void *buf, size_t len)
     if (ctx->bridge == ahb_ilpcb)
         return ilpcb_write(ilpcb_as_ahb(ctx->ilpcb), phys, buf, len);
     else if (ctx->bridge == ahb_l2ab)
-        return l2ab_write(ctx->l2ab, phys, buf, len);
+        return l2ab_write(l2ab_as_ahb(ctx->l2ab), phys, buf, len);
     else if (ctx->bridge == ahb_p2ab)
         return p2ab_write(ctx->p2ab, phys, buf, len);
     else if (ctx->bridge == ahb_debug)
@@ -192,7 +192,7 @@ int ahb_readl(struct ahb *ctx, uint32_t phys, uint32_t *val)
     if (ctx->bridge == ahb_ilpcb)
         return ilpcb_readl(ilpcb_as_ahb(ctx->ilpcb), phys, val);
     else if (ctx->bridge == ahb_l2ab)
-        return l2ab_readl(ctx->l2ab, phys, val);
+        return l2ab_readl(l2ab_as_ahb(ctx->l2ab), phys, val);
     else if (ctx->bridge == ahb_p2ab)
         return p2ab_readl(ctx->p2ab, phys, val);
     else if (ctx->bridge == ahb_debug)
@@ -208,7 +208,7 @@ int ahb_writel(struct ahb *ctx, uint32_t phys, uint32_t val)
     if (ctx->bridge == ahb_ilpcb)
         return ilpcb_writel(ilpcb_as_ahb(ctx->ilpcb), phys, val);
     else if (ctx->bridge == ahb_l2ab)
-        return l2ab_writel(ctx->l2ab, phys, val);
+        return l2ab_writel(l2ab_as_ahb(ctx->l2ab), phys, val);
     else if (ctx->bridge == ahb_p2ab)
         return p2ab_writel(ctx->p2ab, phys, val);
     else if (ctx->bridge == ahb_debug)

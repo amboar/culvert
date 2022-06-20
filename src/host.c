@@ -6,6 +6,7 @@
 #include "compiler.h"
 #include "host.h"
 #include "ilpc.h"
+#include "l2a.h"
 #include "log.h"
 
 #include <errno.h>
@@ -84,6 +85,9 @@ struct ahb *host_get_ahb(struct host *ctx __unused)
     if (bridge->driver->type == ahb_ilpcb) {
         ctx->shim.bridge = bridge->driver->type;
         ctx->shim.ilpcb = to_ilpcb(ahb);
+    } else if (bridge->driver->type == ahb_l2ab) {
+        ctx->shim.bridge = bridge->driver->type;
+        ctx->shim.l2ab = to_l2ab(ahb);
     } else {
         return NULL;
     }
