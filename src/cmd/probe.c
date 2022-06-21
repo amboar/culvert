@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+
+#include "compiler.h"
+
+#include "ahb.h"
+#include "array.h"
+#include "ast.h"
+#include "host.h"
+#include "log.h"
+#include "priv.h"
+
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
@@ -8,14 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "compiler.h"
-
-#include "ahb.h"
-#include "array.h"
-#include "ast.h"
-#include "log.h"
-#include "priv.h"
 
 static void
 cmd_probe_help(const char *name, int argc __unused, char *argv[] __unused)
@@ -130,10 +132,12 @@ static void cmd_probe_sort_ranges(struct ahb_range *src,
 
 int cmd_probe(const char *name, int argc, char *argv[])
 {
+    struct host _host, *host = &_host;
     struct ast_interfaces ifaces;
     bool pass_requirement = true;
     char *opt_interface = NULL;
     char *opt_require = NULL;
+    struct ahb *ahb;
     int rc;
     int c;
     int i;
@@ -190,52 +194,19 @@ int cmd_probe(const char *name, int argc, char *argv[])
         }
     }
 
-    if (argc == optind) {
-        rc = ast_ahb_bridge_probe(&ifaces);
-        if (rc < 0) {
-            bool denied = (rc == -EACCES || rc == -EPERM);
-            if (denied && !priv_am_root()) {
-                priv_print_unprivileged(name);
-                rc = EXIT_FAILURE;
-            } else if (rc == -ENOTSUP) {
-                if (opt_require) {
-                    logi("Probes failed, cannot access BMC AHB\n");
-                    rc = EXIT_SUCCESS;
-                } else {
-                    loge("Probes failed, cannot access BMC AHB\n");
-                    rc = EXIT_FAILURE;
-                }
-            } else {
-                errno = -rc;
-                perror("ast_ahb_bridge_probe");
-                rc = EXIT_FAILURE;
-            }
-            goto done;
-        }
-    } else {
-        struct ahb _ahb, *ahb = &_ahb;
-
-        rc = ahb_init(ahb, ahb_debug, argv[optind + 0], argv[optind + 1],
-                      strtoul(argv[optind + 2], NULL, 0), argv[optind + 3],
-                      argv[optind + 4]);
-        if (rc) {
-            errno = -rc;
-            perror("ahb_init");
-            rc = EXIT_FAILURE;
-            goto done;
-        }
-
-        rc = ast_ahb_bridge_discover(ahb, &ifaces);
-
-        ahb_destroy(ahb);
-
-        if (rc) {
-            errno = -rc;
-            perror("ast_ahb_bridge_discover");
-            rc = EXIT_FAILURE;
-            goto done;
-        }
+    if ((rc = host_init(host, argc - optind, &argv[optind])) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
+        rc = EXIT_FAILURE;
+        goto done;
     }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
+    }
+
+    rc = ast_ahb_bridge_discover(ahb, &ifaces);
 
     if (!opt_interface || !strcmp("ilpc", opt_interface)) {
         cmd_probe_pr_ip(ifaces.lpc.superio, "SuperIO: ");
@@ -316,6 +287,9 @@ int cmd_probe(const char *name, int argc, char *argv[])
         rc = pass_requirement ? EXIT_SUCCESS : EXIT_FAILURE;
     else
         rc = EXIT_SUCCESS;
+
+cleanup_host:
+    host_destroy(host);
 
 done:
     exit(rc);

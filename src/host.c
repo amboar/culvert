@@ -73,7 +73,7 @@ void host_destroy(struct host *ctx)
     }
 }
 
-struct ahb *host_get_ahb(struct host *ctx __unused)
+struct ahb *host_get_ahb(struct host *ctx)
 {
     struct bridge *bridge;
 
