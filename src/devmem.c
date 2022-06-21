@@ -71,6 +71,10 @@ int devmem_probe(struct devmem *ctx)
 
     logd("Probing %s\n", ahb_interface_names[ahb_devmem]);
 
+#ifndef __arm__
+    return -ENOTSUP;
+#endif
+
     rc = rev_probe(ahb_use(&ahb, ahb_devmem, ctx));
 
     return rc < 0 ? rc : 1;
