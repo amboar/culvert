@@ -25,6 +25,10 @@ int l2ab_init(struct l2ab *ctx)
     if (rc)
         return rc;
 
+    rc = ilpcb_probe(ilpcb);
+    if (rc)
+        goto cleanup;
+
     rc = ilpcb_readl(ilpcb, LPC_HICR7, &ctx->restore7);
     if (rc)
         goto cleanup;
