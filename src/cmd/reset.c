@@ -1,26 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+#include "ahb.h"
+#include "ast.h"
+#include "clk.h"
+#include "compiler.h"
+#include "host.h"
+#include "log.h"
+#include "priv.h"
+#include "soc.h"
+#include "wdt.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "ahb.h"
-#include "ast.h"
-#include "clk.h"
-#include "log.h"
-#include "priv.h"
-#include "soc.h"
-#include "wdt.h"
-
-int cmd_reset(const char *name, int argc, char *argv[])
+int cmd_reset(const char *name __unused, int argc, char *argv[])
 {
-    struct ahb _ahb, *ahb = &_ahb;
+    struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     struct clk _clk, *clk = &_clk;
     struct wdt _wdt, *wdt = &_wdt;
     int64_t wait = 0;
+    struct ahb *ahb;
     int cleanup;
     int rc;
 
@@ -35,25 +38,27 @@ int cmd_reset(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    /* Initialise the AHB bridge */
-    if ((rc = ast_ahb_from_args(ahb, argc - 2, argv + 2)) < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_from_args");
-        }
+    if ((rc = host_init(host, argc - 2, argv + 2)) < 0) {
+        loge("Failed to acquire AHB interface, exiting: %d\n", rc);
         exit(EXIT_FAILURE);
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if ((rc = soc_probe(soc, ahb)) < 0) {
+        errno = -rc;
+        perror("soc_probe");
+        goto cleanup_host;
     }
 
     /* Probe the SoC */
     if ((rc = soc_probe(soc, ahb)) < 0) {
         errno = -rc;
         perror("soc_probe");
-        goto cleanup_ahb;
+        goto cleanup_host;
     }
 
     /* Initialise the required SoC drivers */
@@ -107,11 +112,8 @@ cleanup_clk:
 cleanup_soc:
     soc_destroy(soc);
 
-cleanup_ahb:
-    if ((cleanup = ahb_cleanup(ahb)) < 0) {
-        errno = -cleanup;
-        perror("ahb_destroy");
-    }
+cleanup_host:
+    host_destroy(host);
 
     return rc;
 }
