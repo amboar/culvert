@@ -4,6 +4,8 @@
 #include "ahb.h"
 #include "ast.h"
 #include "clk.h"
+#include "compiler.h"
+#include "host.h"
 #include "log.h"
 #include "priv.h"
 #include "uart/suart.h"
@@ -14,14 +16,15 @@
 #include <string.h>
 #include <unistd.h>
 
-int cmd_console(const char *name, int argc, char *argv[])
+int cmd_console(const char *name __unused, int argc, char *argv[])
 {
     struct suart _suart, *suart = &_suart;
     struct uart_mux _mux, *mux = &_mux;
-    struct ahb _ahb, *ahb = &_ahb;
+    struct host _host, *host = &_host;
     struct clk _clk, *clk = &_clk;
     struct soc _soc, *soc = &_soc;
     const char *user, *pass;
+    struct ahb *ahb;
     int cleanup;
     int baud;
     int rc;
@@ -46,24 +49,22 @@ int cmd_console(const char *name, int argc, char *argv[])
     user = argv[3];
     pass = argv[4];
 
-    rc = ast_ahb_init(ahb, true);
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_init");
-        }
+
+    if ((rc = host_init(host, argc - 5, argv + 5)) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
         exit(EXIT_FAILURE);
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto host_cleanup;
     }
 
     if ((rc = soc_probe(soc, ahb)) < 0) {
         errno = -rc;
         perror("soc_probe");
-        goto ahb_cleanup;
+        goto host_cleanup;
     }
 
     if ((rc = clk_init(clk, soc)) < 0) {
@@ -180,9 +181,8 @@ clk_cleanup:
 soc_cleanup:
     soc_destroy(soc);
 
-ahb_cleanup:
-    cleanup = ahb_destroy(ahb);
-    if (cleanup) { errno = -cleanup; perror("ahb_destroy"); }
+host_cleanup:
+    host_destroy(host);
 
     return rc;
 }
