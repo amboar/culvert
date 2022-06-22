@@ -3,7 +3,9 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "compiler.h"
 #include "flash.h"
+#include "host.h"
 #include "log.h"
 #include "priv.h"
 #include "sdmc.h"
@@ -91,34 +93,31 @@ static int cmd_dump_ram(struct soc *soc)
     return rc;
 }
 
-int cmd_read(const char *name, int argc, char *argv[])
+int cmd_read(const char *name __unused, int argc, char *argv[])
 {
+    struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    struct ahb _ahb, *ahb = &_ahb;
-    int rc, cleanup;
+    struct ahb *ahb;
+    int rc;
 
     if (argc < 1) {
         loge("Not enough arguments for read command\n");
         exit(EXIT_FAILURE);
     }
 
-    rc = ast_ahb_from_args(ahb, argc - 1, argv + 1);
-    printf("ast_ahb_from_args: 0x%x\n", rc);
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_from_args");
-        }
+    if ((rc = host_init(host, argc - 1, argv + 1)) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
         exit(EXIT_FAILURE);
     }
 
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
+    }
+
     if ((rc = soc_probe(soc, ahb)) < 0)
-        goto cleanup_ahb;
+        goto cleanup_host;
 
     if (!strcmp("firmware", argv[0]))
         rc = cmd_dump_firmware(soc);
@@ -131,9 +130,8 @@ int cmd_read(const char *name, int argc, char *argv[])
 
     soc_destroy(soc);
 
-cleanup_ahb:
-    cleanup = ahb_destroy(ahb);
-    if (cleanup) { errno = -cleanup; perror("ahb_destroy"); }
+cleanup_host:
+    host_destroy(host);
 
     if (rc < 0)
         exit(EXIT_FAILURE);
