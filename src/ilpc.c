@@ -18,9 +18,10 @@
 
 #define LPC_HICRB_ILPCB_RO (1 << 6)
 
+#define to_ilpcb(ahb) container_of(ahb, struct ilpcb, ahb)
+
 int ilpcb_probe(struct ilpcb *ctx)
 {
-    struct ahb ahb;
     int rc;
 
     logd("Probing %s\n", ahb_interface_names[ahb_ilpcb]);
@@ -28,7 +29,7 @@ int ilpcb_probe(struct ilpcb *ctx)
     if (!sio_probe(&ctx->sio))
         return 0;
 
-    rc = rev_probe(ahb_use(&ahb, ahb_ilpcb, ctx));
+    rc = rev_probe(ilpcb_as_ahb(ctx));
 
     return rc < 0 ? rc : 1;
 }
@@ -309,7 +310,7 @@ static const struct ahb_ops ilpcb_ops = {
 
 int ilpcb_init(struct ilpcb *ctx)
 {
-    ahb_init_ops(&ctx->ahb, &ilpcb_ops);
+    ahb_init_ops(&ctx->ahb, ahb_ilpcb, &ilpcb_ops);
 
     return sio_init(&ctx->sio);
 }

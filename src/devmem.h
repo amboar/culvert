@@ -4,8 +4,6 @@
 #ifndef _DEVMEM_H
 #define _DEVMEM_H
 
-#include "ccan/container_of/container_of.h"
-
 #include "ahb.h"
 
 #include <stdint.h>
@@ -20,7 +18,6 @@ struct devmem {
     size_t len;
     off_t pgsize;
 };
-#define to_devmem(ahb) container_of(ahb, struct devmem, ahb)
 
 int devmem_init(struct devmem *ctx);
 int devmem_destroy(struct devmem *ctx);

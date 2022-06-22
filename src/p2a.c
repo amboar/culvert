@@ -12,6 +12,8 @@
 #include "pci.h"
 #include "rev.h"
 
+#include "ccan/container_of/container_of.h"
+
 #include <assert.h>
 #include <endian.h>
 #include <errno.h>
@@ -28,6 +30,8 @@
 #define   P2AB_RBAR_REMAP_MASK  0xffff0000
 #define P2AB_WINDOW_BASE        0x10000
 #define P2AB_WINDOW_LEN         0x10000
+
+#define to_p2ab(ahb) container_of(ahb, struct p2ab, ahb)
 
 static int __p2ab_readl(struct p2ab *ctx, size_t addr, uint32_t *val)
 {
@@ -73,12 +77,11 @@ static inline int p2ab_lock(struct p2ab *ctx)
 
 int p2ab_probe(struct p2ab *ctx)
 {
-    struct ahb ahb;
     int64_t rc;
 
     logd("Probing %s\n", ahb_interface_names[ahb_p2ab]);
 
-    rc = rev_probe(ahb_use(&ahb, ahb_p2ab, ctx));
+    rc = rev_probe(p2ab_as_ahb(ctx));
     if (rc < 0)
         return rc;
 
@@ -219,7 +222,7 @@ int p2ab_init(struct p2ab *ctx, uint16_t vid, uint16_t did)
     if ((rc = p2ab_unlock(ctx)) < 0)
         goto cleanup_mmap;
 
-    ahb_init_ops(&ctx->ahb, &p2ab_ahb_ops);
+    ahb_init_ops(&ctx->ahb, ahb_p2ab, &p2ab_ahb_ops);
 
     return 0;
 

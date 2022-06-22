@@ -4,8 +4,6 @@
 #ifndef _DEBUG_H
 #define _DEBUG_H
 
-#include "ccan/container_of/container_of.h"
-
 #include "ahb.h"
 #include "console.h"
 #include "prompt.h"
@@ -21,7 +19,6 @@ struct debug {
     struct prompt prompt;
     int port;
 };
-#define to_debug(ahb) container_of(ahb, struct debug, ahb)
 
 int debug_init(struct debug *ctx, ...);
 int debug_init_v(struct debug *ctx, va_list args);

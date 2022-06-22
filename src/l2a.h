@@ -4,8 +4,6 @@
 #ifndef L2A_H
 #define L2A_H
 
-#include "ccan/container_of/container_of.h"
-
 #include "ahb.h"
 #include "lpc.h"
 #include "ilpc.h"
@@ -22,7 +20,6 @@ struct l2ab {
     uint32_t restore7;
     uint32_t restore8;
 };
-#define to_l2ab(ahb) container_of(ahb, struct l2ab, ahb)
 
 int l2ab_init(struct l2ab *ctx);
 int l2ab_destroy(struct l2ab *ctx);

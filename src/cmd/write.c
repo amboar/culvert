@@ -94,7 +94,7 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
     if ((rc = vuart_init(vuart, soc, "vuart")) < 0)
         goto cleanup_clk;
 
-    if (ahb->bridge == ahb_devmem)
+    if (ahb->type == ahb_devmem)
         loge("I hope you know what you are doing\n");
     else if (live) {
         logi("Preventing system reset\n");
@@ -163,7 +163,7 @@ cleanup_sfc:
 cleanup_state:
     if (live) {
         if (rc == 0) {
-            if (ahb->bridge != ahb_devmem) {
+            if (ahb->type != ahb_devmem) {
                 struct wdt _wdt, *wdt = &_wdt;
                 int64_t wait;
 

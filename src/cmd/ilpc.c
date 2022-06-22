@@ -11,7 +11,7 @@
 int cmd_ilpc(const char *name, int argc, char *argv[])
 {
     struct ilpcb _ilpcb, *ilpcb = &_ilpcb;
-    struct ahb _ahb, *ahb = &_ahb;
+    struct ahb *ahb;
     int cleanup;
     int rc;
 
@@ -27,7 +27,7 @@ int cmd_ilpc(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    ahb_use(ahb, ahb_ilpcb, ilpcb);
+    ahb = ilpcb_as_ahb(ilpcb);
     rc = ast_ahb_access(name, argc, argv, ahb);
     if (rc) {
         errno = -rc;

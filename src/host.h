@@ -10,7 +10,6 @@
 
 struct host {
 	struct list_head bridges;
-	struct ahb shim;
 };
 
 int host_init(struct host *ctx, int argc, char *argv[]);

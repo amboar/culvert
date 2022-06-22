@@ -11,6 +11,8 @@
 #include "ts16.h"
 #include "tty.h"
 
+#include "ccan/container_of/container_of.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -19,6 +21,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#define to_debug(ahb) container_of(ahb, struct debug, ahb)
 
 static inline int streq(const char *a, const char *b)
 {
@@ -474,7 +478,7 @@ int debug_init_v(struct debug *ctx, va_list args)
     rc = prompt_init(&ctx->prompt, fd, "\r", false);
     if (rc < 0) { goto cleanup_ts16; }
 
-    ahb_init_ops(&ctx->ahb, &debug_ahb_ops);
+    ahb_init_ops(&ctx->ahb, ahb_debug, &debug_ahb_ops);
 
     return 0;
 

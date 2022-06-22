@@ -4,8 +4,6 @@
 #ifndef _P2A_H
 #define _P2A_H
 
-#include "ccan/container_of/container_of.h"
-
 #include "ahb.h"
 
 #include <stdint.h>
@@ -21,7 +19,6 @@ struct p2ab {
     void *mmio;
     uint32_t rbar;
 };
-#define to_p2ab(ahb) container_of(ahb, struct p2ab, ahb)
 
 int p2ab_init(struct p2ab *p2ab, uint16_t vid, uint16_t did);
 int p2ab_destroy(struct p2ab *p2ab);

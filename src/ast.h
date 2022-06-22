@@ -66,11 +66,7 @@ struct ast_interfaces {
     struct ast_cap_xdma xdma;
 };
 
-int ast_ahb_bridge_probe(struct ast_interfaces *state);
 int ast_ahb_bridge_discover(struct ahb *ahb, struct ast_interfaces *state);
-int ast_ahb_init(struct ahb *ahb, bool rw);
-
-int ast_ahb_from_args(struct ahb *ahb, int argc, char *argv[]);
 int ast_ahb_access(const char *name, int argc, char *argv[], struct ahb *ahb);
 
 #endif

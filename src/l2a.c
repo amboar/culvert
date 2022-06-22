@@ -6,6 +6,8 @@
 #include "l2a.h"
 #include "log.h"
 
+#include "ccan/container_of/container_of.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +16,8 @@
 #define LPC_HICR7               0x1e789088
 #define LPC_HICR8               0x1e78908c
 #define L2AB_WINDOW_SIZE        (1 << 27)
+
+#define to_l2ab(ahb) container_of(ahb, struct l2ab, ahb)
 
 /* @return The LPC FW offset mapped to phys */
 int64_t l2ab_map(struct l2ab *ctx, uint32_t phys, size_t len)
@@ -158,7 +162,7 @@ int l2ab_init(struct l2ab *ctx)
     if (rc)
         goto cleanup;
 
-    ahb_init_ops(&ctx->ahb, &l2ab_ahb_ops);
+    ahb_init_ops(&ctx->ahb, ahb_l2ab, &l2ab_ahb_ops);
 
     return 0;
 

@@ -4,8 +4,6 @@
 #ifndef ILPC_H
 #define ILPC_H
 
-#include "ccan/container_of/container_of.h"
-
 #include "ahb.h"
 #include "sio.h"
 
@@ -18,7 +16,6 @@ struct ilpcb
     struct ahb ahb;
     struct sio sio;
 };
-#define to_ilpcb(ahb) container_of(ahb, struct ilpcb, ahb)
 
 int ilpcb_init(struct ilpcb *ctx);
 int ilpcb_destroy(struct ilpcb *ctx);

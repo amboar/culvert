@@ -72,12 +72,6 @@ static int region_readl(struct soc *soc, const struct soc_region *region,
     return soc_readl(soc, region->start + offset, val);
 }
 
-static int region_writel(struct soc *soc, const struct soc_region *region,
-                         uint32_t offset, uint32_t val)
-{
-    return soc_writel(soc, region->start + offset, val);
-}
-
 static int ast_ilpc_status(struct soc *soc, struct ast_cap_lpc *cap)
 {
     static const struct soc_device_id scu_match[] = {
@@ -337,9 +331,9 @@ static int ast2500_debug_status(struct soc *soc, struct ast_cap_uart *cap)
 }
 
 static int
-ast_kernel_status(struct soc *soc __unused, struct ast_cap_kernel *cap)
+ast_kernel_status(struct soc *soc, struct ast_cap_kernel *cap)
 {
-    cap->have_devmem = (soc->ahb->bridge == ahb_devmem);
+    cap->have_devmem = (soc->ahb->type == ahb_devmem);
 
     return 0;
 }
@@ -403,7 +397,7 @@ int ast_ahb_bridge_discover(struct ahb *ahb, struct ast_interfaces *state)
     }
 
     logi("Performing interface discovery via %s\n",
-         ahb_interface_names[ahb->bridge]);
+         ahb_interface_names[ahb->type]);
 
     if ((rc = ops->ilpc_status(soc, &state->lpc)) < 0)
         goto cleanup_soc;
@@ -423,283 +417,6 @@ cleanup_soc:
     soc_destroy(soc);
 
     return rc;
-}
-
-int ast_ahb_bridge_probe(struct ast_interfaces *state)
-{
-    struct devmem _devmem, *devmem = &_devmem;
-    struct ilpcb _ilpcb, *ilpcb = &_ilpcb;
-    struct p2ab _p2ab, *p2ab = &_p2ab;
-    struct ahb _ahb, *ahb = &_ahb;
-    int cleanup;
-    int rc;
-
-    if (!priv_am_root())
-        return -EPERM;
-
-    logi("Probing AHB interfaces\n");
-
-    rc = devmem_init(devmem);
-    if (!rc) {
-        rc = devmem_probe(devmem);
-        if (rc == 1) {
-            ahb_use(ahb, ahb_devmem, devmem);
-
-            rc = ast_ahb_bridge_discover(ahb, state);
-
-            cleanup = devmem_destroy(devmem);
-            if (cleanup) { errno = -cleanup; perror("devmem_destroy"); }
-
-            return rc;
-        }
-
-        cleanup = devmem_destroy(devmem);
-        if (cleanup) { errno = -cleanup; perror("devmem_destroy"); }
-    }
-
-    rc = p2ab_init(p2ab, AST_PCI_VID, AST_PCI_DID_VGA);
-    if (!rc) {
-        rc = p2ab_probe(p2ab);
-        if (rc == 1) {
-            ahb_use(ahb, ahb_p2ab, p2ab);
-
-            rc = ast_ahb_bridge_discover(ahb, state);
-
-            cleanup = p2ab_destroy(p2ab);
-            if (cleanup) { errno = -cleanup; perror("p2ab_destroy"); }
-
-            return rc;
-        }
-
-        cleanup = p2ab_destroy(p2ab);
-        if (cleanup) { errno = -cleanup; perror("p2ab_destroy"); }
-    }
-
-    rc = ilpcb_init(ilpcb);
-    if (!rc) {
-        rc = ilpcb_probe(ilpcb);
-        if (rc == 1) {
-            ahb_use(ahb, ahb_ilpcb, ilpcb);
-
-            rc = ast_ahb_bridge_discover(ahb, state);
-
-            cleanup = ilpcb_destroy(ilpcb);
-            if (cleanup) { errno = -cleanup; perror("ilpcb_destroy"); }
-
-            return rc;
-        }
-        cleanup = ilpcb_destroy(ilpcb);
-        if (cleanup) { errno = -cleanup; perror("ilpcb_destroy"); }
-    }
-
-    return -ENOTSUP;
-}
-
-static int ast_p2ab_enable_writes(struct soc *soc, const struct soc_region *scu)
-{
-    uint32_t val;
-    int rc;
-
-    logi("Disabling %s write filters\n", ahb_interface_names[ahb_p2ab]);
-    if ((rc = region_readl(soc, scu, SCU_MISC, &val)) < 0)
-        return rc;
-
-    /* Unconditionally turn off all write filters */
-    if (soc_generation(soc) == ast_g4) {
-        val &= ~(SCU_MISC_G4_P2A_DRAM_RO | SCU_MISC_G4_P2A_SPI_RO |
-                SCU_MISC_G4_P2A_SOC_RO  | SCU_MISC_G4_P2A_FMC_RO);
-    } else if (soc_generation(soc) == ast_g5) {
-        val &= ~(SCU_MISC_G5_P2A_DRAM_RO | SCU_MISC_G5_P2A_LPCH_RO |
-                SCU_MISC_G5_P2A_SOC_RO  | SCU_MISC_G5_P2A_FLASH_RO);
-    } else if (soc_generation(soc) == ast_g6) {
-        return 0;
-    } else {
-        return -ENOTSUP;
-    }
-
-    if ((rc = region_writel(soc, scu, SCU_MISC, val)) < 0)
-        return rc;
-
-    return 0;
-}
-
-int ast_ahb_init(struct ahb *ahb, bool rw)
-{
-    bool have_vga, have_vga_mmio, have_bmc, have_bmc_mmio, have_p2ab;
-    static const struct soc_device_id scu_match[] = {
-        { .compatible = "aspeed,ast2400-scu" },
-        { .compatible = "aspeed,ast2500-scu" },
-        { },
-    };
-    static const struct soc_device_id lpc_match[] = {
-        { .compatible = "aspeed,ast2400-lpc-v2" },
-        { .compatible = "aspeed,ast2500-lpc-v2" },
-        { },
-    };
-    struct p2ab _p2ab, *p2ab = &_p2ab;
-    struct soc _soc, *soc = &_soc;
-    struct ast_interfaces state;
-    struct soc_region scu, lpc;
-    struct soc_device_node dn;
-    uint32_t val;
-    int rc;
-
-    rc = ast_ahb_bridge_probe(&state);
-    if (rc)
-        return rc;
-
-    if (state.kernel.have_devmem) {
-        logi("Detected devmem interface\n");
-        return ahb_init(ahb, ahb_devmem);
-    }
-
-    have_vga = state.pci.vga == ip_state_enabled;
-    have_vga_mmio = state.pci.vga_mmio == ip_state_enabled;
-    have_bmc = state.pci.bmc == ip_state_enabled;
-    have_bmc_mmio = state.pci.bmc_mmio == ip_state_enabled;
-    have_p2ab = (have_vga && have_vga_mmio) || (have_bmc && have_bmc_mmio);
-
-    if (!have_p2ab || (rw && !state.pci.ranges[p2ab_soc].rw)) {
-        if (state.lpc.superio != ip_state_enabled)
-            return -ENOTSUP;
-
-        if (!state.lpc.ilpc.rw && rw)
-            return -ENOTSUP;
-
-        rc = ahb_init(ahb, ahb_ilpcb);
-        if (rc || !rw)
-            goto cleanup;
-
-        if ((rc = soc_probe(soc, ahb)) < 0)
-            goto cleanup_ilpc_ahb;
-
-        if (!have_p2ab) {
-            if ((rc = soc_device_match_node(soc, scu_match, &dn)) < 0)
-                goto cleanup_ilpc_soc;
-
-            if ((rc = soc_device_get_memory(soc, &dn, &scu)) < 0)
-                goto cleanup_ilpc_soc;
-
-            /* Enable the P2A interface */
-            logi("Enabling %s interface via %s\n",
-                 ahb_interface_names[ahb_p2ab], ahb_interface_names[ahb_ilpcb]);
-
-            if ((rc = region_readl(soc, &scu, SCU_PCIE_CONFIG, &val)) < 0)
-                goto cleanup_ilpc_soc;
-
-            val |= (SCU_PCIE_CONFIG_VGA | SCU_PCIE_CONFIG_VGA_MMIO);
-
-            if ((rc = region_writel(soc, &scu, SCU_PCIE_CONFIG, val)) < 0)
-                goto cleanup_ilpc_soc;
-
-            rc = system("echo 1 > /sys/bus/pci/rescan");
-            if (rc == -1) {
-                rc = -errno;
-                goto cleanup_ilpc_soc;
-            } else if (rc == 127) {
-                rc = -EIO;
-                goto cleanup_ilpc_soc;
-            }
-
-            usleep(1000);
-        }
-
-        /* Make the P2A interface writable */
-        if (rw && !state.pci.ranges[p2ab_soc].rw) {
-            if ((rc = ast_p2ab_enable_writes(soc, &scu)) < 0)
-                goto cleanup_ilpc_soc;
-        }
-
-cleanup_ilpc_soc:
-        soc_destroy(soc);
-
-cleanup_ilpc_ahb:
-        ahb_destroy(ahb);
-    }
-
-    if ((rc = p2ab_init(p2ab, AST_PCI_VID, AST_PCI_DID_VGA)) < 0)
-        return rc;
-
-    if (p2ab_probe(p2ab) < 1) {
-        p2ab_destroy(p2ab);
-        if ((rc = ahb_init(ahb, ahb_l2ab)) < 0)
-            goto cleanup;
-        goto done;
-    }
-
-    if ((rc = ahb_init(ahb, ahb_p2ab)) < 0)
-        goto cleanup;
-
-    if (state.lpc.superio != ip_state_enabled) {
-        if ((rc = soc_probe(soc, ahb)) < 0)
-            goto cleanup_p2a_ahb;
-
-        if ((rc = soc_device_match_node(soc, scu_match, &dn)) < 0)
-            goto cleanup_p2a_soc;
-
-        if ((rc = soc_device_get_memory(soc, &dn, &scu)) < 0)
-            goto cleanup_p2a_soc;
-
-        /* Enable the LPC interface */
-        logi("Enabling %s interface via %s\n",
-             ahb_interface_names[ahb_ilpcb], ahb_interface_names[ahb_p2ab]);
-
-        val = SCU_HW_STRAP_SIO_DEC;
-        if ((rc = region_writel(soc, &scu, SCU_SILICON_REVISION, val)) < 0)
-            goto cleanup_p2a_soc;
-
-        /* Make the LPC interface writable */
-        if (rw && !state.lpc.ilpc.rw) {
-            if ((rc = soc_device_match_node(soc, lpc_match, &dn)) < 0)
-                goto cleanup_p2a_soc;
-
-            if ((rc = soc_device_get_memory(soc, &dn, &lpc)) < 0)
-                goto cleanup_p2a_soc;
-
-            if ((rc = region_readl(soc, &lpc, LPC_HICRB, &val)) < 0)
-                goto cleanup_p2a_soc;
-
-            val &= ~LPC_HICRB_ILPC_RO;
-
-            if ((rc = region_writel(soc, &lpc, LPC_HICRB, val)) < 0)
-                goto cleanup_p2a_soc;
-        }
-
-cleanup_p2a_soc:
-        soc_destroy(soc);
-    }
-
-    if (rc) {
-cleanup_p2a_ahb:
-        ahb_destroy(ahb);
-cleanup:
-        loge("Probed initialisation failed: %d\n", rc);
-        return rc;
-    }
-
-done:
-    logi("Probed initialisation complete, using %s interface\n",
-         ahb_interface_names[ahb->bridge]);
-
-    return 0;
-}
-
-int ast_ahb_from_args(struct ahb *ahb, int argc, char *argv[])
-{
-    /* Local interfaces */
-    if (argc == 0) {
-        logi("Probing local interfaces\n");
-        return ast_ahb_init(ahb, true);
-    }
-
-    /* Local debug interface */
-    if (argc == 1)
-        return ahb_init(ahb, ahb_debug, argv[0]);
-
-    /* Remote debug interface */
-    assert(argc == 5);
-    return ahb_init(ahb, ahb_debug, argv[0], argv[1], strtoul(argv[2], NULL, 0),
-                    argv[3], argv[4]);
 }
 
 int ast_ahb_access(const char *name __unused, int argc, char *argv[],

@@ -79,32 +79,7 @@ struct ahb *host_get_ahb(struct host *ctx)
 
     bridge = list_top(&ctx->bridges, struct bridge, entry);
 
-    if (!bridge) {
-        return NULL;
-    }
-
-    struct ahb *ahb = bridge->ahb;
-
-    if (bridge->driver->type == ahb_ilpcb) {
-        ctx->shim.bridge = bridge->driver->type;
-        ctx->shim.ilpcb = to_ilpcb(ahb);
-    } else if (bridge->driver->type == ahb_l2ab) {
-        ctx->shim.bridge = bridge->driver->type;
-        ctx->shim.l2ab = to_l2ab(ahb);
-    } else if (bridge->driver->type == ahb_p2ab) {
-        ctx->shim.bridge = bridge->driver->type;
-        ctx->shim.p2ab = to_p2ab(ahb);
-    } else if (bridge->driver->type == ahb_debug) {
-        ctx->shim.bridge = bridge->driver->type;
-        ctx->shim.debug = to_debug(ahb);
-    } else if (bridge->driver->type == ahb_devmem) {
-        ctx->shim.bridge = bridge->driver->type;
-        ctx->shim.devmem = to_devmem(ahb);
-    } else {
-        return NULL;
-    }
-
-    return &ctx->shim;
+    return bridge ? bridge->ahb : NULL;
 }
 
 int host_bridge_reinit_from_ahb(struct host *ctx, struct ahb *ahb)

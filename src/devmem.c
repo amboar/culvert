@@ -11,6 +11,8 @@
 #include "mmio.h"
 #include "rev.h"
 
+#include "ccan/container_of/container_of.h"
+
 #include <assert.h>
 #include <endian.h>
 #include <errno.h>
@@ -25,9 +27,10 @@
 #define AST_SOC_IO	0x1e600000
 #define AST_SOC_IO_LEN	0x00200000
 
+#define to_devmem(ahb) container_of(ahb, struct devmem, ahb)
+
 int devmem_probe(struct devmem *ctx)
 {
-    struct ahb ahb;
     int rc;
 
     logd("Probing %s\n", ahb_interface_names[ahb_devmem]);
@@ -36,7 +39,7 @@ int devmem_probe(struct devmem *ctx)
     return -ENOTSUP;
 #endif
 
-    rc = rev_probe(ahb_use(&ahb, ahb_devmem, ctx));
+    rc = rev_probe(devmem_as_ahb(ctx));
 
     return rc < 0 ? rc : 1;
 }
@@ -180,7 +183,7 @@ int devmem_init(struct devmem *ctx)
 
     ctx->win = NULL;
 
-    ahb_init_ops(&ctx->ahb, &devmem_ahb_ops);
+    ahb_init_ops(&ctx->ahb, ahb_devmem, &devmem_ahb_ops);
 
     return 0;
 
