@@ -1,31 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
 #define _GNU_SOURCE
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "ahb.h"
 #include "ast.h"
+#include "compiler.h"
+#include "host.h"
 #include "log.h"
 #include "priv.h"
 #include "sdmc.h"
 #include "soc.h"
 
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #define DUMP_RAM_WIN  (8 << 20)
 
-int cmd_replace(const char *name, int argc, char *argv[])
+int cmd_replace(const char *name __unused, int argc, char *argv[])
 {
+    struct host _host, *host = &_host;
     struct sdmc _sdmc, *sdmc = &_sdmc;
     struct soc _soc, *soc = &_soc;
-    struct ahb _ahb, *ahb = &_ahb;
     struct soc_region dram, vram;
     size_t replace_len;
     size_t ram_cursor;
+    struct ahb *ahb;
     void *win_chunk;
     void *needle;
-    int cleanup;
     int rc;
 
     if (argc < 3) {
@@ -47,22 +50,20 @@ int cmd_replace(const char *name, int argc, char *argv[])
     win_chunk = malloc(DUMP_RAM_WIN);
     if (!win_chunk) { perror("malloc"); exit(EXIT_FAILURE); }
 
-    rc = ast_ahb_init(ahb, true);
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_init");
-        }
-        exit(EXIT_FAILURE);
+    if ((rc = host_init(host, argc - 3, argv + 3)) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
+        rc = EXIT_FAILURE;
+        goto win_chunk_cleanup;
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto host_cleanup;
     }
 
     if ((rc = soc_probe(soc, ahb)))
-        goto ahb_cleanup;
+        goto host_cleanup;
 
     if ((rc = sdmc_init(sdmc, soc)))
         goto soc_cleanup;
@@ -119,10 +120,10 @@ sdmc_cleanup:
 soc_cleanup:
     soc_destroy(soc);
 
-ahb_cleanup:
-    cleanup = ahb_destroy(ahb);
-    if (cleanup) { errno = -cleanup; perror("ahb_destroy"); }
+host_cleanup:
+    host_destroy(host);
 
+win_chunk_cleanup:
     free(win_chunk);
 
     return rc;
