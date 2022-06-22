@@ -2,6 +2,15 @@
 // Copyright (C) 2018,2021 IBM Corp.
 // Copyright (C) 2021, Oracle and/or its affiliates.
 
+#include "ahb.h"
+#include "ast.h"
+#include "compiler.h"
+#include "host.h"
+#include "log.h"
+#include "priv.h"
+#include "soc.h"
+#include "trace.h"
+
 #include <errno.h>
 #include <inttypes.h>
 #include <signal.h>
@@ -10,24 +19,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "ahb.h"
-#include "ast.h"
-#include "log.h"
-#include "priv.h"
-#include "soc.h"
-#include "trace.h"
-
 //doit trace ADDRESS WIDTH:OFFSET MODE
 //doit trace 0x1e788000 1:0 read
 //doit trace 0x1e788000 2:2 read
 //doit trace 0x1e788000 4:0 write
-int cmd_trace(const char *name, int argc, char *argv[])
+int cmd_trace(const char *name __unused, int argc, char *argv[])
 {
     struct trace _trace, *trace = &_trace;
-    struct ahb _ahb, *ahb = &_ahb;
+    struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     enum trace_mode mode;
     uint32_t addr, width;
+    struct ahb *ahb;
     sigset_t set;
     int sig;
     int rc;
@@ -70,21 +73,19 @@ int cmd_trace(const char *name, int argc, char *argv[])
         return rc;
     }
 
-    if ((rc = ast_ahb_from_args(ahb, argc - 3, &argv[3])) < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_from_args");
-        }
-        return rc;
+    if ((rc = host_init(host, argc - 3, argv + 3)) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
+        exit(EXIT_FAILURE);
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
     }
 
     if ((rc = soc_probe(soc, ahb)) < 0)
-        goto cleanup_ahb;
+        goto cleanup_host;
 
     if ((rc = trace_init(trace, soc))) {
         loge("Unable to initialise trace object\n");
@@ -110,7 +111,10 @@ int cmd_trace(const char *name, int argc, char *argv[])
      * between when we start tracing and when we stop. Especially if other functions
      * of this tool are being used. Work around that by re-initing the bridge.
      */
-    ahb_init(ahb, ahb->bridge);
+    if ((rc = host_bridge_reinit_from_ahb(host, ahb)) < 0) {
+        loge("Failed to reinitialise AHB bridge: %d\n", rc);
+        goto cleanup_soc;
+    }
 
     if ((rc = trace_stop(trace))) {
         loge("Unable to stop trace: %d\n");
@@ -123,8 +127,8 @@ int cmd_trace(const char *name, int argc, char *argv[])
 cleanup_soc:
     soc_destroy(soc);
 
-cleanup_ahb:
-    ahb_destroy(ahb);
+cleanup_host:
+    host_destroy(host);
 
     return rc;
 }
