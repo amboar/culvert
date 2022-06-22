@@ -1,25 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+#include "ahb.h"
+#include "ast.h"
+#include "compiler.h"
+#include "host.h"
+#include "log.h"
+#include "otp.h"
+#include "priv.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "ahb.h"
-#include "ast.h"
-#include "log.h"
-#include "otp.h"
-#include "priv.h"
-
-int cmd_otp(const char *name, int argc, char *argv[])
+int cmd_otp(const char *name __unused, int argc, char *argv[])
 {
     enum otp_region reg = otp_region_conf;
-    struct ahb _ahb, *ahb = &_ahb;
+    struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     struct otp _otp, *otp = &_otp;
+    struct ahb *ahb;
     bool rd = true;
     int argo = 2;
-    int cleanup;
     int rc;
 
     if (argc < 2) {
@@ -49,23 +51,21 @@ int cmd_otp(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if ((rc = ast_ahb_from_args(ahb, argc - argo, &argv[argo])) < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_from_args");
-        }
+    if ((rc = host_init(host, argc - argo, argv + argo)) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
         exit(EXIT_FAILURE);
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
     }
 
     if ((rc = soc_probe(soc, ahb)) < 0) {
         errno = -rc;
         perror("soc_probe");
-        goto cleanup_ahb;
+        goto cleanup_host;
     }
 
     if ((rc = otp_init(otp, soc)) < 0) {
@@ -99,10 +99,8 @@ int cmd_otp(const char *name, int argc, char *argv[])
 cleanup_soc:
     soc_destroy(soc);
 
-cleanup_ahb:
-    cleanup = ahb_destroy(ahb);
-    if (cleanup < 0) { errno = -cleanup; perror("ahb_destroy"); }
+cleanup_host:
+    host_destroy(host);
 
     return rc;
 }
-
