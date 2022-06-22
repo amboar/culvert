@@ -1,5 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+#include "ahb.h"
+#include "ast.h"
+#include "clk.h"
+#include "compiler.h"
+#include "flash.h"
+#include "host.h"
+#include "log.h"
+#include "priv.h"
+#include "sfc.h"
+#include "uart/vuart.h"
+#include "wdt.h"
+
 #include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -7,26 +19,17 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "ahb.h"
-#include "ast.h"
-#include "clk.h"
-#include "flash.h"
-#include "log.h"
-#include "priv.h"
-#include "sfc.h"
-#include "uart/vuart.h"
-#include "wdt.h"
-
 #define SFC_FLASH_WIN (64 << 10)
 
-int cmd_write(const char *name, int argc, char *argv[])
+int cmd_write(const char *name __unused, int argc, char *argv[])
 {
     struct vuart _vuart, *vuart = &_vuart;
-    struct ahb _ahb, *ahb = &_ahb;
+    struct host _host, *host = &_host;
     struct clk _clk, *clk = &_clk;
     struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
     bool live = false;
+    struct ahb *ahb;
     ssize_t ingress;
     struct sfc *sfc;
     int rc, cleanup;
@@ -65,24 +68,21 @@ int cmd_write(const char *name, int argc, char *argv[])
         }
     }
 
-    rc = ast_ahb_from_args(ahb, argc - optind, &argv[optind]);
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_from_args");
-        }
+    if ((rc = host_init(host, argc - optind, argv + optind)) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
         exit(EXIT_FAILURE);
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
     }
 
     if ((rc = soc_probe(soc, ahb)) < 0) {
         errno = -rc;
         perror("soc_probe");
-        goto cleanup_ahb;
+        goto cleanup_host;
     }
 
     if ((rc = clk_init(clk, soc))) {
@@ -208,11 +208,8 @@ cleanup_clk:
 cleanup_soc:
     soc_destroy(soc);
 
-cleanup_ahb:
-    if ((cleanup = ahb_cleanup(ahb))) {
-        errno = -cleanup;
-        perror("ahb_cleanup");
-    }
+cleanup_host:
+    host_destroy(host);
 
     return rc;
 }
