@@ -56,7 +56,7 @@ int pci_open(uint16_t vid, uint16_t did, int bar)
 
 	d = opendir("/sys/bus/pci/devices/");
 	if (!d)
-		exit(1);
+		return -errno;
 
 	dfd = dirfd(d); /* we need an FD for openat() */
 
