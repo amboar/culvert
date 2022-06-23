@@ -169,6 +169,8 @@ int trace_start(struct trace *ctx, uint32_t addr, int width, enum trace_mode mod
     if ((rc = ahbc_writel(ctx, R_AHBC_BCR_ADDR, addr & ~3)))
         return rc;
 
+    logi("Zeroing trace buffer [%p - %p]\n", ctx->sram.start, ctx->sram.start + ctx->sram.length);
+
     for (i = 0; i < (ctx->sram.length / 4); i++) {
         soc_writel(ctx->soc, 4 * i + ctx->sram.start, 0);
     }
