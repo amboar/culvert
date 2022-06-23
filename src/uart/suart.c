@@ -522,7 +522,7 @@ ssize_t suart_fill(struct suart *ctx, char *buf, size_t len)
 
 ssize_t suart_fill_until(struct suart *ctx, char *buf, size_t len, char term)
 {
-    ssize_t remaining;
+    ssize_t remaining = len;
     ssize_t consumed = 0;
 
     if (len > SSIZE_MAX)
