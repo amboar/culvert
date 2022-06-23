@@ -202,6 +202,11 @@ int trace_stop(struct trace *ctx)
     if ((rc = ahbc_readl(ctx, R_AHBC_BCR_CSR, &csr)))
         return rc;
 
+    if (!(csr & AHBC_BCR_CSR_POLL_EN)) {
+        /* Tracing isn't running, we're done */
+        return 0;
+    }
+
     logt("%s: csr: 0x%08" PRIx32 "\n", __func__, csr);
 
     /* Note: This won't flush the tail values if they don't form a full word */
