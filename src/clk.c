@@ -20,32 +20,6 @@
 #define   SCU_HW_STRAP_ARM_CLK          (1 <<  0)
 #define SCU_SILICON_REVISION		0x7c
 
-static const struct soc_device_id scu_match[] = {
-    { .compatible = "aspeed,ast2500-scu" },
-    { },
-};
-
-int clk_init(struct clk *ctx, struct soc *soc)
-{
-    struct soc_device_node dn;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, scu_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->scu)) < 0)
-        return rc;
-
-    ctx->soc = soc;
-
-    return 0;
-}
-
-void clk_destroy(struct clk *ctx)
-{
-    ctx->soc = NULL;
-}
-
 static int scu_readl(struct clk *ctx, uint32_t offset, uint32_t *val)
 {
     return soc_readl(ctx->soc, ctx->scu.start + offset, val);
@@ -144,4 +118,76 @@ int clk_enable(struct clk *ctx, enum clksrc src)
     }
 
     return -ENOTSUP;
+}
+
+static const struct soc_device_id scu_match[] = {
+    { .compatible = "aspeed,ast2500-scu" },
+    { },
+};
+
+int clk_init(struct clk *ctx, struct soc *soc)
+{
+    struct soc_device_node dn;
+    int rc;
+
+    if ((rc = soc_device_match_node(soc, scu_match, &dn)) < 0)
+        return rc;
+
+    if ((rc = soc_device_get_memory(soc, &dn, &ctx->scu)) < 0)
+        return rc;
+
+    ctx->soc = soc;
+
+    return 0;
+}
+
+void clk_destroy(struct clk *ctx)
+{
+    ctx->soc = NULL;
+}
+
+static int clk_driver_init(struct soc *soc, struct soc_device *dev)
+{
+    struct clk *ctx;
+    int rc;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return -ENOMEM;
+    }
+
+    if ((rc = clk_init(ctx, soc)) < 0) {
+        goto cleanup_ctx;
+    }
+
+    soc_device_set_drvdata(dev, ctx);
+
+    return 0;
+
+cleanup_ctx:
+    free(ctx);
+
+    return rc;
+}
+
+static void clk_driver_destroy(struct soc_device *dev)
+{
+    struct clk *ctx = soc_device_get_drvdata(dev);
+
+    clk_destroy(ctx);
+
+    free(ctx);
+}
+
+static const struct soc_driver clk_driver = {
+    .name = "clk",
+    .matches = scu_match,
+    .init = clk_driver_init,
+    .destroy = clk_driver_destroy,
+};
+REGISTER_SOC_DRIVER(&clk_driver);
+
+struct clk *clk_get(struct soc *soc)
+{
+    return soc_driver_get_drvdata(soc, &clk_driver);
 }

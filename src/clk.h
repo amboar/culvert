@@ -21,4 +21,6 @@ int64_t clk_get_rate(struct clk *ctx, enum clksrc src);
 int clk_enable(struct clk *ctx, enum clksrc src);
 int clk_disable(struct clk *ctx, enum clksrc src);
 
+struct clk *clk_get(struct soc *soc);
+
 #endif
