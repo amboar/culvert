@@ -49,7 +49,7 @@ struct sfc_data {
     struct soc *soc;
     struct soc_region iomem;
     struct soc_region flash;
-    struct clk clk;
+    struct clk *clk;
 
     /* We have 2 controllers, one for the BMC flash, one for the PNOR */
     uint8_t    type;
@@ -363,7 +363,7 @@ static void ast2500_get_ahb_freq(struct sfc_data *ct)
     if (ast_ahb_freq)
 	return;
 
-    ast_ahb_freq = clk_get_rate(&ct->clk, clk_ahb);
+    ast_ahb_freq = clk_get_rate(ct->clk, clk_ahb);
 }
 
 static int sfc_check_reads(struct sfc_data *ct,
@@ -996,8 +996,11 @@ int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name)
 	goto fail;
     }
 
-    if ((rc = clk_init(&ct->clk, soc)) < 0)
+    if (!(ct->clk = clk_get(soc))) {
+	loge("Failed to acquire clock controller\n");
+	rc = -ENODEV;
 	goto fail;
+    }
 
     ct->soc = soc;
 
@@ -1026,20 +1029,17 @@ int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name)
 	ct->fread_timing_reg = FMC_TIMING;
     } else {
 	rc = -EINVAL;
-	goto cleanup_clk;
+	goto fail;
     }
 
     if (!sfc_init_device(ct)) {
 	rc = -EIO;
-	goto cleanup_clk;
+	goto fail;
     }
 
     *ctrl = &ct->ops;
 
     return 0;
-
-cleanup_clk:
-    clk_destroy(&ct->clk);
 
 fail:
     free(ct);

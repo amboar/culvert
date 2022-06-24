@@ -25,11 +25,11 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
 {
     struct vuart _vuart, *vuart = &_vuart;
     struct host _host, *host = &_host;
-    struct clk _clk, *clk = &_clk;
     struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
     bool live = false;
     struct ahb *ahb;
+    struct clk *clk;
     ssize_t ingress;
     struct sfc *sfc;
     int rc, cleanup;
@@ -85,14 +85,13 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
         goto cleanup_host;
     }
 
-    if ((rc = clk_init(clk, soc))) {
-        errno = -rc;
-        perror("clk_init");
+    if (!(clk = clk_get(soc))) {
+        loge("Failed to acquire clock controller, exiting\n");
         goto cleanup_soc;
     }
 
     if ((rc = vuart_init(vuart, soc, "vuart")) < 0)
-        goto cleanup_clk;
+        goto cleanup_soc;
 
     if (ahb->type == ahb_devmem)
         loge("I hope you know what you are doing\n");
@@ -170,7 +169,7 @@ cleanup_state:
                 logi("Performing SoC reset\n");
                 rc = wdt_init(wdt, soc, "wdt2");
                 if (rc < 0) {
-                    goto cleanup_clk;
+                    goto cleanup_soc;
                 }
 
                 wait = wdt_perform_reset(wdt);
@@ -179,7 +178,7 @@ cleanup_state:
 
                 if (wait < 0) {
                     rc = wait;
-                    goto cleanup_clk;
+                    goto cleanup_soc;
                 }
 
                 usleep(wait);
@@ -201,9 +200,6 @@ cleanup_state:
 
 cleanup_vuart:
     vuart_destroy(vuart);
-
-cleanup_clk:
-    clk_destroy(clk);
 
 cleanup_soc:
     soc_destroy(soc);

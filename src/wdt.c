@@ -52,8 +52,10 @@ int wdt_init(struct wdt *ctx, struct soc *soc, const char *name)
     if ((rc = soc_device_get_memory(soc, &dn, &ctx->iomem)) < 0)
         return rc;
 
-    if ((rc = clk_init(&ctx->clk, soc)) < 0)
-        return rc;
+    if (!(ctx->clk = clk_get(soc))) {
+        loge("Failed to acquire clock controller\n");
+        return -ENODEV;
+    }
 
     ctx->soc = soc;
 
@@ -62,7 +64,7 @@ int wdt_init(struct wdt *ctx, struct soc *soc, const char *name)
 
 void wdt_destroy(struct wdt *ctx)
 {
-    clk_destroy(&ctx->clk);
+    ctx->clk = NULL;
     ctx->soc = NULL;
 }
 
@@ -191,7 +193,7 @@ int64_t wdt_perform_reset(struct wdt *ctx)
         return rc;
 
     /* The ARM clock gate is sticky on reset?! Ensure it's clear  */
-    if ((rc = clk_enable(&ctx->clk, clk_arm)) < 0)
+    if ((rc = clk_enable(ctx->clk, clk_arm)) < 0)
         return rc;
 
     rc = wdt_writel(ctx, WDT_RELOAD, 0);

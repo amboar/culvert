@@ -10,10 +10,7 @@
 
 enum clksrc { clk_arm, clk_ahb, clk_uart3 };
 
-struct clk {
-	struct soc *soc;
-	struct soc_region scu;
-};
+struct clk;
 
 int clk_init(struct clk *ctx, struct soc *soc);
 void clk_destroy(struct clk *ctx);

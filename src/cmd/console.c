@@ -21,10 +21,10 @@ int cmd_console(const char *name __unused, int argc, char *argv[])
     struct suart _suart, *suart = &_suart;
     struct uart_mux _mux, *mux = &_mux;
     struct host _host, *host = &_host;
-    struct clk _clk, *clk = &_clk;
     struct soc _soc, *soc = &_soc;
     const char *user, *pass;
     struct ahb *ahb;
+    struct clk *clk;
     int cleanup;
     int baud;
     int rc;
@@ -67,16 +67,15 @@ int cmd_console(const char *name __unused, int argc, char *argv[])
         goto host_cleanup;
     }
 
-    if ((rc = clk_init(clk, soc)) < 0) {
-        errno = -rc;
-        perror("clk_init");
+    if (!(clk = clk_get(soc))) {
+        loge("Failed to acquire clock controller, exiting\n");
         goto soc_cleanup;
     }
 
     if ((rc = uart_mux_init(mux, soc))) {
         errno = -rc;
         perror("uart_mux_init");
-        goto clk_cleanup;
+        goto soc_cleanup;
     }
 
     logi("Enabling UART clocks\n");
@@ -174,9 +173,6 @@ mux_restore:
 
 mux_cleanup:
     uart_mux_destroy(mux);
-
-clk_cleanup:
-    clk_destroy(clk);
 
 soc_cleanup:
     soc_destroy(soc);

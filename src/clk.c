@@ -20,6 +20,11 @@
 #define   SCU_HW_STRAP_ARM_CLK          (1 <<  0)
 #define SCU_SILICON_REVISION		0x7c
 
+struct clk {
+	struct soc *soc;
+	struct soc_region scu;
+};
+
 static int scu_readl(struct clk *ctx, uint32_t offset, uint32_t *val)
 {
     return soc_readl(ctx->soc, ctx->scu.start + offset, val);

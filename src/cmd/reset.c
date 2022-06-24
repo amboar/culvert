@@ -20,10 +20,10 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    struct clk _clk, *clk = &_clk;
     struct wdt _wdt, *wdt = &_wdt;
     int64_t wait = 0;
     struct ahb *ahb;
+    struct clk *clk;
     int cleanup;
     int rc;
 
@@ -62,16 +62,15 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
     }
 
     /* Initialise the required SoC drivers */
-    if ((rc = clk_init(clk, soc))) {
-        errno = -rc;
-        perror("clk_init");
+    if (!(clk = clk_get(soc))) {
+        loge("Failed to acquire clock controller, exiting\n");
         goto cleanup_soc;
     }
 
     if ((rc = wdt_init(wdt, soc, argv[1])) < 0) {
         errno = -rc;
         perror("wdt_init");
-        goto cleanup_clk;
+        goto cleanup_soc;
     }
 
     /* Do the reset */
@@ -105,9 +104,6 @@ clk_enable_arm:
 
 cleanup_wdt:
     wdt_destroy(wdt);
-
-cleanup_clk:
-    clk_destroy(clk);
 
 cleanup_soc:
     soc_destroy(soc);
