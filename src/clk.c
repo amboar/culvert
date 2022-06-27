@@ -130,27 +130,6 @@ static const struct soc_device_id scu_match[] = {
     { },
 };
 
-int clk_init(struct clk *ctx, struct soc *soc)
-{
-    struct soc_device_node dn;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, scu_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->scu)) < 0)
-        return rc;
-
-    ctx->soc = soc;
-
-    return 0;
-}
-
-void clk_destroy(struct clk *ctx)
-{
-    ctx->soc = NULL;
-}
-
 static int clk_driver_init(struct soc *soc, struct soc_device *dev)
 {
     struct clk *ctx;
@@ -161,9 +140,11 @@ static int clk_driver_init(struct soc *soc, struct soc_device *dev)
         return -ENOMEM;
     }
 
-    if ((rc = clk_init(ctx, soc)) < 0) {
+    if ((rc = soc_device_get_memory(soc, &dev->node, &ctx->scu)) < 0) {
         goto cleanup_ctx;
     }
+
+    ctx->soc = soc;
 
     soc_device_set_drvdata(dev, ctx);
 
@@ -177,11 +158,7 @@ cleanup_ctx:
 
 static void clk_driver_destroy(struct soc_device *dev)
 {
-    struct clk *ctx = soc_device_get_drvdata(dev);
-
-    clk_destroy(ctx);
-
-    free(ctx);
+    free(soc_device_get_drvdata(dev));
 }
 
 static const struct soc_driver clk_driver = {
