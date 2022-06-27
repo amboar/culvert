@@ -8,14 +8,6 @@
 
 #include "../soc.h"
 
-struct uart_mux {
-    struct soc *soc;
-    struct soc_region lpc;
-
-    uint32_t hicr9;
-    uint32_t hicra;
-};
-
 enum mux_type { mux_io, mux_uart, mux_type_count };
 enum mux_io { io1, io2, io3, io4, io5, io6, mux_io_count };
 enum mux_uart { uart1, uart2, uart3, uart4, uart5, mux_uart_count };
@@ -34,6 +26,8 @@ extern const struct mux_obj *mux_obj_uart1;
 extern const struct mux_obj *mux_obj_uart2;
 extern const struct mux_obj *mux_obj_uart3;
 extern const struct mux_obj *mux_obj_uart5;
+
+struct uart_mux;
 
 int uart_mux_init(struct uart_mux *ctx, struct soc *soc);
 void uart_mux_destroy(struct uart_mux *ctx);

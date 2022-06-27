@@ -19,10 +19,10 @@
 int cmd_console(const char *name __unused, int argc, char *argv[])
 {
     struct suart _suart, *suart = &_suart;
-    struct uart_mux _mux, *mux = &_mux;
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     const char *user, *pass;
+    struct uart_mux *mux;
     struct ahb *ahb;
     struct clk *clk;
     int cleanup;
@@ -72,9 +72,8 @@ int cmd_console(const char *name __unused, int argc, char *argv[])
         goto soc_cleanup;
     }
 
-    if ((rc = uart_mux_init(mux, soc))) {
-        errno = -rc;
-        perror("uart_mux_init");
+    if (!(mux = uart_mux_get(soc))) {
+        loge("Failed to acquire UART mux controller, exiting\n");
         goto soc_cleanup;
     }
 
@@ -83,14 +82,14 @@ int cmd_console(const char *name __unused, int argc, char *argv[])
     if ((rc = clk_enable(clk, clk_uart3)) < 0) {
         errno = -rc;
         perror("clk_enable");
-        goto mux_cleanup;
+        goto soc_cleanup;
     }
 
     logi("Routing UART3 to UART5\n");
     if ((rc = uart_mux_route(mux, mux_obj_uart3, mux_obj_uart5)) < 0) {
         errno = -rc;
         perror("uart_mux_route");
-        goto mux_cleanup;
+        goto soc_cleanup;
     }
 
     logi("Initialising SUART3\n");
@@ -170,9 +169,6 @@ suart_cleanup:
 mux_restore:
     cleanup = uart_mux_restore(mux);
     if (cleanup) { errno = -cleanup; perror("suart_destroy"); }
-
-mux_cleanup:
-    uart_mux_destroy(mux);
 
 soc_cleanup:
     soc_destroy(soc);

@@ -38,6 +38,14 @@ const struct mux_obj _mux_obj_uart3 = { .type = mux_uart, .uart = uart3 },
 const struct mux_obj _mux_obj_uart5 = { .type = mux_uart, .uart = uart5 },
                      *mux_obj_uart5 = &_mux_obj_uart5;
 
+struct uart_mux {
+    struct soc *soc;
+    struct soc_region lpc;
+
+    uint32_t hicr9;
+    uint32_t hicra;
+};
+
 struct mux_desc {
     uint32_t reg;
     uint32_t mask;
