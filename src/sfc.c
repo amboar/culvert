@@ -1075,3 +1075,41 @@ int sfc_destroy(struct sfc *ctrl)
 
 	return 0;
 }
+
+static int sfc_driver_init(struct soc *soc, struct soc_device *dev)
+{
+    struct sfc *ctx;
+    int rc;
+
+    // FIXME: fmc
+    if ((rc = sfc_init(&ctx, soc, "fmc")) < 0) {
+	return rc;
+    }
+
+    soc_device_set_drvdata(dev, ctx);
+
+    return 0;
+}
+
+static void sfc_driver_destroy(struct soc_device *dev)
+{
+    struct sfc *ctx = soc_device_get_drvdata(dev);
+    int rc;
+
+    if ((rc = sfc_destroy(ctx)) < 0) {
+	loge("Failed to destroy %s instance: %d\n", dev->driver->name, rc);
+    }
+}
+
+static const struct soc_driver sfc_driver = {
+    .name = "sfc",
+    .matches = sfc_match,
+    .init = sfc_driver_init,
+    .destroy = sfc_driver_destroy,
+};
+REGISTER_SOC_DRIVER(&sfc_driver);
+
+struct sfc *sfc_get_by_name(struct soc *soc, const char *name)
+{
+    return soc_driver_get_drvdata_by_name(soc, &sfc_driver, name);
+}

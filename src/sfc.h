@@ -83,4 +83,6 @@ int sfc_write_protect_restore(struct sfc *ctrl, uint32_t save);
 
 int sfc_get_flash(struct sfc *ctrl, struct soc_region *flash);
 
+struct sfc *sfc_get_by_name(struct soc *soc, const char *name);
+
 #endif
