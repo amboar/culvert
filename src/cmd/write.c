@@ -112,13 +112,14 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
     }
 
     logi("Initialising flash subsystem\n");
-    rc = sfc_init(&sfc, soc, "fmc");
-    if (rc < 0)
+    if (!(sfc = sfc_get_by_name(soc, "fmc"))) {
+        loge("Failed to acquire SPI flash controller, exiting\n");
         goto cleanup_state;
+    }
 
     rc = flash_init(sfc, &chip);
     if (rc < 0)
-        goto cleanup_sfc;
+        goto cleanup_state;
 
     /* FIXME: Make this common with the sfc write implementation */
     buf = malloc(SFC_FLASH_WIN);
@@ -157,9 +158,6 @@ cleanup_buf:
 
 cleanup_flash:
     flash_destroy(chip);
-
-cleanup_sfc:
-    sfc_destroy(sfc);
 
 cleanup_state:
     if (live) {

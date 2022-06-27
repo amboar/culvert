@@ -70,13 +70,15 @@ int cmd_sfc(const char *name __unused, int argc, char *argv[])
     if (rc < 0)
         goto cleanup_host;
 
-    rc = sfc_init(&sfc, soc, "fmc");
-    if (rc < 0)
+    ;
+    if (!(sfc = sfc_get_by_name(soc, "fmc"))) {
+        loge("Failed to acquire SPI controller, exiting\n");
         goto cleanup_soc;
+    }
 
     rc = flash_init(sfc, &chip);
     if (rc < 0)
-        goto cleanup_sfc;
+        goto cleanup_soc;
 
     if (op == flash_op_read) {
         ssize_t egress;
@@ -121,9 +123,6 @@ int cmd_sfc(const char *name __unused, int argc, char *argv[])
 
 cleanup_flash:
     flash_destroy(chip);
-
-cleanup_sfc:
-    sfc_destroy(sfc);
 
 cleanup_soc:
     soc_destroy(soc);

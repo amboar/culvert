@@ -28,12 +28,15 @@ static int cmd_dump_firmware(struct soc *soc)
     int rc;
 
     logi("Initialising flash controller\n");
-    if ((rc = sfc_init(&sfc, soc, "fmc")))
-        return rc;
+    if (!(sfc = sfc_get_by_name(soc, "fmc"))) {
+        loge("Failed to acquire SPI controller\n");
+        return -ENODEV;
+    }
 
     logi("Initialising flash chip\n");
-    if ((rc = flash_init(sfc, &chip)))
-        goto cleanup_sfc;
+    if ((rc = flash_init(sfc, &chip))) {
+        return rc;
+    }
 
     logi("Write-protecting all chip-selects\n");
     if ((rc = sfc_write_protect_save(sfc, true, &wp)))
@@ -53,12 +56,6 @@ static int cmd_dump_firmware(struct soc *soc)
 
 cleanup_chip:
     flash_destroy(chip);
-
-cleanup_sfc:
-    if ((cleanup = sfc_destroy(sfc)) < 0) {
-        errno = -cleanup;
-        perror("sfc_destroy");
-    }
 
     return rc;
 }
