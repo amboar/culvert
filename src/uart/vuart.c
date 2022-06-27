@@ -70,3 +70,49 @@ void vuart_destroy(struct vuart *ctx)
 {
     ctx->soc = NULL;
 }
+
+static int vuart_driver_init(struct soc *soc, struct soc_device *dev)
+{
+    struct vuart *ctx;
+    int rc;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return -ENOMEM;
+    }
+
+    if ((rc = vuart_init(ctx, soc, "vuart")) < 0) {
+        goto cleanup_ctx;
+    }
+
+    soc_device_set_drvdata(dev, ctx);
+
+    return 0;
+
+cleanup_ctx:
+    free(ctx);
+
+    return rc;
+}
+
+static void vuart_driver_destroy(struct soc_device *dev)
+{
+    struct vuart *ctx = soc_device_get_drvdata(dev);
+
+    vuart_destroy(ctx);
+
+    free(ctx);
+}
+
+static const struct soc_driver vuart_driver = {
+    .name = "vuart",
+    .matches = vuart_match,
+    .init = vuart_driver_init,
+    .destroy = vuart_driver_destroy,
+};
+REGISTER_SOC_DRIVER(&vuart_driver);
+
+struct vuart *vuart_get_by_name(struct soc *soc, const char *name)
+{
+    return soc_driver_get_drvdata_by_name(soc, &vuart_driver, name);
+}

@@ -17,4 +17,6 @@ int vuart_init(struct vuart *ctx, struct soc *soc, const char *path);
 int vuart_set_host_tx_discard(struct vuart *ctx, enum vuart_discard state);
 void vuart_destroy(struct vuart *ctx);
 
+struct vuart *vuart_get_by_name(struct soc *soc, const char *name);
+
 #endif
