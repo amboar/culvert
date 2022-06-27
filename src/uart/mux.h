@@ -29,9 +29,6 @@ extern const struct mux_obj *mux_obj_uart5;
 
 struct uart_mux;
 
-int uart_mux_init(struct uart_mux *ctx, struct soc *soc);
-void uart_mux_destroy(struct uart_mux *ctx);
-
 int uart_mux_restore(struct uart_mux *ctx);
 
 /* Uni-directional connection */

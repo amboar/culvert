@@ -283,41 +283,10 @@ static const struct soc_device_id lpc_match[] = {
     { },
 };
 
-int uart_mux_init(struct uart_mux *ctx, struct soc *soc)
-{
-    struct soc_device_node dn;
-    uint32_t val;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, lpc_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->lpc)) < 0)
-        return rc;
-
-    ctx->soc = soc;
-
-    if ((rc = lpc_readl(ctx, LPC_HICR9, &val)) < 0)
-        return rc;
-
-    ctx->hicr9 = val;
-
-    if ((rc = lpc_readl(ctx, LPC_HICRA, &val)) < 0)
-        return rc;
-
-    ctx->hicra = val;
-
-    return 0;
-}
-
-void uart_mux_destroy(struct uart_mux *ctx)
-{
-    ctx->soc = NULL;
-}
-
 static int uart_mux_driver_init(struct soc *soc, struct soc_device *dev)
 {
     struct uart_mux *ctx;
+    uint32_t val;
     int rc;
 
     ctx = malloc(sizeof(*ctx));
@@ -325,9 +294,23 @@ static int uart_mux_driver_init(struct soc *soc, struct soc_device *dev)
         return -ENOMEM;
     }
 
-    if ((rc = uart_mux_init(ctx, soc)) < 0) {
+    if ((rc = soc_device_get_memory(soc, &dev->node, &ctx->lpc)) < 0) {
         goto cleanup_ctx;
     }
+
+    ctx->soc = soc;
+
+    if ((rc = lpc_readl(ctx, LPC_HICR9, &val)) < 0) {
+        goto cleanup_ctx;
+    }
+
+    ctx->hicr9 = val;
+
+    if ((rc = lpc_readl(ctx, LPC_HICRA, &val)) < 0) {
+        return rc;
+    }
+
+    ctx->hicra = val;
 
     soc_device_set_drvdata(dev, ctx);
 
@@ -341,11 +324,7 @@ cleanup_ctx:
 
 static void uart_mux_driver_destroy(struct soc_device *dev)
 {
-    struct uart_mux *ctx = soc_device_get_drvdata(dev);
-
-    uart_mux_destroy(ctx);
-
-    free(ctx);
+    free(soc_device_get_drvdata(dev));
 }
 
 static const struct soc_driver uart_mux_driver = {
