@@ -26,4 +26,6 @@ int sdmc_get_vram(struct sdmc *ctx, struct soc_region *vram);
 int sdmc_constrains_xdma(struct sdmc *ctx);
 void sdmc_destroy(struct sdmc *ctx);
 
+struct sdmc *sdmc_get(struct soc *soc);
+
 #endif

@@ -55,50 +55,9 @@ static const struct sdmc_pdata ast2600_sdmc_pdata = {
     .gmp_xdma_mask = BIT(18),
 };
 
-static const struct soc_device_id sdmc_match[] = {
-    {
-        .compatible = "aspeed,ast2400-sdram-controller",
-        .data = &ast2400_sdmc_pdata
-    },
-    {
-        .compatible = "aspeed,ast2500-sdram-controller",
-        .data = &ast2500_sdmc_pdata
-    },
-    {
-        .compatible = "aspeed,ast2600-sdram-controller",
-        .data = &ast2600_sdmc_pdata
-    },
-    { },
-};
-
 static int sdmc_readl(struct sdmc *ctx, uint32_t off, uint32_t *val)
 {
     return soc_readl(ctx->soc, ctx->iomem.start + off, val);
-}
-
-int sdmc_init(struct sdmc *ctx, struct soc *soc)
-{
-    struct soc_device_node dn;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, sdmc_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->iomem)) < 0)
-        return rc;
-
-    if (!(ctx->pdata = soc_device_get_match_data(soc, sdmc_match, &dn)))
-        return -EINVAL;
-
-    if ((rc = soc_device_from_type(soc, "memory", &dn)))
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->dram)) < 0)
-        return rc;
-
-    ctx->soc = soc;
-
-    return 0;
 }
 
 static void sdmc_dram_region(struct sdmc *ctx, uint32_t mcr_conf,
@@ -149,7 +108,94 @@ int sdmc_constrains_xdma(struct sdmc *ctx)
     return !!(mcr_gmp & ctx->pdata->gmp_xdma_mask);
 }
 
+static const struct soc_device_id sdmc_match[] = {
+    {
+        .compatible = "aspeed,ast2400-sdram-controller",
+        .data = &ast2400_sdmc_pdata
+    },
+    {
+        .compatible = "aspeed,ast2500-sdram-controller",
+        .data = &ast2500_sdmc_pdata
+    },
+    {
+        .compatible = "aspeed,ast2600-sdram-controller",
+        .data = &ast2600_sdmc_pdata
+    },
+    { },
+};
+
+int sdmc_init(struct sdmc *ctx, struct soc *soc)
+{
+    struct soc_device_node dn;
+    int rc;
+
+    if ((rc = soc_device_match_node(soc, sdmc_match, &dn)) < 0)
+        return rc;
+
+    if ((rc = soc_device_get_memory(soc, &dn, &ctx->iomem)) < 0)
+        return rc;
+
+    if (!(ctx->pdata = soc_device_get_match_data(soc, sdmc_match, &dn)))
+        return -EINVAL;
+
+    if ((rc = soc_device_from_type(soc, "memory", &dn)))
+        return rc;
+
+    if ((rc = soc_device_get_memory(soc, &dn, &ctx->dram)) < 0)
+        return rc;
+
+    ctx->soc = soc;
+
+    return 0;
+}
+
 void sdmc_destroy(struct sdmc *ctx)
 {
     ctx->soc = NULL;
+}
+
+static int sdmc_driver_init(struct soc *soc, struct soc_device *dev)
+{
+    struct sdmc *ctx;
+    int rc;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return -ENOMEM;
+    }
+
+    if ((rc = sdmc_init(ctx, soc)) < 0) {
+        goto cleanup_ctx;
+    }
+
+    soc_device_set_drvdata(dev, ctx);
+
+    return 0;
+
+cleanup_ctx:
+    free(ctx);
+
+    return rc;
+}
+
+static void sdmc_driver_destroy(struct soc_device *dev)
+{
+    struct sdmc *ctx = soc_device_get_drvdata(dev);
+
+    sdmc_destroy(ctx);
+
+    free(ctx);
+}
+
+static const struct soc_driver sdmc_driver = {
+    .name = "sdmc",
+    .matches = sdmc_match,
+    .init = sdmc_driver_init,
+    .destroy = sdmc_driver_destroy,
+};
+REGISTER_SOC_DRIVER(&sdmc_driver);
+
+struct sdmc *sdmc_get(struct soc *soc)
+{
+    return soc_driver_get_drvdata(soc, &sdmc_driver);
 }
