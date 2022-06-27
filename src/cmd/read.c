@@ -65,18 +65,21 @@ cleanup_sfc:
 
 static int cmd_dump_ram(struct soc *soc)
 {
-    struct sdmc _sdmc, *sdmc = &_sdmc;
     struct soc_region dram, vram;
+    struct sdmc *sdmc;
     int rc;
 
-    if ((rc = sdmc_init(sdmc, soc)))
-        return rc;
+    if (!(sdmc = sdmc_get(soc))) {
+        return -ENODEV;
+    }
 
-    if ((rc = sdmc_get_dram(sdmc, &dram)))
+    if ((rc = sdmc_get_dram(sdmc, &dram))) {
         return rc;
+    }
 
-    if ((rc = sdmc_get_vram(sdmc, &vram)))
+    if ((rc = sdmc_get_vram(sdmc, &vram))) {
         return rc;
+    }
 
     logi("%dMiB DRAM with %dMiB VRAM; dumping %dMiB (0x%x-0x%08x)\n",
          dram.length >> 20, vram.length >> 20,
@@ -87,8 +90,6 @@ static int cmd_dump_ram(struct soc *soc)
         errno = -rc;
         perror("soc_siphon_in");
     }
-
-    sdmc_destroy(sdmc);
 
     return rc;
 }

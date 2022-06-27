@@ -340,21 +340,21 @@ ast_kernel_status(struct soc *soc, struct ast_cap_kernel *cap)
 
 static int ast_xdma_status(struct soc *soc, struct ast_cap_xdma *cap)
 {
-    struct sdmc _sdmc, *sdmc = &_sdmc;
+    struct sdmc *sdmc;
     int rc;
 
-    if ((rc = sdmc_init(sdmc, soc)) < 0)
-        return rc;
+    if (!(sdmc = sdmc_get(soc))) {
+        return -ENODEV;
+    }
 
-    if ((rc = sdmc_constrains_xdma(sdmc)) < 0)
-        goto cleanup_sdmc;
+    if ((rc = sdmc_constrains_xdma(sdmc)) < 0) {
+        return rc;
+    }
 
     cap->unconstrained = !rc;
-    if (rc == 1)
+    if (rc == 1) {
         rc = 0;
-
-cleanup_sdmc:
-    sdmc_destroy(sdmc);
+    }
 
     return rc;
 }

@@ -9,6 +9,19 @@
 #define MCR_CONFIG      0x04
 #define MCR_GMP         0x08
 
+struct sdmc_pdata {
+    const uint32_t (*dram_sizes)[4];
+    const uint32_t (*vram_sizes)[4];
+    const uint32_t gmp_xdma_mask;
+};
+
+struct sdmc {
+	struct soc *soc;
+	struct soc_region iomem;
+	struct soc_region dram;
+	const struct sdmc_pdata *pdata;
+};
+
 static const uint32_t ast_vram_sizes[4] = {
     [0b00] = 8  << 20,
     [0b01] = 16 << 20,

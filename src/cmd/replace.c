@@ -21,10 +21,10 @@
 int cmd_replace(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
-    struct sdmc _sdmc, *sdmc = &_sdmc;
     struct soc _soc, *soc = &_soc;
     struct soc_region dram, vram;
     size_t replace_len;
+    struct sdmc *sdmc;
     size_t ram_cursor;
     struct ahb *ahb;
     void *win_chunk;
@@ -65,14 +65,17 @@ int cmd_replace(const char *name __unused, int argc, char *argv[])
     if ((rc = soc_probe(soc, ahb)))
         goto host_cleanup;
 
-    if ((rc = sdmc_init(sdmc, soc)))
+    if (!(sdmc = sdmc_get(soc))) {
+        loge("Failed to acquire memory controller, exiting\n");
+        rc = EXIT_FAILURE;
         goto soc_cleanup;
+    }
 
     if ((rc = sdmc_get_dram(sdmc, &dram)))
-        goto sdmc_cleanup;
+        goto soc_cleanup;
 
     if ((rc = sdmc_get_vram(sdmc, &vram)))
-        goto sdmc_cleanup;
+        goto soc_cleanup;
 
     replace_len = strlen(argv[1]);
     for (ram_cursor = dram.start;
@@ -113,9 +116,6 @@ int cmd_replace(const char *name __unused, int argc, char *argv[])
             needle += replace_len;
         }
     }
-
-sdmc_cleanup:
-    sdmc_destroy(sdmc);
 
 soc_cleanup:
     soc_destroy(soc);
