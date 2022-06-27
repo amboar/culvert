@@ -251,65 +251,6 @@ undo_soak:
     return rc;
 }
 
-static const struct soc_device_id otp_match[] = {
-    { .compatible = "aspeed,ast2600-secure-boot-controller" },
-    { },
-};
-
-int otp_init(struct otp *otp, struct soc *soc)
-{
-    struct soc_device_node dn;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, otp_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &otp->iomem)) < 0)
-        return rc;
-
-    otp->soc = soc;
-
-    if (soc_stepping(soc) >= 2) {
-        logi("Detected AST2600 A2\n");
-
-        otp->timings[0] = 0x04190760;
-        otp->timings[1] = 0x04191388;
-        otp->timings[2] = 0x04193a98;
-
-        otp->soak_parameters[0][0] = 0x0210;
-        otp->soak_parameters[0][1] = 0x2000;
-        otp->soak_parameters[0][2] = 0x0;
-
-        otp->soak_parameters[1][0] = 0x1200;
-        otp->soak_parameters[1][1] = 0x107f;
-        otp->soak_parameters[1][2] = 0x1024;
-
-        otp->soak_parameters[2][0] = 0x1220;
-        otp->soak_parameters[2][1] = 0x2074;
-        otp->soak_parameters[2][2] = 0x08a4;
-    } else {
-        logi("Detected AST2600 A0/A1\n");
-
-        otp->timings[0] = 0x04190760;
-        otp->timings[1] = 0x04190760;
-        otp->timings[2] = 0x041930d4;
-
-        otp->soak_parameters[0][0] = 0x0;
-        otp->soak_parameters[0][1] = 0x0;
-        otp->soak_parameters[0][2] = 0x0;
-
-        otp->soak_parameters[1][0] = 0x4021;
-        otp->soak_parameters[1][1] = 0x302f;
-        otp->soak_parameters[1][2] = 0x4020;
-
-        otp->soak_parameters[2][0] = 0x4021;
-        otp->soak_parameters[2][1] = 0x1027;
-        otp->soak_parameters[2][2] = 0x4820;
-    }
-
-    return 0;
-}
-
 int otp_read(struct otp *otp, enum otp_region reg)
 {
     int rc;
@@ -488,4 +429,107 @@ done:
     otp_writel(otp, OTP_PROTECT_KEY, 0);
 
     return rc;
+}
+
+static const struct soc_device_id otp_match[] = {
+    { .compatible = "aspeed,ast2600-secure-boot-controller" },
+    { },
+};
+
+int otp_init(struct otp *otp, struct soc *soc)
+{
+    struct soc_device_node dn;
+    int rc;
+
+    if ((rc = soc_device_match_node(soc, otp_match, &dn)) < 0)
+        return rc;
+
+    if ((rc = soc_device_get_memory(soc, &dn, &otp->iomem)) < 0)
+        return rc;
+
+    otp->soc = soc;
+
+    if (soc_stepping(soc) >= 2) {
+        logi("Detected AST2600 A2\n");
+
+        otp->timings[0] = 0x04190760;
+        otp->timings[1] = 0x04191388;
+        otp->timings[2] = 0x04193a98;
+
+        otp->soak_parameters[0][0] = 0x0210;
+        otp->soak_parameters[0][1] = 0x2000;
+        otp->soak_parameters[0][2] = 0x0;
+
+        otp->soak_parameters[1][0] = 0x1200;
+        otp->soak_parameters[1][1] = 0x107f;
+        otp->soak_parameters[1][2] = 0x1024;
+
+        otp->soak_parameters[2][0] = 0x1220;
+        otp->soak_parameters[2][1] = 0x2074;
+        otp->soak_parameters[2][2] = 0x08a4;
+    } else {
+        logi("Detected AST2600 A0/A1\n");
+
+        otp->timings[0] = 0x04190760;
+        otp->timings[1] = 0x04190760;
+        otp->timings[2] = 0x041930d4;
+
+        otp->soak_parameters[0][0] = 0x0;
+        otp->soak_parameters[0][1] = 0x0;
+        otp->soak_parameters[0][2] = 0x0;
+
+        otp->soak_parameters[1][0] = 0x4021;
+        otp->soak_parameters[1][1] = 0x302f;
+        otp->soak_parameters[1][2] = 0x4020;
+
+        otp->soak_parameters[2][0] = 0x4021;
+        otp->soak_parameters[2][1] = 0x1027;
+        otp->soak_parameters[2][2] = 0x4820;
+    }
+
+    return 0;
+}
+
+static int otp_driver_init(struct soc *soc, struct soc_device *dev)
+{
+    struct otp *ctx;
+    int rc;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return -ENOMEM;
+    }
+
+    if ((rc = otp_init(ctx, soc)) < 0) {
+        goto cleanup_ctx;
+    }
+
+    ctx->soc = soc;
+
+    soc_device_set_drvdata(dev, ctx);
+
+    return 0;
+
+cleanup_ctx:
+    free(ctx);
+
+    return rc;
+}
+
+static void otp_driver_destroy(struct soc_device *dev)
+{
+    free(soc_device_get_drvdata(dev));
+}
+
+static const struct soc_driver otp_driver = {
+    .name = "otp",
+    .matches = otp_match,
+    .init = otp_driver_init,
+    .destroy = otp_driver_destroy,
+};
+REGISTER_SOC_DRIVER(&otp_driver);
+
+struct otp *otp_get(struct soc *soc)
+{
+    return soc_driver_get_drvdata(soc, &otp_driver);
 }

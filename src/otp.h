@@ -24,4 +24,6 @@ int otp_read(struct otp *otp, enum otp_region reg);
 int otp_write_conf(struct otp *otp, unsigned int word, unsigned int bit);
 int otp_write_strap(struct otp *otp, unsigned int bit, unsigned int val);
 
+struct otp *otp_get(struct soc *soc);
+
 #endif
