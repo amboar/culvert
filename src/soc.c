@@ -465,3 +465,32 @@ void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match)
 
 	return NULL;
 }
+
+void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *match,
+				     const char *name)
+{
+	struct soc_device_node dn;
+	struct soc_device *dev;
+	int rc;
+
+	rc = soc_device_from_name(soc, name, &dn);
+	if (rc < 0) {
+		logd("Failed to find device by name '%s': %d\n", name, rc);
+		return NULL;
+	}
+
+	list_for_each(&soc->devices, dev, entry) {
+		if (!(dev->node.offset == dn.offset)) {
+			continue;
+		}
+
+		if (dev->driver != match) {
+			logi("Failed to match driver %s on device %s", match->name, name);
+			return NULL;
+		}
+
+		return soc_device_init_driver(soc, dev);
+	}
+
+	return NULL;
+}
