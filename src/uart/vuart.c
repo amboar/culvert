@@ -9,6 +9,11 @@
 #define   VUART_GCRA                    0x20
 #define     VUART_GCRA_TX_DISCARD       (1 << 5)
 
+struct vuart {
+	struct soc *soc;
+	struct soc_region iomem;
+};
+
 static const struct soc_device_id vuart_match[] = {
     { .compatible = "aspeed,ast2400-vuart" },
     { .compatible = "aspeed,ast2500-vuart" },

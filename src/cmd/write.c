@@ -23,10 +23,10 @@
 
 int cmd_write(const char *name __unused, int argc, char *argv[])
 {
-    struct vuart _vuart, *vuart = &_vuart;
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
+    struct vuart *vuart;
     bool live = false;
     struct ahb *ahb;
     struct clk *clk;
@@ -90,8 +90,10 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if ((rc = vuart_init(vuart, soc, "vuart")) < 0)
+    if (!(vuart = vuart_get_by_name(soc, "vuart"))) {
+        loge("Failed to acquire VUART controller, exiting\n");
         goto cleanup_soc;
+    }
 
     if (ahb->type == ahb_devmem)
         loge("I hope you know what you are doing\n");
@@ -112,7 +114,7 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
     logi("Initialising flash subsystem\n");
     rc = sfc_init(&sfc, soc, "fmc");
     if (rc < 0)
-        goto cleanup_vuart;
+        goto cleanup_state;
 
     rc = flash_init(sfc, &chip);
     if (rc < 0)
@@ -197,9 +199,6 @@ cleanup_state:
             }
         }
     }
-
-cleanup_vuart:
-    vuart_destroy(vuart);
 
 cleanup_soc:
     soc_destroy(soc);

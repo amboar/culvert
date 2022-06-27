@@ -8,10 +8,7 @@
 
 enum vuart_discard { discard_enable, discard_disable };
 
-struct vuart {
-	struct soc *soc;
-	struct soc_region iomem;
-};
+struct vuart;
 
 int vuart_init(struct vuart *ctx, struct soc *soc, const char *path);
 int vuart_set_host_tx_discard(struct vuart *ctx, enum vuart_discard state);
