@@ -75,9 +75,6 @@ struct sfc {
 	void *priv;
 };
 
-int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name);
-int sfc_destroy(struct sfc *ctrl);
-
 int sfc_write_protect_save(struct sfc *ctrl, bool enable, uint32_t *save);
 int sfc_write_protect_restore(struct sfc *ctrl, uint32_t save);
 

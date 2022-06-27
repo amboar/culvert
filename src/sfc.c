@@ -951,13 +951,11 @@ static const struct soc_device_id sfc_match[] = {
     { },
 };
 
-int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name)
+static int sfc_driver_init(struct soc *soc, struct soc_device *dev)
 {
-    struct soc_device_node dn;
     struct sfc_data *ct;
     int rc;
 
-    *ctrl = NULL;
     ct = malloc(sizeof(*ct));
     if (!ct) {
 	SFC_ERR("AST_SF: Failed to allocate\n");
@@ -965,33 +963,15 @@ int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name)
     }
     memset(ct, 0, sizeof(*ct));
 
-    rc = soc_device_from_name(soc, name, &dn);
-    if (rc < 0) {
-        loge("sfc: Failed to find device by name '%s': %d\n", name, rc);
-	goto fail;
-    }
-
-    rc = soc_device_is_compatible(soc, sfc_match, &dn);
-    if (rc < 0) {
-        loge("sfc: Failed verify device compatibility: %d\n", rc);
-	goto fail;
-    }
-
-    if (!rc) {
-        loge("sfc: Incompatible device described by node '%s'\n", name);
-        rc = -EINVAL;
-	goto fail;
-    }
-
-    if ((rc = soc_device_get_memory_index(soc, &dn, 0, &ct->iomem)) < 0)
+    if ((rc = soc_device_get_memory_index(soc, &dev->node, 0, &ct->iomem)) < 0)
 	goto fail;
 
-    if ((rc = soc_device_get_memory_index(soc, &dn, 1, &ct->flash)) < 0)
+    if ((rc = soc_device_get_memory_index(soc, &dev->node, 1, &ct->flash)) < 0)
 	goto fail;
 
-    ct->type = (unsigned long)(soc_device_get_match_data(soc, sfc_match, &dn));
+    ct->type = (unsigned long)(soc_device_get_match_data(soc, sfc_match, &dev->node));
     if (!ct->type) {
-	loge("sfc: Failed to acquire match data for '%s'\n", name);
+	loge("sfc: Failed to acquire match data\n");
 	rc = -EINVAL;
 	goto fail;
     }
@@ -1037,7 +1017,7 @@ int sfc_init(struct sfc **ctrl, struct soc *soc, const char *name)
 	goto fail;
     }
 
-    *ctrl = &ct->ops;
+    soc_device_set_drvdata(dev, &ct->ops);
 
     return 0;
 
@@ -1046,59 +1026,41 @@ fail:
     return rc;
 }
 
-int sfc_destroy(struct sfc *ctrl)
-{
-	struct sfc_data *ct = container_of(ctrl, struct sfc_data, ops);
-	int rc;
-
-	/* Restore control reg to read */
-	rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val);
-	if (rc < 0)
-		return rc;
-
-	/* Additional cleanup */
-	if (ct->type == SFC_TYPE_SMC) {
-		uint32_t reg;
-		rc = sfc_readl(ct, SMC_CONF, &reg);
-		if (rc < 0)
-			return rc;
-
-		if (reg != 0xffffffff) {
-			rc = sfc_writel(ct, SMC_CONF, reg & ~1);
-			if (rc < 0)
-				return rc;
-		}
-	}
-
-	/* Free the whole lot */
-	free(ct);
-
-	return 0;
-}
-
-static int sfc_driver_init(struct soc *soc, struct soc_device *dev)
-{
-    struct sfc *ctx;
-    int rc;
-
-    // FIXME: fmc
-    if ((rc = sfc_init(&ctx, soc, "fmc")) < 0) {
-	return rc;
-    }
-
-    soc_device_set_drvdata(dev, ctx);
-
-    return 0;
-}
-
 static void sfc_driver_destroy(struct soc_device *dev)
 {
-    struct sfc *ctx = soc_device_get_drvdata(dev);
+    struct sfc_data *ct;
+    struct sfc *ctrl;
     int rc;
 
-    if ((rc = sfc_destroy(ctx)) < 0) {
-	loge("Failed to destroy %s instance: %d\n", dev->driver->name, rc);
+    ctrl = soc_device_get_drvdata(dev);
+    ct = container_of(ctrl, struct sfc_data, ops);
+
+    /* Restore control reg to read */
+    if ((rc = sfc_writel(ct, ct->ctl_reg, ct->ctl_read_val)) < 0) {
+	loge("Failed to restore control reg state: %d\n", rc);
+	goto cleanup_ct;
     }
+
+    /* Additional cleanup */
+    if (ct->type == SFC_TYPE_SMC) {
+	uint32_t reg;
+
+	if ((rc = sfc_readl(ct, SMC_CONF, &reg)) < 0) {
+	    loge("Failed to read configuration register: %d\n", rc);
+	    goto cleanup_ct;
+	}
+
+	if (reg != 0xffffffff) {
+	    if ((rc = sfc_writel(ct, SMC_CONF, reg & ~1)) < 0) {
+		loge("Failed to write configuration register: %d\n", rc);
+		goto cleanup_ct;
+	    }
+	}
+    }
+
+cleanup_ct:
+    /* Free the whole lot */
+    free(ct);
 }
 
 static const struct soc_driver sfc_driver = {
