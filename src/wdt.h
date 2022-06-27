@@ -9,11 +9,7 @@
 
 int wdt_prevent_reset(struct soc *soc);
 
-struct wdt {
-	struct soc *soc;
-	struct soc_region iomem;
-	struct clk *clk;
-};
+struct wdt;
 
 int wdt_init(struct wdt *ctx, struct soc *soc, const char *name);
 int64_t wdt_perform_reset(struct wdt *ctx);

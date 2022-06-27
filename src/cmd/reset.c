@@ -20,10 +20,10 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    struct wdt _wdt, *wdt = &_wdt;
     int64_t wait = 0;
     struct ahb *ahb;
     struct clk *clk;
+    struct wdt *wdt;
     int cleanup;
     int rc;
 
@@ -67,9 +67,8 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if ((rc = wdt_init(wdt, soc, argv[1])) < 0) {
-        errno = -rc;
-        perror("wdt_init");
+    if (!(wdt = wdt_get_by_name(soc, argv[1]))) {
+        loge("Failed to acquire %s controller, exiting\n", argv[1]);
         goto cleanup_soc;
     }
 
@@ -78,7 +77,7 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
         logi("Gating ARM clock\n");
         rc = clk_disable(clk, clk_arm);
         if (rc < 0)
-            goto cleanup_wdt;
+            goto cleanup_soc;
     }
 
     logi("Preventing system reset\n");
@@ -101,9 +100,6 @@ clk_enable_arm:
             perror("clk_enable");
         }
     }
-
-cleanup_wdt:
-    wdt_destroy(wdt);
 
 cleanup_soc:
     soc_destroy(soc);

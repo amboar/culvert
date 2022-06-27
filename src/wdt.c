@@ -23,6 +23,12 @@
 #define   WDT_CTRL_ENABLE	(1 << 0)
 #define WDT_RESET_MASK		0x1c
 
+struct wdt {
+	struct soc *soc;
+	struct soc_region iomem;
+	struct clk *clk;
+};
+
 static inline int wdt_readl(struct wdt *ctx, uint32_t reg, uint32_t *val)
 {
     int rc;
@@ -80,15 +86,15 @@ int wdt_prevent_reset(struct soc *soc)
         /* ... but for now we YOLO */
         assert(i < 10);
         name[3] = '1' + i;
-        rc = wdt_init(wdt, soc, name);
-        if (rc < 0)
+
+        if (!(wdt = wdt_get_by_name(soc, name))) {
+            logd("Failed to acquire %s controller\n", name);
             return rc;
+        }
 
         rc = wdt_stop(wdt);
         if (rc < 0)
             return rc;
-
-        wdt_destroy(wdt);
     }
 
     return 0;

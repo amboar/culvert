@@ -165,18 +165,16 @@ cleanup_state:
     if (live) {
         if (rc == 0) {
             if (ahb->type != ahb_devmem) {
-                struct wdt _wdt, *wdt = &_wdt;
+                struct wdt *wdt;
                 int64_t wait;
 
                 logi("Performing SoC reset\n");
-                rc = wdt_init(wdt, soc, "wdt2");
-                if (rc < 0) {
+                if (!(wdt = wdt_get_by_name(soc, "wdt2"))) {
+                    loge("Failed to acquire wdt2 controller, exiting\n");
                     goto cleanup_soc;
                 }
 
                 wait = wdt_perform_reset(wdt);
-
-                wdt_destroy(wdt);
 
                 if (wait < 0) {
                     rc = wait;
