@@ -443,60 +443,6 @@ static const struct soc_device_id otp_match[] = {
     { },
 };
 
-int otp_init(struct otp *otp, struct soc *soc)
-{
-    struct soc_device_node dn;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, otp_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &otp->iomem)) < 0)
-        return rc;
-
-    otp->soc = soc;
-
-    if (soc_stepping(soc) >= 2) {
-        logi("Detected AST2600 A2\n");
-
-        otp->timings[0] = 0x04190760;
-        otp->timings[1] = 0x04191388;
-        otp->timings[2] = 0x04193a98;
-
-        otp->soak_parameters[0][0] = 0x0210;
-        otp->soak_parameters[0][1] = 0x2000;
-        otp->soak_parameters[0][2] = 0x0;
-
-        otp->soak_parameters[1][0] = 0x1200;
-        otp->soak_parameters[1][1] = 0x107f;
-        otp->soak_parameters[1][2] = 0x1024;
-
-        otp->soak_parameters[2][0] = 0x1220;
-        otp->soak_parameters[2][1] = 0x2074;
-        otp->soak_parameters[2][2] = 0x08a4;
-    } else {
-        logi("Detected AST2600 A0/A1\n");
-
-        otp->timings[0] = 0x04190760;
-        otp->timings[1] = 0x04190760;
-        otp->timings[2] = 0x041930d4;
-
-        otp->soak_parameters[0][0] = 0x0;
-        otp->soak_parameters[0][1] = 0x0;
-        otp->soak_parameters[0][2] = 0x0;
-
-        otp->soak_parameters[1][0] = 0x4021;
-        otp->soak_parameters[1][1] = 0x302f;
-        otp->soak_parameters[1][2] = 0x4020;
-
-        otp->soak_parameters[2][0] = 0x4021;
-        otp->soak_parameters[2][1] = 0x1027;
-        otp->soak_parameters[2][2] = 0x4820;
-    }
-
-    return 0;
-}
-
 static int otp_driver_init(struct soc *soc, struct soc_device *dev)
 {
     struct otp *ctx;
@@ -507,11 +453,49 @@ static int otp_driver_init(struct soc *soc, struct soc_device *dev)
         return -ENOMEM;
     }
 
-    if ((rc = otp_init(ctx, soc)) < 0) {
+    if ((rc = soc_device_get_memory(soc, &dev->node, &ctx->iomem)) < 0) {
         goto cleanup_ctx;
     }
 
     ctx->soc = soc;
+
+    if (soc_stepping(soc) >= 2) {
+        logi("Detected AST2600 A2\n");
+
+        ctx->timings[0] = 0x04190760;
+        ctx->timings[1] = 0x04191388;
+        ctx->timings[2] = 0x04193a98;
+
+        ctx->soak_parameters[0][0] = 0x0210;
+        ctx->soak_parameters[0][1] = 0x2000;
+        ctx->soak_parameters[0][2] = 0x0;
+
+        ctx->soak_parameters[1][0] = 0x1200;
+        ctx->soak_parameters[1][1] = 0x107f;
+        ctx->soak_parameters[1][2] = 0x1024;
+
+        ctx->soak_parameters[2][0] = 0x1220;
+        ctx->soak_parameters[2][1] = 0x2074;
+        ctx->soak_parameters[2][2] = 0x08a4;
+    } else {
+        logi("Detected AST2600 A0/A1\n");
+
+        ctx->timings[0] = 0x04190760;
+        ctx->timings[1] = 0x04190760;
+        ctx->timings[2] = 0x041930d4;
+
+        ctx->soak_parameters[0][0] = 0x0;
+        ctx->soak_parameters[0][1] = 0x0;
+        ctx->soak_parameters[0][2] = 0x0;
+
+        ctx->soak_parameters[1][0] = 0x4021;
+        ctx->soak_parameters[1][1] = 0x302f;
+        ctx->soak_parameters[1][2] = 0x4020;
+
+        ctx->soak_parameters[2][0] = 0x4021;
+        ctx->soak_parameters[2][1] = 0x1027;
+        ctx->soak_parameters[2][2] = 0x4820;
+    }
 
     soc_device_set_drvdata(dev, ctx);
 

@@ -13,8 +13,6 @@ enum otp_region {
 
 struct otp;
 
-int otp_init(struct otp *otp, struct soc *soc);
-
 int otp_read(struct otp *otp, enum otp_region reg);
 int otp_write_conf(struct otp *otp, unsigned int word, unsigned int bit);
 int otp_write_strap(struct otp *otp, unsigned int bit, unsigned int val);
