@@ -23,51 +23,6 @@
 #define   WDT_CTRL_ENABLE	(1 << 0)
 #define WDT_RESET_MASK		0x1c
 
-static const struct soc_device_id wdt_match[] = {
-    { .compatible = "aspeed,ast2500-wdt" },
-    { },
-};
-
-int wdt_init(struct wdt *ctx, struct soc *soc, const char *name)
-{
-    struct soc_device_node dn;
-    int rc;
-
-    if ((rc = soc_device_from_name(soc, name, &dn)) < 0) {
-        loge("wdt: Failed to find device by name '%s': %d\n", name, rc);
-        return rc;
-    }
-
-    rc = soc_device_is_compatible(soc, wdt_match, &dn);
-    if (rc < 0) {
-        loge("wdt: Failed verify device compatibility: %d\n", rc);
-        return rc;
-    }
-
-    if (!rc) {
-        loge("wdt: Incompatible device described by node '%s'\n", name);
-        return -EINVAL;
-    }
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->iomem)) < 0)
-        return rc;
-
-    if (!(ctx->clk = clk_get(soc))) {
-        loge("Failed to acquire clock controller\n");
-        return -ENODEV;
-    }
-
-    ctx->soc = soc;
-
-    return 0;
-}
-
-void wdt_destroy(struct wdt *ctx)
-{
-    ctx->clk = NULL;
-    ctx->soc = NULL;
-}
-
 static inline int wdt_readl(struct wdt *ctx, uint32_t reg, uint32_t *val)
 {
     int rc;
@@ -201,4 +156,96 @@ int64_t wdt_perform_reset(struct wdt *ctx)
         return rc;
 
     return wait;
+}
+
+static const struct soc_device_id wdt_match[] = {
+    { .compatible = "aspeed,ast2500-wdt" },
+    { },
+};
+
+int wdt_init(struct wdt *ctx, struct soc *soc, const char *name)
+{
+    struct soc_device_node dn;
+    int rc;
+
+    if ((rc = soc_device_from_name(soc, name, &dn)) < 0) {
+        loge("wdt: Failed to find device by name '%s': %d\n", name, rc);
+        return rc;
+    }
+
+    rc = soc_device_is_compatible(soc, wdt_match, &dn);
+    if (rc < 0) {
+        loge("wdt: Failed verify device compatibility: %d\n", rc);
+        return rc;
+    }
+
+    if (!rc) {
+        loge("wdt: Incompatible device described by node '%s'\n", name);
+        return -EINVAL;
+    }
+
+    if ((rc = soc_device_get_memory(soc, &dn, &ctx->iomem)) < 0)
+        return rc;
+
+    if (!(ctx->clk = clk_get(soc))) {
+        loge("Failed to acquire clock controller\n");
+        return -ENODEV;
+    }
+
+    ctx->soc = soc;
+
+    return 0;
+}
+
+void wdt_destroy(struct wdt *ctx)
+{
+    ctx->clk = NULL;
+    ctx->soc = NULL;
+}
+
+static int wdt_driver_init(struct soc *soc, struct soc_device *dev)
+{
+    struct wdt *ctx;
+    int rc;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return -ENOMEM;
+    }
+
+    // FIXME: wdt1 is a temporary until we cleanup wdt_init()
+    if ((rc = wdt_init(ctx, soc, "wdt1")) < 0) {
+        goto cleanup_ctx;
+    }
+
+    soc_device_set_drvdata(dev, ctx);
+
+    return 0;
+
+cleanup_ctx:
+    free(ctx);
+
+    return rc;
+}
+
+static void wdt_driver_destroy(struct soc_device *dev)
+{
+    struct wdt *ctx = soc_device_get_drvdata(dev);
+
+    wdt_destroy(ctx);
+
+    free(ctx);
+}
+
+static const struct soc_driver wdt_driver = {
+    .name = "wdt",
+    .matches = wdt_match,
+    .init = wdt_driver_init,
+    .destroy = wdt_driver_destroy,
+};
+REGISTER_SOC_DRIVER(&wdt_driver);
+
+struct wdt *wdt_get_by_name(struct soc *soc, const char *name)
+{
+    return soc_driver_get_drvdata_by_name(soc, &wdt_driver, name);
 }
