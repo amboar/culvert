@@ -33,6 +33,13 @@
 #define NUM_OTP_CONF    16
 #define NUM_PROG_TRIES  16
 
+struct otp {
+    struct soc *soc;
+    struct soc_region iomem;
+    uint32_t timings[3];
+    uint32_t soak_parameters[3][3];
+};
+
 struct otpstrap_status {
     uint8_t value;
     uint8_t option_array[7];

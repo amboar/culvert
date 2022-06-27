@@ -11,12 +11,7 @@ enum otp_region {
     otp_region_conf,
 };
 
-struct otp {
-    struct soc *soc;
-    struct soc_region iomem;
-    uint32_t timings[3];
-    uint32_t soak_parameters[3][3];
-};
+struct otp;
 
 int otp_init(struct otp *otp, struct soc *soc);
 

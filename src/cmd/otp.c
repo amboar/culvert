@@ -18,7 +18,7 @@ int cmd_otp(const char *name __unused, int argc, char *argv[])
     enum otp_region reg = otp_region_conf;
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    struct otp _otp, *otp = &_otp;
+    struct otp *otp;
     struct ahb *ahb;
     bool rd = true;
     int argo = 2;
@@ -68,9 +68,9 @@ int cmd_otp(const char *name __unused, int argc, char *argv[])
         goto cleanup_host;
     }
 
-    if ((rc = otp_init(otp, soc)) < 0) {
-        errno = -rc;
-        perror("otp_init");
+    if (!(otp = otp_get(soc))) {
+        loge("Failed to acquire OTP controller, exiting\n");
+        rc = EXIT_FAILURE;
         goto cleanup_soc;
     }
 
