@@ -137,38 +137,9 @@ static const struct soc_device_id sdmc_match[] = {
     { },
 };
 
-int sdmc_init(struct sdmc *ctx, struct soc *soc)
-{
-    struct soc_device_node dn;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, sdmc_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->iomem)) < 0)
-        return rc;
-
-    if (!(ctx->pdata = soc_device_get_match_data(soc, sdmc_match, &dn)))
-        return -EINVAL;
-
-    if ((rc = soc_device_from_type(soc, "memory", &dn)))
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->dram)) < 0)
-        return rc;
-
-    ctx->soc = soc;
-
-    return 0;
-}
-
-void sdmc_destroy(struct sdmc *ctx)
-{
-    ctx->soc = NULL;
-}
-
 static int sdmc_driver_init(struct soc *soc, struct soc_device *dev)
 {
+    struct soc_device_node dn;
     struct sdmc *ctx;
     int rc;
 
@@ -177,9 +148,24 @@ static int sdmc_driver_init(struct soc *soc, struct soc_device *dev)
         return -ENOMEM;
     }
 
-    if ((rc = sdmc_init(ctx, soc)) < 0) {
+    if ((rc = soc_device_get_memory(soc, &dev->node, &ctx->iomem)) < 0) {
         goto cleanup_ctx;
     }
+
+    if (!(ctx->pdata = soc_device_get_match_data(soc, sdmc_match, &dev->node))) {
+        rc = -EINVAL;
+        goto cleanup_ctx;
+    }
+
+    if ((rc = soc_device_from_type(soc, "memory", &dn))) {
+        goto cleanup_ctx;
+    }
+
+    if ((rc = soc_device_get_memory(soc, &dn, &ctx->dram)) < 0) {
+        goto cleanup_ctx;
+    }
+
+    ctx->soc = soc;
 
     soc_device_set_drvdata(dev, ctx);
 
@@ -193,11 +179,7 @@ cleanup_ctx:
 
 static void sdmc_driver_destroy(struct soc_device *dev)
 {
-    struct sdmc *ctx = soc_device_get_drvdata(dev);
-
-    sdmc_destroy(ctx);
-
-    free(ctx);
+    free(soc_device_get_drvdata(dev));
 }
 
 static const struct soc_driver sdmc_driver = {
