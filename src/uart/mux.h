@@ -48,4 +48,6 @@ int uart_mux_route(struct uart_mux *ctx, const struct mux_obj *s,
 int uart_mux_connect(struct uart_mux *ctx, const struct mux_obj *a,
                      const struct mux_obj *b);
 
+struct uart_mux *uart_mux_get(struct soc *soc);
+
 #endif

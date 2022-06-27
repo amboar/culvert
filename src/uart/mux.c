@@ -217,38 +217,6 @@ static int lpc_writel(struct uart_mux *ctx, uint32_t offset, uint32_t val)
     return soc_writel(ctx->soc, ctx->lpc.start + offset, val);
 }
 
-static const struct soc_device_id lpc_match[] = {
-    { .compatible = "aspeed,ast2500-lpc-v2" },
-    { },
-};
-
-int uart_mux_init(struct uart_mux *ctx, struct soc *soc)
-{
-    struct soc_device_node dn;
-    uint32_t val;
-    int rc;
-
-    if ((rc = soc_device_match_node(soc, lpc_match, &dn)) < 0)
-        return rc;
-
-    if ((rc = soc_device_get_memory(soc, &dn, &ctx->lpc)) < 0)
-        return rc;
-
-    ctx->soc = soc;
-
-    if ((rc = lpc_readl(ctx, LPC_HICR9, &val)) < 0)
-        return rc;
-
-    ctx->hicr9 = val;
-
-    if ((rc = lpc_readl(ctx, LPC_HICRA, &val)) < 0)
-        return rc;
-
-    ctx->hicra = val;
-
-    return 0;
-}
-
 int uart_mux_restore(struct uart_mux *ctx)
 {
     int rc;
@@ -302,7 +270,85 @@ int uart_mux_connect(struct uart_mux *ctx, const struct mux_obj *a,
     return 0;
 }
 
+static const struct soc_device_id lpc_match[] = {
+    { .compatible = "aspeed,ast2500-lpc-v2" },
+    { },
+};
+
+int uart_mux_init(struct uart_mux *ctx, struct soc *soc)
+{
+    struct soc_device_node dn;
+    uint32_t val;
+    int rc;
+
+    if ((rc = soc_device_match_node(soc, lpc_match, &dn)) < 0)
+        return rc;
+
+    if ((rc = soc_device_get_memory(soc, &dn, &ctx->lpc)) < 0)
+        return rc;
+
+    ctx->soc = soc;
+
+    if ((rc = lpc_readl(ctx, LPC_HICR9, &val)) < 0)
+        return rc;
+
+    ctx->hicr9 = val;
+
+    if ((rc = lpc_readl(ctx, LPC_HICRA, &val)) < 0)
+        return rc;
+
+    ctx->hicra = val;
+
+    return 0;
+}
+
 void uart_mux_destroy(struct uart_mux *ctx)
 {
     ctx->soc = NULL;
+}
+
+static int uart_mux_driver_init(struct soc *soc, struct soc_device *dev)
+{
+    struct uart_mux *ctx;
+    int rc;
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return -ENOMEM;
+    }
+
+    if ((rc = uart_mux_init(ctx, soc)) < 0) {
+        goto cleanup_ctx;
+    }
+
+    soc_device_set_drvdata(dev, ctx);
+
+    return 0;
+
+cleanup_ctx:
+    free(ctx);
+
+    return rc;
+}
+
+static void uart_mux_driver_destroy(struct soc_device *dev)
+{
+    struct uart_mux *ctx = soc_device_get_drvdata(dev);
+
+    uart_mux_destroy(ctx);
+
+    free(ctx);
+}
+
+static const struct soc_driver uart_mux_driver = {
+    .name = "uart-mux",
+    .matches = lpc_match,
+    .init = uart_mux_driver_init,
+    .destroy = uart_mux_driver_destroy,
+};
+REGISTER_SOC_DRIVER(&uart_mux_driver);
+
+struct uart_mux *uart_mux_get(struct soc *soc)
+{
+    return soc_driver_get_drvdata(soc, &uart_mux_driver);
 }
