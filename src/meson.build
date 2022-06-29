@@ -5,19 +5,6 @@ incdirs = [ '.' ]
 src = files(
 	'ahb.c',
 	'ast.c',
-	'cmd/console.c',
-	'cmd/debug.c',
-	'cmd/devmem.c',
-	'cmd/ilpc.c',
-	'cmd/otp.c',
-	'cmd/p2a.c',
-	'cmd/probe.c',
-	'cmd/read.c',
-	'cmd/replace.c',
-	'cmd/reset.c',
-	'cmd/sfc.c',
-	'cmd/trace.c',
-	'cmd/write.c',
 	'culvert.c',
 	'flash.c',
 	'host.c',
@@ -64,6 +51,7 @@ configure_file(input: 'config.h.in',
 
 subdir('bridge')
 subdir('ccan')
+subdir('cmd')
 subdir('devicetree')
 subdir('soc')
 

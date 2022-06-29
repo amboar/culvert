@@ -1,0 +1,13 @@
+src += files('console.c',
+	     'debug.c',
+	     'devmem.c',
+	     'ilpc.c',
+	     'otp.c',
+	     'p2a.c',
+	     'probe.c',
+	     'read.c',
+	     'replace.c',
+	     'reset.c',
+	     'sfc.c',
+	     'trace.c',
+	     'write.c')
