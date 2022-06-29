@@ -2,13 +2,13 @@
 // Copyright (C) 2018,2021 IBM Corp.
 #include "ahb.h"
 #include "ast.h"
-#include "clk.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
 #include "priv.h"
 #include "soc.h"
-#include "wdt.h"
+#include "soc/clk.h"
+#include "soc/wdt.h"
 
 #include <errno.h>
 #include <stdio.h>

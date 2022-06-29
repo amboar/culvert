@@ -5,7 +5,6 @@ incdirs = [ '.' ]
 src = files(
 	'ahb.c',
 	'ast.c',
-	'clk.c',
 	'cmd/console.c',
 	'cmd/debug.c',
 	'cmd/devmem.c',
@@ -24,23 +23,16 @@ src = files(
 	'host.c',
 	'log.c',
 	'mmio.c',
-	'otp.c',
 	'pci.c',
 	'priv.c',
 	'prompt.c',
 	'rev.c',
-	'sdmc.c',
-	'sfc.c',
 	'shell.c',
 	'sio.c',
 	'soc.c',
-	'trace.c',
 	'ts16.c',
 	'tty.c',
-	'uart/mux.c',
-	'uart/suart.c',
-	'uart/vuart.c',
-	'wdt.c'
+	'uart/suart.c'
 )
 
 conf_data = configuration_data()
@@ -73,6 +65,7 @@ configure_file(input: 'config.h.in',
 subdir('bridge')
 subdir('ccan')
 subdir('devicetree')
+subdir('soc')
 
 executable('culvert', src, dtbos,
 	   include_directories: incdirs,

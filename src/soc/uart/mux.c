@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
 
-#include "../ast.h"
-#include "../mb.h"
+#include "ast.h"
+#include "mb.h"
 
-#include "mux.h"
+#include "soc/uart/mux.h"
 
 #include <assert.h>
 #include <errno.h>

@@ -3,8 +3,8 @@
 // Copyright (C) 2021, Oracle and/or its affiliates.
 
 #include "bridge.h"
+#include "bridge/ilpc.h"
 #include "compiler.h"
-#include "ilpc.h"
 #include "log.h"
 #include "rev.h"
 

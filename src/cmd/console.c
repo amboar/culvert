@@ -3,13 +3,13 @@
 
 #include "ahb.h"
 #include "ast.h"
-#include "clk.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
 #include "priv.h"
+#include "soc/clk.h"
+#include "soc/uart/mux.h"
 #include "uart/suart.h"
-#include "uart/mux.h"
 
 #include <stdio.h>
 #include <stdlib.h>

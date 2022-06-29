@@ -8,8 +8,8 @@
 #include "host.h"
 #include "log.h"
 #include "priv.h"
-#include "sdmc.h"
 #include "soc.h"
+#include "soc/sdmc.h"
 
 #include <errno.h>
 #include <stdio.h>

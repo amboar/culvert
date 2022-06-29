@@ -7,7 +7,7 @@
 #include "host.h"
 #include "log.h"
 #include "priv.h"
-#include "sfc.h"
+#include "soc/sfc.h"
 
 #include <errno.h>
 #include <stdio.h>

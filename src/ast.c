@@ -10,9 +10,9 @@
 #include "log.h"
 #include "mb.h"
 #include "priv.h"
-#include "sdmc.h"
-#include "soc.h"
 #include "rev.h"
+#include "soc.h"
+#include "soc/sdmc.h"
 
 #include <assert.h>
 #include <errno.h>

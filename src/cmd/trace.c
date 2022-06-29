@@ -9,7 +9,7 @@
 #include "log.h"
 #include "priv.h"
 #include "soc.h"
-#include "trace.h"
+#include "soc/trace.h"
 
 #include <errno.h>
 #include <inttypes.h>

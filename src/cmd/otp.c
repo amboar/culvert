@@ -5,8 +5,8 @@
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
-#include "otp.h"
 #include "priv.h"
+#include "soc/otp.h"
 
 #include <errno.h>
 #include <stdio.h>

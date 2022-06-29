@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#include "../soc.h"
+#include "soc.h"
 
 enum mux_type { mux_io, mux_uart, mux_type_count };
 enum mux_io { io1, io2, io3, io4, io5, io6, mux_io_count };

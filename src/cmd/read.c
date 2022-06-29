@@ -8,9 +8,9 @@
 #include "host.h"
 #include "log.h"
 #include "priv.h"
-#include "sdmc.h"
-#include "sfc.h"
 #include "soc.h"
+#include "soc/sdmc.h"
+#include "soc/sfc.h"
 
 #include <errno.h>
 #include <stdbool.h>

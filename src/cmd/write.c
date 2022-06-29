@@ -2,15 +2,15 @@
 // Copyright (C) 2018,2021 IBM Corp.
 #include "ahb.h"
 #include "ast.h"
-#include "clk.h"
 #include "compiler.h"
 #include "flash.h"
 #include "host.h"
 #include "log.h"
 #include "priv.h"
-#include "sfc.h"
-#include "uart/vuart.h"
-#include "wdt.h"
+#include "soc/clk.h"
+#include "soc/sfc.h"
+#include "soc/uart/vuart.h"
+#include "soc/wdt.h"
 
 #include <errno.h>
 #include <getopt.h>
