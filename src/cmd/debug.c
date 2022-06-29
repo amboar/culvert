@@ -5,8 +5,8 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "bridge/debug.h"
 #include "log.h"
-#include "debug.h"
 
 int cmd_debug(const char *name, int argc, char *argv[])
 {

@@ -6,7 +6,7 @@
 
 #include "ahb.h"
 #include "ast.h"
-#include "devmem.h"
+#include "bridge/devmem.h"
 #include "priv.h"
 
 int cmd_devmem(const char *name, int argc, char *argv[])

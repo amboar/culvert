@@ -5,7 +5,7 @@
 
 #include "ahb.h"
 #include "ast.h"
-#include "ilpc.h"
+#include "bridge/ilpc.h"
 #include "priv.h"
 
 int cmd_ilpc(const char *name, int argc, char *argv[])

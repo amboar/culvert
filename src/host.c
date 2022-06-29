@@ -3,14 +3,14 @@
 
 #include "ahb.h"
 #include "bridge.h"
+#include "bridge/debug.h"
+#include "bridge/devmem.h"
+#include "bridge/ilpc.h"
+#include "bridge/l2a.h"
+#include "bridge/p2a.h"
 #include "compiler.h"
-#include "debug.h"
-#include "devmem.h"
 #include "host.h"
-#include "ilpc.h"
-#include "l2a.h"
 #include "log.h"
-#include "p2a.h"
 
 #include <errno.h>
 

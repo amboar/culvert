@@ -7,8 +7,8 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "bridge/p2a.h"
 #include "log.h"
-#include "p2a.h"
 #include "priv.h"
 
 int cmd_p2a(const char *name, int argc, char *argv[])

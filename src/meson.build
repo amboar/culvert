@@ -20,16 +20,11 @@ src = files(
 	'cmd/trace.c',
 	'cmd/write.c',
 	'culvert.c',
-	'debug.c',
-	'devmem.c',
 	'flash.c',
 	'host.c',
-	'ilpc.c',
-	'l2a.c',
 	'log.c',
 	'mmio.c',
 	'otp.c',
-	'p2a.c',
 	'pci.c',
 	'priv.c',
 	'prompt.c',
@@ -75,6 +70,7 @@ configure_file(input: 'config.h.in',
 	       output: 'config.h',
 	       configuration: conf_data)
 
+subdir('bridge')
 subdir('ccan')
 subdir('devicetree')
 

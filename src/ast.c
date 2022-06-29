@@ -4,11 +4,11 @@
 
 #define _GNU_SOURCE
 #include "ast.h"
-#include "devmem.h"
-#include "ilpc.h"
+#include "bridge/devmem.h"
+#include "bridge/ilpc.h"
+#include "bridge/p2a.h"
 #include "log.h"
 #include "mb.h"
-#include "p2a.h"
 #include "priv.h"
 #include "sdmc.h"
 #include "soc.h"
