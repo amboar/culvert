@@ -80,6 +80,7 @@ struct soc_device_node {
 
 struct soc_device {
 	struct list_node entry;
+	struct soc_device *parent;
 	struct soc_device_node node;
 	const struct soc_driver *driver;
 	void *drvdata;

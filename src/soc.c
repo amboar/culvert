@@ -71,14 +71,26 @@ int soc_from_rev(struct soc *ctx, struct ahb *ahb, uint32_t rev)
 
 /* soc_bus_enumerate_devices() and soc_device_bind_driver() mutually recurse */
 static int
-soc_bus_enumerate_devices(struct soc *ctx, int bus, struct soc_driver **drivers, size_t n_drivers);
+soc_bus_enumerate_devices(struct soc *ctx, struct soc_device *dev, int bus, struct soc_driver **drivers, size_t n_drivers);
 
 static int
-soc_device_bind_driver(struct soc *ctx, int node, struct soc_driver **drivers, size_t n_drivers)
+soc_device_bind_driver(struct soc *ctx, struct soc_device *parent, int node, struct soc_driver **drivers, size_t n_drivers)
 {
+	struct soc_device *dev;
 	char path[PATH_MAX];
+	bool is_bus, is_mfd;
 	size_t i;
 	int rc;
+
+	dev = malloc(sizeof(*dev));
+	if (!dev) {
+		loge("malloc() failed, exiting");
+		return -ENOMEM;
+	}
+
+	dev->parent = parent;
+	dev->node.fdt = &ctx->fdt;
+	dev->node.offset = node;
 
 	rc = fdt_get_path(ctx->fdt.start, node, path, sizeof(path));
 	if (rc < 0) {
@@ -87,28 +99,22 @@ soc_device_bind_driver(struct soc *ctx, int node, struct soc_driver **drivers, s
 		logt("Processing devicetree node at %s\n", path);
 	}
 
-	if (!fdt_node_check_compatible(ctx->fdt.start, node, "simple-bus")) {
-		return soc_bus_enumerate_devices(ctx, node, drivers, n_drivers);
+	/* Alias simple-mfd to simple-bus */
+	is_bus = !fdt_node_check_compatible(ctx->fdt.start, node, "simple-bus");
+	is_mfd = !fdt_node_check_compatible(ctx->fdt.start, node, "simple-mfd");
+
+	if (is_bus || is_mfd) {
+		return soc_bus_enumerate_devices(ctx, dev, node, drivers, n_drivers);
 	}
 
 	for (i = 0; i < n_drivers; i++) {
 		const struct soc_device_id *entry;
 
 		for (entry = drivers[i]->matches; entry && entry->compatible; entry++) {
-			struct soc_device *dev;
-
 			if (fdt_node_check_compatible(ctx->fdt.start, node, entry->compatible)) {
 				continue;
 			}
 
-			dev = malloc(sizeof(*dev));
-			if (!dev) {
-				loge("malloc() failed, exiting");
-				return -ENOMEM;
-			}
-
-			dev->node.fdt = &ctx->fdt;
-			dev->node.offset = node;
 			dev->driver = drivers[i];
 			dev->drvdata = NULL;
 
@@ -126,13 +132,13 @@ soc_device_bind_driver(struct soc *ctx, int node, struct soc_driver **drivers, s
 	return 0;
 }
 
-static int soc_bus_enumerate_devices(struct soc *ctx, int bus, struct soc_driver **drivers, size_t n_drivers)
+static int soc_bus_enumerate_devices(struct soc *ctx, struct soc_device *dev, int bus, struct soc_driver **drivers, size_t n_drivers)
 {
 	int node;
 	int rc;
 
 	fdt_for_each_subnode(node, ctx->fdt.start, bus) {
-		rc = soc_device_bind_driver(ctx, node, drivers, n_drivers);
+		rc = soc_device_bind_driver(ctx, dev, node, drivers, n_drivers);
 		if (rc < 0) {
 			return rc;
 		}
@@ -154,7 +160,7 @@ static void soc_bind_drivers(struct soc *ctx)
 	logd("Found %zu registered drivers\n", n_drivers);
 
 	if (drivers && n_drivers) {
-		soc_bus_enumerate_devices(ctx, 0, drivers, n_drivers);
+		soc_bus_enumerate_devices(ctx, NULL, 0, drivers, n_drivers);
 	}
 
 	autodata_free(drivers);
@@ -165,10 +171,16 @@ static void soc_unbind_drivers(struct soc *ctx)
 	struct soc_device *dev, *next;
 
 	list_for_each_safe(&ctx->devices, dev, next, entry) {
-		logd("Unbound instance of driver %s\n", dev->driver->name);
+		if (!dev->driver) {
+			continue;
+		}
+
 		if (dev->drvdata) {
 			dev->driver->destroy(dev);
 		}
+
+		logd("Unbound instance of driver %s\n", dev->driver->name);
+
 		list_del(&dev->entry);
 		free(dev);
 	}
@@ -354,12 +366,39 @@ int soc_device_from_type(struct soc *ctx, const char *type,
 	return -ENOENT;
 }
 
+static int
+soc_device_resolve_node(struct soc *ctx, const struct soc_device_node *src,
+			struct soc_device_node *dst)
+{
+	bool is_mfd;
+	int parent;
+
+	/* XXX: Expensive, fix this up by adjusting the API to take a struct soc_device pointer */
+	parent = fdt_parent_offset(ctx->fdt.start, src->offset);
+	if (parent < 0) {
+		loge("Failed to find node parent: %d\n", parent);
+		return -EINVAL;
+	}
+
+	is_mfd = !fdt_node_check_compatible(ctx->fdt.start, parent, "simple-mfd");
+	dst->offset = is_mfd ? parent : src->offset;
+
+	return 0;
+}
+
 int soc_device_get_memory_index(struct soc *ctx,
-				const struct soc_device_node *dn, int index,
+				const struct soc_device_node *sdn, int index,
 				struct soc_region *region)
 {
+	struct soc_device_node _dn, *dn = &_dn;
 	const uint32_t *reg;
 	int len;
+	int rc;
+
+	/* MFD transparency for resource acquisition */
+	if ((rc = soc_device_resolve_node(ctx, sdn, dn)) < 0) {
+		return rc;
+	}
 
 	/* FIXME: Do ranges translation */
 	reg = fdt_getprop(ctx->fdt.start, dn->offset, "reg", &len);
@@ -443,6 +482,21 @@ static void *soc_device_init_driver(struct soc *ctx, struct soc_device *dev)
 		return dev->drvdata;
 	}
 
+	assert(dev->driver);
+	if (!dev->driver) {
+		char path[PATH_MAX];
+		int rc;
+
+		rc = fdt_get_path(ctx->fdt.start, dev->node.offset, path, sizeof(path));
+		if (rc < 0) {
+			loge("Failed to get path for offset %d\n", dev->node.offset);
+			return NULL;
+		}
+
+		loge("No driver bound for device %s\n", path);
+		return NULL;
+	}
+
 	if ((rc = dev->driver->init(ctx, dev)) < 0) {
 		loge("Failed to initialise driver: %d\n", rc);
 		return NULL;
@@ -458,7 +512,7 @@ void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match)
 	struct soc_device *dev;
 
 	list_for_each(&soc->devices, dev, entry) {
-		if (!strcmp(dev->driver->name, match->name)) {
+		if (dev->driver && !strcmp(dev->driver->name, match->name)) {
 			return soc_device_init_driver(soc, dev);
 		}
 	}
