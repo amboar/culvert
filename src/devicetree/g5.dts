@@ -75,6 +75,10 @@
 			syscon: syscon@1e6e2000 {
 				compatible = "aspeed,ast2500-scu", "syscon", "simple-mfd";
 				reg = <0x1e6e2000 0x1a8>;
+
+				strapping {
+					compatible = "aspeed,ast2500-strapping";
+				};
 			};
 
 			wdt1: watchdog@1e785000 {
