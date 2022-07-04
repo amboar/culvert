@@ -6,6 +6,7 @@
 
 #include "ahb.h"
 #include "rev.h"
+#include "soc/bridgectl.h"
 
 #include "ccan/autodata/autodata.h"
 #include "ccan/list/list.h"
@@ -23,6 +24,7 @@ struct soc {
 	struct soc_fdt fdt;
 	struct ahb *ahb;
 	struct list_head devices;
+	struct list_head bridges;
 };
 
 int soc_probe(struct soc *ctx, struct ahb *ahb);
@@ -154,4 +156,12 @@ AUTODATA_TYPE(soc_drivers, struct soc_driver);
 void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match);
 void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *match, const char
 		*name);
+
+int soc_bridge_controller_register(struct soc *soc, struct bridgectl *bridge,
+				   const struct bridgectl_ops *ops);
+
+void soc_bridge_controller_unregister(struct soc *soc, struct bridgectl *bridge);
+
+void soc_list_bridge_controllers(struct soc *soc);
+int soc_probe_bridge_controllers(struct soc *soc, enum bridge_mode *discovered, const char *name);
 #endif

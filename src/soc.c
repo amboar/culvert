@@ -6,6 +6,7 @@
 #include "devicetree/g6.h"
 
 #include "ast.h"
+#include "compiler.h"
 #include "log.h"
 #include "soc.h"
 #include "rev.h"
@@ -17,6 +18,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <stdio.h>
 
 static const struct soc_fdt soc_fdts[] = {
 	[ast_g4] = {
@@ -66,6 +68,7 @@ int soc_from_rev(struct soc *ctx, struct ahb *ahb, uint32_t rev)
 	ctx->rev = rev;
 	ctx->ahb = ahb;
 	list_head_init(&ctx->devices);
+	list_head_init(&ctx->bridges);
 	return soc_align_fdt(ctx, &soc_fdts[rev_generation(rev)]);
 }
 
@@ -547,4 +550,81 @@ void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *m
 	}
 
 	return NULL;
+}
+
+int
+soc_bridge_controller_register(struct soc *ctx, struct bridgectl *bridge, const struct bridgectl_ops *ops)
+{
+	bridge->ops = ops;
+	list_add(&ctx->bridges, &bridge->entry);
+
+	return 0;
+}
+
+void
+soc_bridge_controller_unregister(struct soc *ctx __unused, struct bridgectl *bridge)
+{
+	list_del(&bridge->entry);
+}
+
+static void soc_init_bridge_controllers(struct soc *ctx)
+{
+	static const char *compatible =  "bridge-controller";
+	struct soc_device *dev;
+
+	list_for_each(&ctx->devices, dev, entry) {
+		if (fdt_node_check_compatible(ctx->fdt.start, dev->node.offset, compatible)) {
+			continue;
+		}
+
+		if (!soc_device_init_driver(ctx, dev)) {
+			continue;
+		}
+
+		logd("Initialised %s AHB bridge controller\n", dev->driver->name);
+	}
+}
+
+void soc_list_bridge_controllers(struct soc *ctx)
+{
+	struct bridgectl *bridge;
+
+	soc_init_bridge_controllers(ctx);
+
+	list_for_each(&ctx->bridges, bridge, entry) {
+		printf("%s\n", bridgectl_name(bridge));
+	}
+}
+
+int soc_probe_bridge_controllers(struct soc *ctx, enum bridge_mode *discovered, const char *name)
+{
+	enum bridge_mode current, aggregate;
+	struct bridgectl *bridge;
+	int error;
+
+	soc_init_bridge_controllers(ctx);
+
+	aggregate = bm_disabled;
+	error = 0;
+	list_for_each(&ctx->bridges, bridge, entry) {
+		int rc;
+
+		if (name && strcmp(name, bridgectl_name(bridge))) {
+			continue;
+		}
+
+		/* Write the report to stdout */
+		if ((rc = bridgectl_report(bridge, 1, &current)) < 0) {
+			loge("Failed to generate %s report: %d\n", bridgectl_name(bridge), rc);
+			error = rc;
+		}
+
+		if (current < aggregate) {
+			aggregate = current;
+		}
+	}
+
+	*discovered = aggregate;
+
+	return error;
 }

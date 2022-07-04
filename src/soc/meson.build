@@ -1,4 +1,5 @@
 src += files(
+	'bridgectl.c',
 	'clk.c',
 	'otp.c',
 	'sdmc.c',
