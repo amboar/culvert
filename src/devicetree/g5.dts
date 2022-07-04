@@ -98,7 +98,7 @@
 			};
 
 			lpc: lpc@1e789000 {
-				compatible = "aspeed,ast2500-lpc-v2";
+				compatible = "aspeed,ast2500-lpc-v2", "syscon", "simple-mfd";
 				reg = <0x1e789000 0x1000>;
 			};
 		};
