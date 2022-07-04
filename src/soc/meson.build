@@ -3,6 +3,7 @@ src += files(
 	'otp.c',
 	'sdmc.c',
 	'sfc.c',
+	'sioctl.c',
 	'strap.c',
 	'trace.c',
 	'uart/mux.c',

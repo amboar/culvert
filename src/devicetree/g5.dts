@@ -79,6 +79,10 @@
 				strapping {
 					compatible = "aspeed,ast2500-strapping";
 				};
+
+				superio {
+					compatible = "aspeed,ast2500-superio";
+				};
 			};
 
 			wdt1: watchdog@1e785000 {
