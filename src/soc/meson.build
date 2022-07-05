@@ -4,6 +4,7 @@ src += files(
 	'debugctl.c',
 	'ilpcctl.c',
 	'otp.c',
+	'pciectl.c',
 	'sdmc.c',
 	'sfc.c',
 	'sioctl.c',

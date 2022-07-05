@@ -61,6 +61,10 @@
 				superio {
 					compatible = "aspeed,ast2400-superio";
 				};
+
+				bridge-controller {
+					compatible = "aspeed,ast2400-pcie-device-controller", "bridge-controller";
+				};
 			};
 
 			wdt1: watchdog@1e785000 {

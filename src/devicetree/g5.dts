@@ -84,8 +84,12 @@
 					compatible = "aspeed,ast2500-superio";
 				};
 
-				bridge-controller {
+				debug-bridge-controller {
 					compatible = "aspeed,ast2500-debug-ahb-bridge", "bridge-controller";
+				};
+
+				pcie-bridge-controller {
+					compatible = "aspeed,ast2500-pcie-device-controller", "bridge-controller";
 				};
 			};
 
