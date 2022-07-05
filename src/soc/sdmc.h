@@ -12,6 +12,7 @@ struct sdmc;
 int sdmc_get_dram(struct sdmc *ctx, struct soc_region *dram);
 int sdmc_get_vram(struct sdmc *ctx, struct soc_region *vram);
 int sdmc_constrains_xdma(struct sdmc *ctx);
+int sdmc_configure_xdma(struct sdmc *ctx, bool constrain);
 
 struct sdmc *sdmc_get(struct soc *soc);
 

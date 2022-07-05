@@ -73,6 +73,11 @@ static int sdmc_readl(struct sdmc *ctx, uint32_t off, uint32_t *val)
     return soc_readl(ctx->soc, ctx->iomem.start + off, val);
 }
 
+static int sdmc_writel(struct sdmc *ctx, uint32_t off, uint32_t val)
+{
+    return soc_writel(ctx->soc, ctx->iomem.start + off, val);
+}
+
 static void sdmc_dram_region(struct sdmc *ctx, uint32_t mcr_conf,
                              struct soc_region *dram)
 {
@@ -119,6 +124,25 @@ int sdmc_constrains_xdma(struct sdmc *ctx)
         return rc;
 
     return !!(mcr_gmp & ctx->pdata->gmp_xdma_mask);
+}
+
+int sdmc_configure_xdma(struct sdmc *ctx, bool constrain)
+{
+    uint32_t mcr_gmp;
+    int rc;
+
+    if ((rc = sdmc_readl(ctx, MCR_GMP, &mcr_gmp)) < 0) {
+        return rc;
+    }
+
+    mcr_gmp &= ~ctx->pdata->gmp_xdma_mask;
+    mcr_gmp |= (ctx->pdata->gmp_xdma_mask * constrain);
+
+    if ((rc = sdmc_writel(ctx, MCR_GMP, mcr_gmp)) < 0) {
+        return rc;
+    }
+
+    return 0;
 }
 
 static const struct soc_device_id sdmc_match[] = {
