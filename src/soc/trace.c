@@ -307,7 +307,7 @@ static const struct soc_driver trace_driver = {
     .init = trace_driver_init,
     .destroy = trace_driver_destroy
 };
-REGISTER_SOC_DRIVER(&trace_driver);
+REGISTER_SOC_DRIVER(trace_driver);
 
 struct trace *trace_get(struct soc *soc)
 {

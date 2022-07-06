@@ -518,7 +518,7 @@ static const struct soc_driver otp_driver = {
     .init = otp_driver_init,
     .destroy = otp_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&otp_driver);
+REGISTER_SOC_DRIVER(otp_driver);
 
 struct otp *otp_get(struct soc *soc)
 {

@@ -239,4 +239,4 @@ static const struct bridge_driver l2ab_driver = {
     .probe = l2ab_driver_probe,
     .destroy = l2ab_driver_destroy,
 };
-REGISTER_BRIDGE_DRIVER(&l2ab_driver);
+REGISTER_BRIDGE_DRIVER(l2ab_driver);

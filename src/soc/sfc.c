@@ -1069,7 +1069,7 @@ static const struct soc_driver sfc_driver = {
     .init = sfc_driver_init,
     .destroy = sfc_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&sfc_driver);
+REGISTER_SOC_DRIVER(sfc_driver);
 
 struct sfc *sfc_get_by_name(struct soc *soc, const char *name)
 {

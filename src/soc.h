@@ -151,7 +151,7 @@ struct soc_driver {
 };
 
 AUTODATA_TYPE(soc_drivers, struct soc_driver);
-#define REGISTER_SOC_DRIVER(sd) AUTODATA(soc_drivers, (sd))
+#define REGISTER_SOC_DRIVER(sd) AUTODATA_SYM(soc_drivers, sd)
 
 void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match);
 void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *match, const char

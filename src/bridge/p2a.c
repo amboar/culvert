@@ -313,4 +313,4 @@ static const struct bridge_driver p2ab_driver = {
     .reinit = p2ab_driver_reinit,
     .destroy = p2ab_driver_destroy,
 };
-REGISTER_BRIDGE_DRIVER(&p2ab_driver);
+REGISTER_BRIDGE_DRIVER(p2ab_driver);

@@ -16,6 +16,6 @@ struct bridge_driver {
 };
 
 AUTODATA_TYPE(bridge_drivers, struct bridge_driver);
-#define REGISTER_BRIDGE_DRIVER(bd) AUTODATA(bridge_drivers, (bd))
+#define REGISTER_BRIDGE_DRIVER(bd) AUTODATA_SYM(bridge_drivers, bd)
 
 #endif

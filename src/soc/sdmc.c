@@ -212,7 +212,7 @@ static const struct soc_driver sdmc_driver = {
     .init = sdmc_driver_init,
     .destroy = sdmc_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&sdmc_driver);
+REGISTER_SOC_DRIVER(sdmc_driver);
 
 struct sdmc *sdmc_get(struct soc *soc)
 {

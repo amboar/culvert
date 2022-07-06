@@ -181,7 +181,7 @@ static const struct soc_driver strap_driver = {
     .init = strap_driver_init,
     .destroy = strap_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&strap_driver);
+REGISTER_SOC_DRIVER(strap_driver);
 
 struct strap *strap_get(struct soc *soc)
 {

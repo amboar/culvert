@@ -374,4 +374,4 @@ static const struct bridge_driver ilpcb_driver = {
     .probe = ilpcb_driver_probe,
     .destroy = ilpcb_driver_destroy,
 };
-REGISTER_BRIDGE_DRIVER(&ilpcb_driver);
+REGISTER_BRIDGE_DRIVER(ilpcb_driver);

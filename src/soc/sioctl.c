@@ -114,7 +114,7 @@ struct soc_driver sioctl_driver = {
     .init = sioctl_driver_init,
     .destroy = sioctl_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&sioctl_driver);
+REGISTER_SOC_DRIVER(sioctl_driver);
 
 struct sioctl *sioctl_get(struct soc *soc)
 {

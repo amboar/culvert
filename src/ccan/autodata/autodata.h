@@ -45,6 +45,11 @@
 	__attribute__((section("xautodata_" #name)))	\
 	AUTODATA_VAR_(name, __LINE__) = (ptr);
 
+#define AUTODATA_SYM(name, sym) \
+	static const autodata_##name##_ *NEEDED		\
+	__attribute__((section("xautodata_" #name)))	\
+	AUTODATA_VAR_(name, sym) = &(sym);
+
 /**
  * autodata_get - get an autodata set
  * @name: the name of the set of autodata

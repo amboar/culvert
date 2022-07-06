@@ -164,4 +164,4 @@ static const struct soc_driver debugctl_driver = {
     .init = debugctl_driver_init,
     .destroy = debugctl_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&debugctl_driver);
+REGISTER_SOC_DRIVER(debugctl_driver);

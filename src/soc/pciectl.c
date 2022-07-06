@@ -691,4 +691,4 @@ static const struct soc_driver pciectl_driver = {
     .init = pciectl_driver_init,
     .destroy = pciectl_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&pciectl_driver);
+REGISTER_SOC_DRIVER(pciectl_driver);

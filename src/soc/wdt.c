@@ -212,7 +212,7 @@ static const struct soc_driver wdt_driver = {
     .init = wdt_driver_init,
     .destroy = wdt_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&wdt_driver);
+REGISTER_SOC_DRIVER(wdt_driver);
 
 struct wdt *wdt_get_by_name(struct soc *soc, const char *name)
 {

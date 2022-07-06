@@ -565,4 +565,4 @@ static const struct bridge_driver debug_driver = {
     .probe = debug_driver_probe,
     .destroy = debug_driver_destroy,
 };
-REGISTER_BRIDGE_DRIVER(&debug_driver);
+REGISTER_BRIDGE_DRIVER(debug_driver);

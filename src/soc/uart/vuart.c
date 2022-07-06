@@ -78,7 +78,7 @@ static const struct soc_driver vuart_driver = {
     .init = vuart_driver_init,
     .destroy = vuart_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&vuart_driver);
+REGISTER_SOC_DRIVER(vuart_driver);
 
 struct vuart *vuart_get_by_name(struct soc *soc, const char *name)
 {

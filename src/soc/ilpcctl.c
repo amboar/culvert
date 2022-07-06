@@ -177,4 +177,4 @@ static const struct soc_driver ilpcctl_driver = {
     .init = ilpcctl_driver_init,
     .destroy = ilpcctl_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&ilpcctl_driver);
+REGISTER_SOC_DRIVER(ilpcctl_driver);

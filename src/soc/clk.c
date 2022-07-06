@@ -167,7 +167,7 @@ static const struct soc_driver clk_driver = {
     .init = clk_driver_init,
     .destroy = clk_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&clk_driver);
+REGISTER_SOC_DRIVER(clk_driver);
 
 struct clk *clk_get(struct soc *soc)
 {

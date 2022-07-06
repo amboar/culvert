@@ -263,4 +263,4 @@ static const struct bridge_driver devmem_driver = {
     .probe = devmem_driver_probe,
     .destroy = devmem_driver_destroy,
 };
-REGISTER_BRIDGE_DRIVER(&devmem_driver);
+REGISTER_BRIDGE_DRIVER(devmem_driver);

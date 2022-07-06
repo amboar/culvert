@@ -333,7 +333,7 @@ static const struct soc_driver uart_mux_driver = {
     .init = uart_mux_driver_init,
     .destroy = uart_mux_driver_destroy,
 };
-REGISTER_SOC_DRIVER(&uart_mux_driver);
+REGISTER_SOC_DRIVER(uart_mux_driver);
 
 struct uart_mux *uart_mux_get(struct soc *soc)
 {
