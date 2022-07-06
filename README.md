@@ -137,7 +137,7 @@ debug:  Permissive
 xdma:   Permissive
         BMC: Disabled
         VGA: Enabled
-        MMIO on VGA: Enabled
+        XDMA on VGA: Enabled
         XDMA is constrained: No
 p2a:    Permissive
         BMC: Disabled
