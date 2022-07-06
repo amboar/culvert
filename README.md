@@ -131,33 +131,27 @@ culvert trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]
 ```
 
 ```
-$ ./culvert probe --require confidentiality digi,portserver-ts-16 <IP> <PORT> <USER> <PASSWORD>
-Connecting to Digi Portserver TS 16 at <IP>:23
-Logging into Digi Portserver TS
-Configuring binary mode on port 4
-Resetting port 4
-Connecting to BMC console at <IP>:2104
-Entering debug mode
-Initialised Debug UART AHB interface
-Performing interface discovery via Debug UART
-Exiting debug mode
-Have SuperIO: Yes
-iLPC2AHB Bridge: Read-only
-Have VGA PCIe device: Yes
-Have MMIO on VGA device: Yes
-P2A write filter state:
-0x00000000-0x0fffffff (Firmware): Read-write
-0x10000000-0x1fffffff (SoC IO): Read-write
-0x20000000-0x3fffffff (Flashes): Read-write
-0x40000000-0x5fffffff (Reserved): Read-write
-0x60000000-0x7fffffff (LPC Host): Read-write
-0x80000000-0xffffffff (DRAM): Read-write
-Have X-DMA on VGA device: Yes
-Have BMC PCIe device: No
-X-DMA is unconstrained: No
-Have debug UART: Yes
-Debug UART enabled on: UART5
-$ echo $?
+# ./culvert probe --require confidentiality
+debug:  Permissive
+        Debug UART port: UART5
+xdma:   Permissive
+        BMC: Disabled
+        VGA: Enabled
+        MMIO on VGA: Enabled
+        XDMA is constrained: No
+p2a:    Permissive
+        BMC: Disabled
+        VGA: Enabled
+        MMIO on VGA: Enabled
+        [0x00000000 - 0x0fffffff]   Firmware: Writable
+        [0x10000000 - 0x1fffffff]     SoC IO: Writable
+        [0x20000000 - 0x2fffffff]  BMC Flash: Writable
+        [0x30000000 - 0x3fffffff] Host Flash: Writable
+        [0x40000000 - 0x5fffffff]   Reserved: Writable
+        [0x60000000 - 0x7fffffff]   LPC Host: Writable
+        [0x80000000 - 0xffffffff]       DRAM: Writable
+ilpc:   Disabled
+# echo $?
 1
-$
+#
 ```
