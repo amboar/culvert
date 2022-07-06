@@ -414,7 +414,7 @@ static int xdmactl_report(struct bridgectl *bridge, int fd, enum bridge_mode *mo
         return 0;
     }
 
-    if ((rc = pciectl_report(ctx, fd, device_function_mmio)) < 0) {
+    if ((rc = pciectl_report(ctx, fd, device_function_xdma)) < 0) {
         loge("Failed to report P2A bridge state: %d\n", rc);
         return rc;
     }
