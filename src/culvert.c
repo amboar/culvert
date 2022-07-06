@@ -2,6 +2,10 @@
 // Copyright (C) 2018,2021 IBM Corp.
 // Copyright (C) 2021, Oracle and/or its affiliates.
 
+/* For program_invocation_short_name */
+#define _GNU_SOURCE
+
+#include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -116,7 +120,7 @@ int main(int argc, char *argv[])
     if (optind == argc) {
         if (!show_help)
             loge("Not enough arguments\n");
-        help(argv[0]);
+        help(program_invocation_short_name);
         exit(EXIT_FAILURE);
     }
 
@@ -138,7 +142,7 @@ int main(int argc, char *argv[])
             }
             optind = 1;
 
-            return cmd->fn(argv[0], argc - offset, argv + offset);
+            return cmd->fn(program_invocation_short_name, argc - offset, argv + offset);
         }
 
         cmd++;

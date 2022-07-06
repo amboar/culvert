@@ -1,32 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+#include "ahb.h"
+#include "ast.h"
+#include "compiler.h"
+#include "flash.h"
+#include "host.h"
+#include "log.h"
+#include "priv.h"
+#include "soc/sfc.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "ahb.h"
-#include "ast.h"
-#include "flash.h"
-#include "log.h"
-#include "priv.h"
-#include "sfc.h"
-
 #define SFC_FLASH_WIN (64 << 10)
 
 enum flash_op { flash_op_read, flash_op_write, flash_op_erase };
 
-int cmd_sfc(const char *name, int argc, char *argv[])
+int cmd_sfc(const char *name __unused, int argc, char *argv[])
 {
-    struct ahb _ahb, *ahb = &_ahb;
+    struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
     uint32_t offset, len;
     enum flash_op op;
     struct sfc *sfc;
-    int rc, cleanup;
+    struct ahb *ahb;
     char *buf;
+    int rc;
 
     if (argc < 4) {
         loge("Not enough arguments for sfc command\n");
@@ -52,31 +55,30 @@ int cmd_sfc(const char *name, int argc, char *argv[])
     offset = strtoul(argv[2], NULL, 0);
     len = strtoul(argv[3], NULL, 0);
 
-    rc = ast_ahb_from_args(ahb, argc - 4, argv + 4);
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_from_args");
-        }
+    if ((rc = host_init(host, argc - 4, argv + 4)) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
         exit(EXIT_FAILURE);
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
     }
 
     rc = soc_probe(soc, ahb);
     if (rc < 0)
-        goto cleanup_ahb;
+        goto cleanup_host;
 
-    rc = sfc_init(&sfc, soc, "fmc");
-    if (rc < 0)
+    ;
+    if (!(sfc = sfc_get_by_name(soc, "fmc"))) {
+        loge("Failed to acquire SPI controller, exiting\n");
         goto cleanup_soc;
+    }
 
     rc = flash_init(sfc, &chip);
     if (rc < 0)
-        goto cleanup_sfc;
+        goto cleanup_soc;
 
     if (op == flash_op_read) {
         ssize_t egress;
@@ -122,16 +124,11 @@ int cmd_sfc(const char *name, int argc, char *argv[])
 cleanup_flash:
     flash_destroy(chip);
 
-cleanup_sfc:
-    sfc_destroy(sfc);
-
 cleanup_soc:
     soc_destroy(soc);
 
-cleanup_ahb:
-    cleanup = ahb_destroy(ahb);
-    if (cleanup < 0) { errno = -cleanup; perror("ahb_destroy"); }
+cleanup_host:
+    host_destroy(host);
 
     return rc;
 }
-

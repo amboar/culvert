@@ -5,13 +5,13 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "bridge/debug.h"
 #include "log.h"
-#include "debug.h"
 
 int cmd_debug(const char *name, int argc, char *argv[])
 {
     struct debug _debug, *debug = &_debug;
-    struct ahb _ahb, *ahb = &_ahb;
+    struct ahb *ahb;
     int rc, cleanup;
 
     /* ./doit debug read 0x1e6e207c digi,portserver-ts-16 <IP> <SERIAL PORT> <USER> <PASSWORD> */
@@ -55,7 +55,7 @@ int cmd_debug(const char *name, int argc, char *argv[])
     rc = debug_enter(debug);
     if (rc < 0) { errno = -rc; perror("debug_enter"); goto cleanup_debug; }
 
-    ahb_use(ahb, ahb_debug, debug);
+    ahb = debug_as_ahb(debug);
     rc = ast_ahb_access(name, argc, argv, ahb);
     if (rc) {
         errno = -rc;

@@ -101,58 +101,57 @@ $ meson setup build-arm --cross-file meson/arm-linux-gnueabi-gcc.ini && meson co
 ## Execution and Example output
 
 ```
-$ ./culvert
-Not enough arguments
+$ ./build/src/culvert -h
+culvert: v0.4.0-10-gb30b8364b75a
 Usage:
 
-./culvert probe [INTERFACE [IP PORT USERNAME PASSWORD]]
-./culvert ilpc read ADDRESS
-./culvert ilpc write ADDRESS VALUE
-./culvert p2a vga read ADDRESS
-./culvert p2a vga write ADDRESS VALUE
-./culvert debug read ADDRESS INTERFACE [IP PORT USERNAME PASSWORD]
-./culvert debug write ADDRESS VALUE INTERFACE [IP PORT USERNAME PASSWORD]
-./culvert devmem read ADDRESS
-./culvert devmem write ADDRESS VALUE
-./culvert console HOST_UART BMC_UART BAUD USER PASSWORD
-./culvert read firmware
-./culvert read ram
-./culvert write firmware
-./culvert replace ram MATCH REPLACE
-./culvert reset TYPE [INTERFACE [IP PORT USERNAME PASSWORD]]
-./culvert sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-./culvert sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-./culvert sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert probe [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert ilpc read ADDRESS
+culvert ilpc write ADDRESS VALUE
+culvert p2a vga read ADDRESS
+culvert p2a vga write ADDRESS VALUE
+culvert debug read ADDRESS INTERFACE [IP PORT USERNAME PASSWORD]
+culvert debug write ADDRESS VALUE INTERFACE [IP PORT USERNAME PASSWORD]
+culvert devmem read ADDRESS
+culvert devmem write ADDRESS VALUE
+culvert console HOST_UART BMC_UART BAUD USER PASSWORD
+culvert read firmware [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert read ram [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert replace ram MATCH REPLACE
+culvert reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert otp read conf [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]
 ```
 
 ```
-$ ./culvert probe --require confidentiality digi,portserver-ts-16 <IP> <PORT> <USER> <PASSWORD>
-Connecting to Digi Portserver TS 16 at <IP>:23
-Logging into Digi Portserver TS
-Configuring binary mode on port 4
-Resetting port 4
-Connecting to BMC console at <IP>:2104
-Entering debug mode
-Initialised Debug UART AHB interface
-Performing interface discovery via Debug UART
-Exiting debug mode
-Have SuperIO: Yes
-iLPC2AHB Bridge: Read-only
-Have VGA PCIe device: Yes
-Have MMIO on VGA device: Yes
-P2A write filter state:
-0x00000000-0x0fffffff (Firmware): Read-write
-0x10000000-0x1fffffff (SoC IO): Read-write
-0x20000000-0x3fffffff (Flashes): Read-write
-0x40000000-0x5fffffff (Reserved): Read-write
-0x60000000-0x7fffffff (LPC Host): Read-write
-0x80000000-0xffffffff (DRAM): Read-write
-Have X-DMA on VGA device: Yes
-Have BMC PCIe device: No
-X-DMA is unconstrained: No
-Have debug UART: Yes
-Debug UART enabled on: UART5
-$ echo $?
+# ./culvert probe --require confidentiality
+debug:  Permissive
+        Debug UART port: UART5
+xdma:   Permissive
+        BMC: Disabled
+        VGA: Enabled
+        MMIO on VGA: Enabled
+        XDMA is constrained: No
+p2a:    Permissive
+        BMC: Disabled
+        VGA: Enabled
+        MMIO on VGA: Enabled
+        [0x00000000 - 0x0fffffff]   Firmware: Writable
+        [0x10000000 - 0x1fffffff]     SoC IO: Writable
+        [0x20000000 - 0x2fffffff]  BMC Flash: Writable
+        [0x30000000 - 0x3fffffff] Host Flash: Writable
+        [0x40000000 - 0x5fffffff]   Reserved: Writable
+        [0x60000000 - 0x7fffffff]   LPC Host: Writable
+        [0x80000000 - 0xffffffff]       DRAM: Writable
+ilpc:   Disabled
+# echo $?
 1
-$
+#
 ```

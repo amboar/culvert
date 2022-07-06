@@ -27,38 +27,46 @@ struct ahb_range {
     bool rw;
 };
 
-struct ilpcb;
-struct l2ab;
-struct p2ab;
-struct debug;
-struct devmem;
+struct ahb;
 
-struct ahb {
-    enum ahb_bridge bridge;
-    union {
-        struct ilpcb *ilpcb;
-        struct l2ab *l2ab;
-        struct p2ab *p2ab;
-        struct debug *debug;
-        struct devmem *devmem;
-    };
+struct ahb_ops {
+    ssize_t (*read)(struct ahb *ctx, uint32_t phys, void *buf, size_t len);
+    ssize_t (*write)(struct ahb *ctx, uint32_t phys, const void *buf, size_t len);
+    int (*readl)(struct ahb *ctx, uint32_t phys, uint32_t *val);
+    int (*writel)(struct ahb *ctx, uint32_t phys, uint32_t val);
 };
 
-struct ahb *ahb_use(struct ahb *ctx, enum ahb_bridge type, void *bridge);
+struct ahb {
+    enum ahb_bridge type;
+    const struct ahb_ops *ops;
+};
 
-int ahb_init(struct ahb *ctx, enum ahb_bridge type, ...);
+static inline void ahb_init_ops(struct ahb *ctx, enum ahb_bridge type, const struct ahb_ops *ops)
+{
+    ctx->type = type;
+    ctx->ops = ops;
+}
 
-/* Tear-down the AHB interface when SoC has *not* been reset */
-int ahb_destroy(struct ahb *ctx);
+static inline ssize_t ahb_read(struct ahb *ctx, uint32_t phys, void *buf, size_t len)
+{
+    return ctx->ops->read(ctx, phys, buf, len);
+}
 
-/* Tear-down the AHB interface when SoC *has* been reset */
-int ahb_cleanup(struct ahb *ctx);
+static inline ssize_t ahb_write(struct ahb *ctx, uint32_t phys, const void *buf, size_t len)
+{
+    return ctx->ops->write(ctx, phys, buf, len);
+}
 
-ssize_t ahb_read(struct ahb *ctx, uint32_t phys, void *buf, size_t len);
-ssize_t ahb_write(struct ahb *ctx, uint32_t phys, const void *buf, size_t len);
+static inline int ahb_readl(struct ahb *ctx, uint32_t phys, uint32_t *val)
+{
+    return ctx->ops->readl(ctx, phys, val);
+}
 
-int ahb_readl(struct ahb *ctx, uint32_t phys, uint32_t *val);
-int ahb_writel(struct ahb *ctx, uint32_t phys, uint32_t val);
+static inline int ahb_writel(struct ahb *ctx, uint32_t phys, uint32_t val)
+{
+    return ctx->ops->writel(ctx, phys, val);
+}
+
 
 ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd);
 ssize_t ahb_siphon_out(struct ahb *ctx, uint32_t phys, int infd);

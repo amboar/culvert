@@ -6,6 +6,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
+      - name: Update archive
+        run: sudo apt-get update -qq
       - name: Install dependencies
         run: sudo apt-get install -qq
           gcc

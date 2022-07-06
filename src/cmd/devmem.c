@@ -6,13 +6,13 @@
 
 #include "ahb.h"
 #include "ast.h"
-#include "devmem.h"
+#include "bridge/devmem.h"
 #include "priv.h"
 
 int cmd_devmem(const char *name, int argc, char *argv[])
 {
     struct devmem _devmem, *devmem = &_devmem;
-    struct ahb _ahb, *ahb = &_ahb;
+    struct ahb *ahb;
     int cleanup;
     int rc;
 
@@ -28,7 +28,7 @@ int cmd_devmem(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    ahb_use(ahb, ahb_devmem, devmem);
+    ahb = devmem_as_ahb(devmem);
     rc = ast_ahb_access(name, argc, argv, ahb);
     if (rc) {
         errno = -rc;

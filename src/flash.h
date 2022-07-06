@@ -17,7 +17,7 @@
 #define _FLASH_H
 
 #include "array.h"
-#include "sfc.h"
+#include "soc/sfc.h"
 
 #include <stdint.h>
 #include <stdbool.h>

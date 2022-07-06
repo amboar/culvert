@@ -1,5 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+#include "ahb.h"
+#include "ast.h"
+#include "compiler.h"
+#include "flash.h"
+#include "host.h"
+#include "log.h"
+#include "priv.h"
+#include "soc/clk.h"
+#include "soc/sfc.h"
+#include "soc/uart/vuart.h"
+#include "soc/wdt.h"
+
 #include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -7,26 +19,17 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "ahb.h"
-#include "ast.h"
-#include "clk.h"
-#include "flash.h"
-#include "log.h"
-#include "priv.h"
-#include "sfc.h"
-#include "uart/vuart.h"
-#include "wdt.h"
-
 #define SFC_FLASH_WIN (64 << 10)
 
-int cmd_write(const char *name, int argc, char *argv[])
+int cmd_write(const char *name __unused, int argc, char *argv[])
 {
-    struct vuart _vuart, *vuart = &_vuart;
-    struct ahb _ahb, *ahb = &_ahb;
-    struct clk _clk, *clk = &_clk;
+    struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
+    struct vuart *vuart;
     bool live = false;
+    struct ahb *ahb;
+    struct clk *clk;
     ssize_t ingress;
     struct sfc *sfc;
     int rc, cleanup;
@@ -65,36 +68,34 @@ int cmd_write(const char *name, int argc, char *argv[])
         }
     }
 
-    rc = ast_ahb_from_args(ahb, argc - optind, &argv[optind]);
-    if (rc < 0) {
-        bool denied = (rc == -EACCES || rc == -EPERM);
-        if (denied && !priv_am_root()) {
-            priv_print_unprivileged(name);
-        } else if (rc == -ENOTSUP) {
-            loge("Probes failed, cannot access BMC AHB\n");
-        } else {
-            errno = -rc;
-            perror("ast_ahb_from_args");
-        }
+    if ((rc = host_init(host, argc - optind, argv + optind)) < 0) {
+        loge("Failed to initialise host interfaces: %d\n", rc);
         exit(EXIT_FAILURE);
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface, exiting\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
     }
 
     if ((rc = soc_probe(soc, ahb)) < 0) {
         errno = -rc;
         perror("soc_probe");
-        goto cleanup_ahb;
+        goto cleanup_host;
     }
 
-    if ((rc = clk_init(clk, soc))) {
-        errno = -rc;
-        perror("clk_init");
+    if (!(clk = clk_get(soc))) {
+        loge("Failed to acquire clock controller, exiting\n");
         goto cleanup_soc;
     }
 
-    if ((rc = vuart_init(vuart, soc, "vuart")) < 0)
-        goto cleanup_clk;
+    if (!(vuart = vuart_get_by_name(soc, "vuart"))) {
+        loge("Failed to acquire VUART controller, exiting\n");
+        goto cleanup_soc;
+    }
 
-    if (ahb->bridge == ahb_devmem)
+    if (ahb->type == ahb_devmem)
         loge("I hope you know what you are doing\n");
     else if (live) {
         logi("Preventing system reset\n");
@@ -111,13 +112,14 @@ int cmd_write(const char *name, int argc, char *argv[])
     }
 
     logi("Initialising flash subsystem\n");
-    rc = sfc_init(&sfc, soc, "fmc");
-    if (rc < 0)
-        goto cleanup_vuart;
+    if (!(sfc = sfc_get_by_name(soc, "fmc"))) {
+        loge("Failed to acquire SPI flash controller, exiting\n");
+        goto cleanup_state;
+    }
 
     rc = flash_init(sfc, &chip);
     if (rc < 0)
-        goto cleanup_sfc;
+        goto cleanup_state;
 
     /* FIXME: Make this common with the sfc write implementation */
     buf = malloc(SFC_FLASH_WIN);
@@ -157,29 +159,24 @@ cleanup_buf:
 cleanup_flash:
     flash_destroy(chip);
 
-cleanup_sfc:
-    sfc_destroy(sfc);
-
 cleanup_state:
     if (live) {
         if (rc == 0) {
-            if (ahb->bridge != ahb_devmem) {
-                struct wdt _wdt, *wdt = &_wdt;
+            if (ahb->type != ahb_devmem) {
+                struct wdt *wdt;
                 int64_t wait;
 
                 logi("Performing SoC reset\n");
-                rc = wdt_init(wdt, soc, "wdt2");
-                if (rc < 0) {
-                    goto cleanup_clk;
+                if (!(wdt = wdt_get_by_name(soc, "wdt2"))) {
+                    loge("Failed to acquire wdt2 controller, exiting\n");
+                    goto cleanup_soc;
                 }
 
                 wait = wdt_perform_reset(wdt);
 
-                wdt_destroy(wdt);
-
                 if (wait < 0) {
                     rc = wait;
-                    goto cleanup_clk;
+                    goto cleanup_soc;
                 }
 
                 usleep(wait);
@@ -199,20 +196,11 @@ cleanup_state:
         }
     }
 
-cleanup_vuart:
-    vuart_destroy(vuart);
-
-cleanup_clk:
-    clk_destroy(clk);
-
 cleanup_soc:
     soc_destroy(soc);
 
-cleanup_ahb:
-    if ((cleanup = ahb_cleanup(ahb))) {
-        errno = -cleanup;
-        perror("ahb_cleanup");
-    }
+cleanup_host:
+    host_destroy(host);
 
     return rc;
 }

@@ -7,14 +7,14 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "bridge/p2a.h"
 #include "log.h"
-#include "p2a.h"
 #include "priv.h"
 
 int cmd_p2a(const char *name, int argc, char *argv[])
 {
     struct p2ab _p2ab, *p2ab = &_p2ab;
-    struct ahb _ahb, *ahb = &_ahb;
+    struct ahb *ahb;
     int cleanup;
     int rc;
 
@@ -38,7 +38,7 @@ int cmd_p2a(const char *name, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    ahb_use(ahb, ahb_p2ab, p2ab);
+    ahb = p2ab_as_ahb(p2ab);
     rc = ast_ahb_access(name, argc - 1, argv + 1, ahb);
     if (rc) {
         errno = -rc;

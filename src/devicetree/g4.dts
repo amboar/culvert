@@ -33,6 +33,11 @@
 		bus-controller@1e600000 {
 			compatible = "aspeed,ast2400-ahb-controller";
 			reg = <0x1e600000 0x20000>;
+
+			memory-region-names = "trace-buffer";
+			// Technically should point to a node under reserved-memory, but SRAM isn't
+			// mapped anyway which is why we're using it.
+			memory-region = <&sram>;
 		};
 
 		apb {
@@ -48,6 +53,18 @@
 			syscon: syscon@1e6e2000 {
 				compatible = "aspeed,ast2400-scu", "syscon", "simple-mfd";
 				reg = <0x1e6e2000 0x1a8>;
+
+				strapping {
+					compatible = "aspeed,ast2400-strapping";
+				};
+
+				superio {
+					compatible = "aspeed,ast2400-superio";
+				};
+
+				bridge-controller {
+					compatible = "aspeed,ast2400-pcie-device-controller", "bridge-controller";
+				};
 			};
 
 			wdt1: watchdog@1e785000 {
@@ -66,8 +83,12 @@
 			};
 
 			lpc: lpc@1e789000 {
-				compatible = "aspeed,ast2400-lpc-v2";
+				compatible = "aspeed,ast2400-lpc-v2", "syscon", "simple-mfd";
 				reg = <0x1e789000 0x1000>;
+
+				bridge-controller {
+					compatible = "aspeed,ast2400-ilpc-ahb-bridge", "bridge-controller";
+				};
 			};
 		};
 	};
