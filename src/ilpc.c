@@ -2,26 +2,21 @@
 // Copyright (C) 2018,2019 IBM Corp.
 // Copyright (C) 2021, Oracle and/or its affiliates.
 
+#include "bridge.h"
+#include "compiler.h"
 #include "ilpc.h"
 #include "log.h"
 #include "rev.h"
+
+#include "ccan/container_of/container_of.h"
 
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #define LPC_HICRB_ILPCB_RO (1 << 6)
-
-int ilpcb_init(struct ilpcb *ctx)
-{
-    return sio_init(&ctx->sio);
-}
-
-int ilpcb_destroy(struct ilpcb *ctx)
-{
-    return sio_destroy(&ctx->sio);
-}
 
 int ilpcb_probe(struct ilpcb *ctx)
 {
@@ -43,15 +38,16 @@ int ilpcb_mode(struct ilpcb *ctx)
     uint32_t hicrb = 0;
     int rc;
 
-    rc = ilpcb_readl(ctx, 0x1e789100, &hicrb);
+    rc = ilpcb_readl(ilpcb_as_ahb(ctx), 0x1e789100, &hicrb);
     if (rc)
         return rc;
 
     return !!(hicrb & LPC_HICRB_ILPCB_RO); /* Maps to enum ilpcb_mode */
 }
 
-ssize_t ilpcb_read(struct ilpcb *ctx, size_t addr, void *buf, size_t len)
+ssize_t ilpcb_read(struct ahb *ahb, uint32_t addr, void *buf, size_t len)
 {
+    struct ilpcb *ctx = to_ilpcb(ahb);
     struct sio *sio = &ctx->sio;
     size_t remaining;
     uint8_t data;
@@ -115,8 +111,9 @@ done:
     return rc ? rc : (ssize_t)len;
 }
 
-ssize_t ilpcb_write(struct ilpcb *ctx, size_t addr, const void *buf, size_t len)
+ssize_t ilpcb_write(struct ahb *ahb, uint32_t addr, const void *buf, size_t len)
 {
+    struct ilpcb *ctx = to_ilpcb(ahb);
     struct sio *sio = &ctx->sio;
     size_t remaining;
     int locked;
@@ -179,8 +176,9 @@ done:
 }
 
 /* Little-endian */
-int ilpcb_readl(struct ilpcb *ctx, size_t addr, uint32_t *val)
+int ilpcb_readl(struct ahb *ahb, uint32_t addr, uint32_t *val)
 {
+    struct ilpcb *ctx = to_ilpcb(ahb);
     struct sio *sio = &ctx->sio;
     uint32_t extracted;
     uint8_t data;
@@ -245,8 +243,9 @@ done:
 }
 
 /* Little-endian */
-int ilpcb_writel(struct ilpcb *ctx, size_t addr, uint32_t val)
+int ilpcb_writel(struct ahb *ahb, uint32_t addr, uint32_t val)
 {
+    struct ilpcb *ctx = to_ilpcb(ahb);
     struct sio *sio = &ctx->sio;
     int locked;
     int rc;
@@ -300,3 +299,78 @@ done:
 
     return rc;
 }
+
+static const struct ahb_ops ilpcb_ops = {
+    .read = ilpcb_read,
+    .write = ilpcb_write,
+    .readl = ilpcb_readl,
+    .writel = ilpcb_writel
+};
+
+int ilpcb_init(struct ilpcb *ctx)
+{
+    ahb_init_ops(&ctx->ahb, &ilpcb_ops);
+
+    return sio_init(&ctx->sio);
+}
+
+int ilpcb_destroy(struct ilpcb *ctx)
+{
+    return sio_destroy(&ctx->sio);
+}
+
+static struct ahb *
+ilpcb_driver_probe(int argc, char *argv[] __unused)
+{
+    struct ilpcb *ctx;
+    int rc;
+
+    // This driver doesn't require args, so if there are any we're not trying to probe it
+    if (argc > 0) {
+        return NULL;
+    }
+
+    ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return NULL;
+    }
+
+    if ((rc = ilpcb_init(ctx)) < 0) {
+        logd("Failed to initialise iLPC bridge: %d\n", rc);
+        goto cleanup_ctx;
+    }
+
+    if ((rc = ilpcb_probe(ctx)) < 0) {
+        logd("Failed iLPC probe: %d\n", rc);
+        goto destroy_ctx;
+    }
+
+    return ilpcb_as_ahb(ctx);
+
+destroy_ctx:
+    ilpcb_destroy(ctx);
+
+cleanup_ctx:
+    free(ctx);
+
+    return NULL;
+}
+
+static void ilpcb_driver_destroy(struct ahb *ahb)
+{
+    struct ilpcb *ctx = to_ilpcb(ahb);
+    int rc;
+
+    if ((rc = ilpcb_destroy(ctx)) < 0) {
+        loge("Failed to destroy iLPC bridge: %d\n", rc);
+    }
+
+    free(ctx);
+}
+
+static const struct bridge_driver ilpcb_driver = {
+    .type = ahb_ilpcb,
+    .probe = ilpcb_driver_probe,
+    .destroy = ilpcb_driver_destroy,
+};
+REGISTER_BRIDGE_DRIVER(&ilpcb_driver);

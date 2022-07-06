@@ -29,11 +29,11 @@ int l2ab_init(struct l2ab *ctx)
     if (rc)
         goto cleanup;
 
-    rc = ilpcb_readl(ilpcb, LPC_HICR7, &ctx->restore7);
+    rc = ilpcb_readl(ilpcb_as_ahb(ilpcb), LPC_HICR7, &ctx->restore7);
     if (rc)
         goto cleanup;
 
-    rc = ilpcb_readl(ilpcb, LPC_HICR8, &ctx->restore8);
+    rc = ilpcb_readl(ilpcb_as_ahb(ilpcb), LPC_HICR8, &ctx->restore8);
     if (rc)
         goto cleanup;
 
@@ -51,11 +51,11 @@ int l2ab_destroy(struct l2ab *ctx)
     struct ilpcb *ilpcb = &ctx->ilpcb;
     int rc;
 
-    rc = ilpcb_writel(ilpcb, 0x1e78908c, ctx->restore8);
+    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), 0x1e78908c, ctx->restore8);
     if (rc)
         return rc;
 
-    rc = ilpcb_writel(ilpcb, 0x1e789088, ctx->restore7);
+    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), 0x1e789088, ctx->restore7);
     if (rc)
         return rc;
 
@@ -99,11 +99,11 @@ int64_t l2ab_map(struct l2ab *ctx, uint32_t phys, size_t len)
     hicr7 = (phys & ~(0xffff));
     hicr8 = (~(len - 1)) | ((len - 1) >> 16);
 
-    rc = ilpcb_writel(ilpcb, LPC_HICR7, hicr7);
+    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR7, hicr7);
     if (rc)
         return rc;
 
-    rc = ilpcb_writel(ilpcb, LPC_HICR8, hicr8);
+    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR8, hicr8);
     if (rc)
         return rc;
 
@@ -165,10 +165,10 @@ ssize_t l2ab_write(struct l2ab *ctx, uint32_t phys, const void *buf, size_t len)
 
 int l2ab_readl(struct l2ab *ctx, uint32_t phys, uint32_t *val)
 {
-    return ilpcb_readl(&ctx->ilpcb, phys, val);
+    return ilpcb_readl(ilpcb_as_ahb(&ctx->ilpcb), phys, val);
 }
 
 int l2ab_writel(struct l2ab *ctx, uint32_t phys, uint32_t val)
 {
-    return ilpcb_writel(&ctx->ilpcb, phys, val);
+    return ilpcb_writel(ilpcb_as_ahb(&ctx->ilpcb), phys, val);
 }

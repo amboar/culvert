@@ -71,7 +71,24 @@ void host_destroy(struct host *ctx)
 
 struct ahb *host_get_ahb(struct host *ctx __unused)
 {
-    return NULL;
+    struct bridge *bridge;
+
+    bridge = list_top(&ctx->bridges, struct bridge, entry);
+
+    if (!bridge) {
+        return NULL;
+    }
+
+    struct ahb *ahb = bridge->ahb;
+
+    if (bridge->driver->type == ahb_ilpcb) {
+        ctx->shim.bridge = bridge->driver->type;
+        ctx->shim.ilpcb = to_ilpcb(ahb);
+    } else {
+        return NULL;
+    }
+
+    return &ctx->shim;
 }
 
 int host_bridge_reinit_from_ahb(struct host *ctx, struct ahb *ahb)
@@ -88,11 +105,3 @@ int host_bridge_reinit_from_ahb(struct host *ctx, struct ahb *ahb)
 
     return 0;
 }
-
-static const struct bridge_driver null_bridge_driver = {
-    .type = 0,
-    .probe = NULL,
-    .reinit = NULL,
-    .destroy = NULL,
-};
-REGISTER_BRIDGE_DRIVER(&null_bridge_driver);
