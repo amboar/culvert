@@ -2,7 +2,8 @@ fs = import('fs')
 
 incdirs = [ '.' ]
 
-src = [ 'ahb.c',
+src = files(
+	'ahb.c',
 	'ast.c',
 	'clk.c',
 	'cmd/console.c',
@@ -44,7 +45,8 @@ src = [ 'ahb.c',
 	'uart/mux.c',
 	'uart/suart.c',
 	'uart/vuart.c',
-	'wdt.c' ]
+	'wdt.c'
+)
 
 conf_data = configuration_data()
 
