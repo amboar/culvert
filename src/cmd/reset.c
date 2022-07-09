@@ -48,12 +48,6 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if ((rc = soc_probe(soc, ahb)) < 0) {
-        errno = -rc;
-        perror("soc_probe");
-        goto cleanup_host;
-    }
-
     /* Probe the SoC */
     if ((rc = soc_probe(soc, ahb)) < 0) {
         errno = -rc;
