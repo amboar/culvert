@@ -107,7 +107,10 @@ soc_device_bind_driver(struct soc *ctx, struct soc_device *parent, int node, str
 	is_mfd = !fdt_node_check_compatible(ctx->fdt.start, node, "simple-mfd");
 
 	if (is_bus || is_mfd) {
-		return soc_bus_enumerate_devices(ctx, dev, node, drivers, n_drivers);
+		rc = soc_bus_enumerate_devices(ctx, dev, node, drivers, n_drivers);
+		if (rc < 0) {
+			return rc;
+		}
 	}
 
 	for (i = 0; i < n_drivers; i++) {
