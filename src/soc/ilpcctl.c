@@ -145,6 +145,8 @@ static int ilpcctl_driver_init(struct soc *soc, struct soc_device *dev)
         goto cleanup_ctx;
     }
 
+    ctx->soc = soc;
+
     soc_device_set_drvdata(dev, ctx);
 
     if ((rc = soc_bridge_controller_register(soc, ilpcctl_as_bridgectl(ctx), &ilpcctl_ops)) < 0) {

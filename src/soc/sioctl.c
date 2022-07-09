@@ -26,7 +26,7 @@ int sioctl_decode_configure(struct sioctl *ctx, const enum sioctl_decode mode)
     int rc;
 
     if (mode == sioctl_decode_disable) {
-        return strap_clear(ctx->strap, SCU_HW_STRAP, SCU_HW_STRAP_SIO_DEC, SCU_HW_STRAP_SIO_DEC);
+        return strap_set(ctx->strap, SCU_HW_STRAP, SCU_HW_STRAP_SIO_DEC, SCU_HW_STRAP_SIO_DEC);
     }
 
     if (mode == sioctl_decode_4e) {
@@ -42,7 +42,7 @@ int sioctl_decode_configure(struct sioctl *ctx, const enum sioctl_decode mode)
         }
     }
 
-    return strap_set(ctx->strap, SCU_HW_STRAP, SCU_HW_STRAP_SIO_DEC, SCU_HW_STRAP_SIO_DEC);
+    return strap_clear(ctx->strap, SCU_HW_STRAP, SCU_HW_STRAP_SIO_DEC, SCU_HW_STRAP_SIO_DEC);
 }
 
 int sioctl_decode_status(struct sioctl *ctx, enum sioctl_decode *status)
@@ -54,7 +54,7 @@ int sioctl_decode_status(struct sioctl *ctx, enum sioctl_decode *status)
         return rc;
     }
 
-    if (!(strap & SCU_HW_STRAP_SIO_DEC)) {
+    if (strap & SCU_HW_STRAP_SIO_DEC) {
         *status = sioctl_decode_disable;
 
         return 0;
