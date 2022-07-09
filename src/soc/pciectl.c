@@ -88,10 +88,15 @@ struct bridgectl *xdmactl_as_bridgectl(struct pciectl *ctx)
     return &ctx->xdmactl;
 }
 
-static uint32_t pciectl_pdata_collect_region_mask(const struct pciectl_pdata *pdata)
+static uint32_t pciectl_pdata_collect_region_mask(const struct pciectl_pdata *pdata,
+                                                  const struct pciectl_endpoint *ep)
 {
     const struct pciectl_p2a_region *curr;
     uint32_t mask = 0;
+
+    if (ep->function.type != device_function_mmio) {
+        return 0;
+    }
 
     curr = pdata->regions;
 
@@ -130,7 +135,10 @@ pciectl_device_enforce(struct pciectl *ctx, const struct pciectl_endpoint *ep, e
         return rc;
     }
 
-    mask = pciectl_pdata_collect_region_mask(ctx->pdata);
+    mask = pciectl_pdata_collect_region_mask(ctx->pdata, ep);
+    if (!mask) {
+        return 0;
+    }
 
     if (mode == bm_restricted) {
         misc |= mask;
@@ -170,7 +178,7 @@ pciectl_device_status(struct pciectl *ctx, const struct pciectl_endpoint *ep, en
         return 0;
     }
 
-    mask = pciectl_pdata_collect_region_mask(ctx->pdata);
+    mask = pciectl_pdata_collect_region_mask(ctx->pdata, ep);
     if (!mask) {
         *mode = bm_permissive;
         return 0;
