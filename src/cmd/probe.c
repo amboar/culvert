@@ -55,7 +55,7 @@ int cmd_probe(const char *name, int argc, char *argv[])
             case 'h':
                 cmd_probe_help(name, argc, argv);
                 rc = EXIT_SUCCESS;
-                goto cleanup_soc;
+                goto done;
             case 'i':
                 opt_iface = optarg;
                 break;
@@ -74,7 +74,7 @@ int cmd_probe(const char *name, int argc, char *argv[])
                          "integrity\n"
                          "confidentiality\n");
                     rc = EXIT_FAILURE;
-                    goto cleanup_soc;
+                    goto done;
                 }
                 break;
             }
