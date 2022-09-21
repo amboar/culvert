@@ -14,7 +14,7 @@ int cmd_debug(const char *name, int argc, char *argv[])
     struct ahb *ahb;
     int rc, cleanup;
 
-    /* ./doit debug read 0x1e6e207c digi,portserver-ts-16 <IP> <SERIAL PORT> <USER> <PASSWORD> */
+    /* ./culvert debug read 0x1e6e207c digi,portserver-ts-16 <IP> <SERIAL PORT> <USER> <PASSWORD> */
     if (!argc) {
         loge("Not enough arguments for debug command\n");
         exit(EXIT_FAILURE);

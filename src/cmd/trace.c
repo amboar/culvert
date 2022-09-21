@@ -19,10 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-//doit trace ADDRESS WIDTH:OFFSET MODE
-//doit trace 0x1e788000 1:0 read
-//doit trace 0x1e788000 2:2 read
-//doit trace 0x1e788000 4:0 write
+//culvert trace ADDRESS WIDTH:OFFSET MODE
+//culvert trace 0x1e788000 1:0 read
+//culvert trace 0x1e788000 2:2 read
+//culvert trace 0x1e788000 4:0 write
 int cmd_trace(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
