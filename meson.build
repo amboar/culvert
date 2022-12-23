@@ -10,6 +10,8 @@ project('culvert', 'c',
 	meson_version: '>=0.53.0',
 	version: 'v0.4.0')
 
+add_global_link_arguments('-z', 'noexecstack', language: 'c')
+
 libfdt_dep = dependency('libfdt',
 			default_options: [ 'warning_level=1', ],
 			fallback: [ 'dtc', 'libfdt_dep' ],
