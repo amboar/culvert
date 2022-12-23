@@ -291,7 +291,7 @@ int otp_read(struct otp *otp, enum otp_region reg)
                 goto done;
 
             if ((rc = otp_read_config(otp, o + 1, &strap[i][1])) < 0)
-                    goto done;
+                goto done;
 
             res[0] ^= strap[i][0];
             res[1] ^= strap[i][1];
