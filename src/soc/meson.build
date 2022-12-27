@@ -1,5 +1,6 @@
 src += files(
 	'bridgectl.c',
+	'bridges.c',
 	'clk.c',
 	'debugctl.c',
 	'ilpcctl.c',
