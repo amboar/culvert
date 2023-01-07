@@ -156,7 +156,7 @@ static int debugctl_driver_init(struct soc *soc, struct soc_device *dev)
 
     ctx->soc = soc;
 
-    if ((rc = bridges_device_get_gates(soc, dev, &ctx->bridges, &ctx->id)) < 0) {
+    if ((rc = bridges_device_get_gate(soc, dev, &ctx->bridges, &ctx->id)) < 0) {
         goto cleanup_ctx;
     }
 

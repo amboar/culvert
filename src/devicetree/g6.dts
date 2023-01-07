@@ -71,6 +71,15 @@
 				bridges: bridge-controller {
 					compatible = "aspeed,ast2600-bridge-controller";
 				};
+
+				pcie-bridge-controller {
+					compatible = "aspeed,ast2600-pcie-device-controller", "bridge-controller";
+					bridge-gate-names = "p2a", "xdma", "xdma-vga";
+					bridge-gates = <&bridges
+							AST2600_P2A_GATE
+							AST2600_XDMA_GATE
+							AST2600_XDMA_VGA_GATE>;
+				};
 			};
 
 			secure-boot-controller@1e6f2000 {

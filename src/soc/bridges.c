@@ -8,6 +8,7 @@
 
 #include <libfdt.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <endian.h>
 #include <inttypes.h>
@@ -35,7 +36,10 @@ static const struct bridge_gate_pdata ast2500_bridge_pdata = {
 };
 
 #define AST2600_SCU_DBGCTL1             0x0c8
+#define   AST2600_SCU_DBGCTL1_XDMA_VGA  (1 << 8)
+#define   AST2600_SCU_DBGCTL1_XDMA      (1 << 2)
 #define   AST2600_SCU_DBGCTL1_UART5_DBG (1 << 1)
+#define   AST2600_SCU_DBGCTL1_P2A       (1 << 0)
 #define AST2600_SCU_DBGCTL2             0x0d8
 #define   AST2600_SCU_DBGCTL2_UART1_DBG (1 << 3)
 
@@ -44,6 +48,12 @@ static const struct bridge_gate_desc ast2600_bridge_gates[] = {
         { .reg = AST2600_SCU_DBGCTL2, .mask = AST2600_SCU_DBGCTL2_UART1_DBG },
     [AST2600_DEBUG_UART5_GATE] =
         { .reg = AST2600_SCU_DBGCTL1, .mask = AST2600_SCU_DBGCTL1_UART5_DBG },
+    [AST2600_P2A_GATE] =
+        { .reg = AST2600_SCU_DBGCTL1, .mask = AST2600_SCU_DBGCTL1_P2A },
+    [AST2600_XDMA_GATE] =
+        { .reg = AST2600_SCU_DBGCTL1, .mask = AST2600_SCU_DBGCTL1_XDMA },
+    [AST2600_XDMA_VGA_GATE] =
+        { .reg = AST2600_SCU_DBGCTL1, .mask = AST2600_SCU_DBGCTL1_XDMA_VGA },
 };
 
 static const struct bridge_gate_pdata ast2600_bridge_pdata = {
@@ -103,53 +113,114 @@ static const struct soc_driver bridges_driver = {
 };
 REGISTER_SOC_DRIVER(bridges_driver);
 
-struct bridges *bridges_get(struct soc *ctx)
-{
-    return soc_driver_get_drvdata(ctx, &bridges_driver);
-}
-
-int bridges_device_get_gates(struct soc *soc, struct soc_device *dev, struct bridges **bridges,
-                             int *gate)
+static struct bridges *bridges_get_by_prop(struct soc *soc, const uint32_t *cells)
 {
     struct soc_device_node bdn;
-    struct bridges *_bridges;
-    const uint32_t *cell;
     int phandle;
     int offset;
-    int len;
 
-    cell = fdt_getprop(soc->fdt.start, dev->node.offset, "bridge-gates", &len);
-    if (len < 0) {
-        loge("Failed to find 'bridge-gates' property in node %d: %d\n", dev->node.offset, len);
-        return -ERANGE;
-    }
+    assert(cells);
 
-    if (len < 2) {
-        loge("Invalid value for 'bridge-gates' property, must be <phandle index [index...]>\n");
-        return -EINVAL;
-    }
-
-    phandle = be32toh(cell[0]);
+    phandle = be32toh(cells[0]);
     offset = fdt_node_offset_by_phandle(soc->fdt.start, phandle);
     if (offset < 0) {
-            loge("fdt: Failed to find node for phandle %"PRIu32" at index %d: %d\n",
-                 phandle, 0, offset);
-            return -EUCLEAN;
+        loge("fdt: Failed to find node for phandle %"PRIu32" at index %d: %d\n",
+                phandle, 0, offset);
+        return NULL;
     }
 
     bdn.fdt = &soc->fdt;
     bdn.offset = offset;
 
-    _bridges = soc_driver_get_drvdata_by_node(soc, &bdn);
-    if (!_bridges) {
-        loge("Failed to locate bridge controller instance\n");
-        return -ENODEV;
+    return soc_driver_get_drvdata_by_node(soc, &bdn);
+}
+
+struct bridges *bridges_get_by_device(struct soc *soc, struct soc_device *dev)
+{
+    const uint32_t *cells;
+    int len;
+
+    cells = fdt_getprop(soc->fdt.start, dev->node.offset, "bridge-gates", &len);
+    if (len < 0) {
+        loge("Failed to find 'bridge-gates' property in node %d: %d\n", dev->node.offset, len);
+        return NULL;
     }
 
-    *bridges = _bridges;
-    *gate = be32toh(cell[1]);
+    if ((long unsigned int)len < 2 * sizeof(*cells)) {
+        loge("Invalid value for 'bridge-gates' property, must be <phandle index [index...]>\n");
+        return NULL;
+    }
+
+    return bridges_get_by_prop(soc, cells);
+}
+
+int bridges_device_get_gate_by_index(struct soc *soc, struct soc_device *dev, int index,
+                                     struct bridges **bridges, int *gate)
+{
+    const uint32_t *cells;
+    int len;
+
+    if (!gate) {
+        loge("'gate' parameter must point to a valid int object\n");
+        return -EINVAL;
+    }
+
+    cells = fdt_getprop(soc->fdt.start, dev->node.offset, "bridge-gates", &len);
+    if (len < 0) {
+        loge("Failed to find 'bridge-gates' property in node %d: %d\n", dev->node.offset, len);
+        return -ERANGE;
+    }
+
+    if ((long unsigned int)len < 2 * sizeof(*cells)) {
+        loge("Invalid value for 'bridge-gates' property, must be <phandle index [index...]>\n");
+        return -EINVAL;
+    }
+
+    if ((long unsigned int)len <= (1 + index) * sizeof(*cells)) {
+        loge("Invalid index for 'bridge-gates' property: %d (%d)\n", index, (len / sizeof(*cells)));
+        return -EINVAL;
+    }
+
+    if (bridges) {
+        struct bridges *_bridges;
+
+        if (!(_bridges = bridges_get_by_prop(soc, cells))) {
+            return -EINVAL;
+        }
+
+        *bridges = _bridges;
+    }
+
+    *gate = be32toh(cells[1 + index]);
 
     return 0;
+}
+
+int bridges_device_get_gate(struct soc *soc, struct soc_device *dev, struct bridges **bridges,
+                             int *gate)
+{
+    return bridges_device_get_gate_by_index(soc, dev, 0, bridges, gate);
+}
+
+int bridges_device_get_gate_by_name(struct soc *soc, struct soc_device *dev, const char *name,
+                                    struct bridges **bridges, int *gate)
+{
+    int idx;
+    int rc;
+
+    idx = fdt_stringlist_search(soc->fdt.start, dev->node.offset, "bridge-gate-names", name);
+    if (idx < 0) {
+        loge("Failed to find 'bridge-gate-names' node: %d\n", idx);
+        return -EINVAL;
+    }
+
+    rc = bridges_device_get_gate_by_index(soc, dev, idx, bridges, gate);
+    if (!rc) {
+        logt("Resolved bridge gate name '%s' to ID %d via device node %d\n",
+             name, *gate, dev->node.offset);
+    }
+
+    return rc;
 }
 
 static int bridges_configure(struct bridges *ctx, int bridge, bool enable)
