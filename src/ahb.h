@@ -4,6 +4,9 @@
 #ifndef _AHB_H
 #define _AHB_H
 
+#include "log.h"
+
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -59,12 +62,22 @@ static inline ssize_t ahb_write(struct ahb *ctx, uint32_t phys, const void *buf,
 
 static inline int ahb_readl(struct ahb *ctx, uint32_t phys, uint32_t *val)
 {
-    return ctx->ops->readl(ctx, phys, val);
+    int rc = ctx->ops->readl(ctx, phys, val);
+    if (!rc) {
+        logt("%s: 0x%08"PRIx32": 0x%08"PRIx32"\n", __func__, phys, *val);
+    }
+
+    return rc;
 }
 
 static inline int ahb_writel(struct ahb *ctx, uint32_t phys, uint32_t val)
 {
-    return ctx->ops->writel(ctx, phys, val);
+    int rc = ctx->ops->writel(ctx, phys, val);
+    if (!rc) {
+        logt("%s: 0x%08"PRIx32": 0x%08"PRIx32"\n", __func__, phys, val);
+    }
+
+    return rc;
 }
 
 

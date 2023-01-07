@@ -73,7 +73,6 @@ int64_t rev_probe(struct ahb *ahb)
      */
     rc = ahb_readl(ahb, AST_SCU | 0x004, &probe[0]);
     if (rc < 0) { return rc; }
-    logt("0x%08" PRIx32 ": 0x%08" PRIx32 "\n", AST_SCU | 0x004, probe[0]);
 
     /*
      * SCU07C is:
@@ -98,7 +97,6 @@ int64_t rev_probe(struct ahb *ahb)
      */
     rc = ahb_readl(ahb, AST_SCU | 0x07c, &probe[1]);
     if (rc < 0) { return rc; }
-    logt("0x%08" PRIx32 ": 0x%08" PRIx32 "\n", AST_SCU | 0x07c, probe[1]);
 
     is_g6 = !(((probe[0] >> 28) & 0xf) && ((probe[1] >> 24) & 0xff));
 
@@ -113,7 +111,6 @@ int64_t rev_probe(struct ahb *ahb)
          */
         rc = ahb_readl(ahb, AST_SCU | 0x014, &rev);
         if (rc < 0) { return rc; }
-        logt("0x%08" PRIx32 ": 0x%08" PRIx32 "\n", AST_SCU | 0x014, rev);
     } else {
         rev = probe[1];
     }
