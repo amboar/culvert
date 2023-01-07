@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021 IBM Corp.
 
+#include "soc/bridge-ids.h"
+
 /dts-v1/;
 
 / {
@@ -65,11 +67,27 @@
 				strapping {
 					compatible = "aspeed,ast2600-strapping";
 				};
+
+				bridges: bridge-controller {
+					compatible = "aspeed,ast2600-bridge-controller";
+				};
 			};
 
 			secure-boot-controller@1e6f2000 {
 				compatible = "aspeed,ast2600-secure-boot-controller";
 				reg = <0x1e6f2000 0x940>;
+			};
+
+			uart1: uart@1e783000 {
+				compatible = "aspeed,ast2600-uart", "ns16550a", "bridge-controller";
+				reg = <0x1e783000 0x20>;
+				bridge-gates = <&bridges AST2600_DEBUG_UART1_GATE>;
+			};
+
+			uart5: uart@1e784000 {
+				compatible = "aspeed,ast2600-uart", "ns16550a", "bridge-controller";
+				reg = <0x1e784000 0x20>;
+				bridge-gates = <&bridges AST2600_DEBUG_UART5_GATE>;
 			};
 
 			wdt1: watchdog@1e785000 {
