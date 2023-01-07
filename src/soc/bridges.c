@@ -42,6 +42,7 @@ static const struct bridge_gate_pdata ast2500_bridge_pdata = {
 #define   AST2600_SCU_DBGCTL1_P2A       (1 << 0)
 #define AST2600_SCU_DBGCTL2             0x0d8
 #define   AST2600_SCU_DBGCTL2_UART1_DBG (1 << 3)
+#define   AST2600_SCU_DBGCTL2_ILPC      (1 << 1)
 
 static const struct bridge_gate_desc ast2600_bridge_gates[] = {
     [AST2600_DEBUG_UART1_GATE] =
@@ -54,6 +55,8 @@ static const struct bridge_gate_desc ast2600_bridge_gates[] = {
         { .reg = AST2600_SCU_DBGCTL1, .mask = AST2600_SCU_DBGCTL1_XDMA },
     [AST2600_XDMA_VGA_GATE] =
         { .reg = AST2600_SCU_DBGCTL1, .mask = AST2600_SCU_DBGCTL1_XDMA_VGA },
+    [AST2600_ILPC_GATE] =
+        { .reg = AST2600_SCU_DBGCTL2, .mask = AST2600_SCU_DBGCTL2_ILPC },
 };
 
 static const struct bridge_gate_pdata ast2600_bridge_pdata = {

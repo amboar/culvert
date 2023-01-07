@@ -11,5 +11,6 @@
 #define AST2600_P2A_GATE		2
 #define AST2600_XDMA_GATE		3
 #define AST2600_XDMA_VGA_GATE		4
+#define AST2600_ILPC_GATE		5
 
 #endif
