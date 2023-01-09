@@ -89,7 +89,7 @@ int wdt_prevent_reset(struct soc *soc)
 
         if (!(wdt = wdt_get_by_name(soc, name))) {
             logd("Failed to acquire %s controller\n", name);
-            return rc;
+            return -ENODEV;
         }
 
         rc = wdt_stop(wdt);
