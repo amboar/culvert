@@ -68,6 +68,10 @@
 					compatible = "aspeed,ast2600-strapping";
 				};
 
+				superio {
+					compatible = "aspeed,ast2600-superio";
+				};
+
 				bridges: bridge-controller {
 					compatible = "aspeed,ast2600-bridge-controller";
 				};
