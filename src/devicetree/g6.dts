@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021 IBM Corp.
 
+#include "soc/bridge-ids.h"
+
 /dts-v1/;
 
 / {
@@ -61,11 +63,44 @@
 			syscon: syscon@1e6e2000 {
 				compatible = "aspeed,ast2600-scu", "syscon", "simple-mfd";
 				reg = <0x1e6e2000 0x1000>;
+
+				strapping {
+					compatible = "aspeed,ast2600-strapping";
+				};
+
+				superio {
+					compatible = "aspeed,ast2600-superio";
+				};
+
+				bridges: bridge-controller {
+					compatible = "aspeed,ast2600-bridge-controller";
+				};
+
+				pcie-bridge-controller {
+					compatible = "aspeed,ast2600-pcie-device-controller", "bridge-controller";
+					bridge-gate-names = "p2a", "xdma", "xdma-vga";
+					bridge-gates = <&bridges
+							AST2600_P2A_GATE
+							AST2600_XDMA_GATE
+							AST2600_XDMA_VGA_GATE>;
+				};
 			};
 
 			secure-boot-controller@1e6f2000 {
 				compatible = "aspeed,ast2600-secure-boot-controller";
 				reg = <0x1e6f2000 0x940>;
+			};
+
+			uart1: uart@1e783000 {
+				compatible = "aspeed,ast2600-uart", "ns16550a", "bridge-controller";
+				reg = <0x1e783000 0x20>;
+				bridge-gates = <&bridges AST2600_DEBUG_UART1_GATE>;
+			};
+
+			uart5: uart@1e784000 {
+				compatible = "aspeed,ast2600-uart", "ns16550a", "bridge-controller";
+				reg = <0x1e784000 0x20>;
+				bridge-gates = <&bridges AST2600_DEBUG_UART5_GATE>;
 			};
 
 			wdt1: watchdog@1e785000 {
@@ -121,6 +156,11 @@
 			lpc: lpc@1e789000 {
 				compatible = "aspeed,ast2600-lpc-v2", "syscon", "simple-mfd";
 				reg = <0x1e789000 0x1000>;
+
+				bridge-controller {
+					compatible = "aspeed,ast2600-ilpc-ahb-bridge", "bridge-controller";
+					bridge-gates = <&bridges AST2600_ILPC_GATE>;
+				};
 			};
 		};
 	};

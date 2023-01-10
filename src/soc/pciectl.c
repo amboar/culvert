@@ -3,6 +3,8 @@
 
 #include "compiler.h"
 #include "log.h"
+#include "soc/bridge-ids.h"
+#include "soc/bridges.h"
 #include "soc/pciectl.h"
 #include "soc/sdmc.h"
 
@@ -13,7 +15,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define SCU_MISC			0x02c
+#define G4_SCU_MISC		        0x02c
+#define G6_SCU_MISC                     0x0c0
 #define   G4_SCU_MISC_P2A_DRAM_RO	(1 << 25)
 #define   G4_SCU_MISC_P2A_SPI_RO	(1 << 24)
 #define   G4_SCU_MISC_P2A_SOC_RO	(1 << 23)
@@ -22,7 +25,8 @@
 #define   G5_SCU_MISC_P2A_LPCH_RO	(1 << 24)
 #define   G5_SCU_MISC_P2A_SOC_RO	(1 << 23)
 #define   G5_SCU_MISC_P2A_FLASH_RO	(1 << 22)
-#define SCU_PCIE_CONFIG		        0x180
+#define G4_SCU_PCIE_CONFIG		0x180
+#define G6_SCU_PCIE_CONFIG              0xc20
 #define   SCU_PCIE_CONFIG_BMC_XDMA      (1 << 14)
 #define   SCU_PCIE_CONFIG_BMC_MMIO	(1 << 9)
 #define   SCU_PCIE_CONFIG_BMC		(1 << 8)
@@ -60,9 +64,13 @@ struct pciectl_endpoint {
         enum device_function type;
         uint32_t mask;
     } function;
+
+    const char *gate;
 };
 
 struct pciectl_pdata {
+    uint32_t misc;
+    uint32_t config;
     const struct pciectl_endpoint *endpoints;
     const struct pciectl_p2a_region *regions;
 };
@@ -70,7 +78,9 @@ struct pciectl_pdata {
 struct pciectl {
     struct bridgectl p2actl;
     struct bridgectl xdmactl;
+    struct bridges *bridges;
     struct soc *soc;
+    struct soc_device *dev;
     struct soc_region scu;
     const struct pciectl_pdata *pdata;
     struct sdmc *sdmc;
@@ -115,7 +125,7 @@ pciectl_device_enforce(struct pciectl *ctx, const struct pciectl_endpoint *ep, e
     uint32_t mask;
     int rc;
 
-    if ((rc = soc_readl(ctx->soc, ctx->scu.start + SCU_PCIE_CONFIG, &pcie)) < 0) {
+    if ((rc = soc_readl(ctx->soc, ctx->scu.start + ctx->pdata->config, &pcie)) < 0) {
         loge("Failed to read PCIe device configuration: %d\n", rc);
         return rc;
     }
@@ -123,14 +133,14 @@ pciectl_device_enforce(struct pciectl *ctx, const struct pciectl_endpoint *ep, e
     if (mode == bm_disabled) {
         pcie &= ~ep->function.mask;
 
-        if ((rc = soc_writel(ctx->soc, ctx->scu.start + SCU_PCIE_CONFIG, pcie)) < 0) {
+        if ((rc = soc_writel(ctx->soc, ctx->scu.start + ctx->pdata->config, pcie)) < 0) {
             loge("Failed to disable PCIe MMIO regions: %d\n", rc);
         }
 
         return rc;
     }
 
-    if ((rc = soc_readl(ctx->soc, ctx->scu.start + SCU_MISC, &misc)) < 0) {
+    if ((rc = soc_readl(ctx->soc, ctx->scu.start + ctx->pdata->misc, &misc)) < 0) {
         loge("Failed to read PCIe MMIO region configuration: %d\n", rc);
         return rc;
     }
@@ -147,14 +157,25 @@ pciectl_device_enforce(struct pciectl *ctx, const struct pciectl_endpoint *ep, e
         misc &= ~mask;
     }
 
-    if ((rc = soc_writel(ctx->soc, ctx->scu.start + SCU_MISC, misc)) < 0) {
+    if ((rc = soc_writel(ctx->soc, ctx->scu.start + ctx->pdata->misc, misc)) < 0) {
         loge("Failed to write PCIe MMIO region configuration: %d\n", rc);
         return rc;
     }
 
     pcie |= ep->device.mask | ep->function.mask;
-    if ((rc = soc_writel(ctx->soc, ctx->scu.start + SCU_PCIE_CONFIG, pcie)) < 0) {
+    if ((rc = soc_writel(ctx->soc, ctx->scu.start + ctx->pdata->config, pcie)) < 0) {
         loge("Failed to enable PCIe VGA device: %d\n", rc);
+    }
+
+    if (ctx->bridges) {
+        int id;
+
+        if ((rc = bridges_device_get_gate_by_name(ctx->soc, ctx->dev, ep->gate, NULL, &id)) < 0) {
+            loge("Failed to resolve bridge gate for gate name '%s': %d\n", ep->gate, rc);
+            return rc;
+        }
+
+        bridges_enable(ctx->bridges, id);
     }
 
     return rc;
@@ -167,7 +188,26 @@ pciectl_device_status(struct pciectl *ctx, const struct pciectl_endpoint *ep, en
     uint32_t mask;
     int rc;
 
-    if ((rc = soc_readl(ctx->soc, ctx->scu.start + SCU_PCIE_CONFIG, &pcie)) < 0) {
+    if (ctx->bridges) {
+        int id;
+
+        if ((rc = bridges_device_get_gate_by_name(ctx->soc, ctx->dev, ep->gate, NULL, &id)) < 0) {
+            loge("Failed to resolve bridge gate for gate name '%s': %d\n", ep->gate, rc);
+            return rc;
+        }
+
+        if ((rc = bridges_status(ctx->bridges, id)) < 0) {
+            loge("Failed to query state of bridge gate %d (%s): %d\n", id, ep->gate, rc);
+            return rc;
+        }
+
+        if (!rc) {
+            *mode = bm_disabled;
+            return 0;
+        }
+    }
+
+    if ((rc = soc_readl(ctx->soc, ctx->scu.start + ctx->pdata->config, &pcie)) < 0) {
         loge("Failed to read PCIe device configuration: %d\n", rc);
         return rc;
     }
@@ -184,7 +224,7 @@ pciectl_device_status(struct pciectl *ctx, const struct pciectl_endpoint *ep, en
         return 0;
     }
 
-    if ((rc = soc_readl(ctx->soc, ctx->scu.start + SCU_MISC, &misc)) < 0) {
+    if ((rc = soc_readl(ctx->soc, ctx->scu.start + ctx->pdata->misc, &misc)) < 0) {
         loge("Failed to read PCIe MMIO region configuration: %d\n", rc);
         return rc;
     }
@@ -202,13 +242,31 @@ pciectl_device_report(struct pciectl *ctx, int fd, const struct pciectl_endpoint
     bool enabled;
     int rc;
 
-    if ((rc = soc_readl(ctx->soc, ctx->scu.start + SCU_PCIE_CONFIG, &pcie)) < 0) {
+    enabled = true;
+
+    if (ctx->bridges) {
+        int id;
+
+        if ((rc = bridges_device_get_gate_by_name(ctx->soc, ctx->dev, ep->gate, NULL, &id)) < 0) {
+            loge("Failed to resolve bridge gate for gate name '%s': %d\n", ep->gate, rc);
+            return rc;
+        }
+
+        if ((rc = bridges_status(ctx->bridges, id)) < 0) {
+            loge("Failed to query state of bridge gate %d (%s): %d\n", id, ep->gate, rc);
+            return rc;
+        }
+
+        enabled = enabled && rc;
+    }
+
+    if ((rc = soc_readl(ctx->soc, ctx->scu.start + ctx->pdata->config, &pcie)) < 0) {
         loge("Failed to read PCIe device configuration: %d\n", rc);
         return rc;
     }
 
     /* Device */
-    enabled = pcie & ep->device.mask;
+    enabled = enabled && (pcie & ep->device.mask);
     description = enabled ? "Enabled" : "Disabled";
     dprintf(fd, "\t%s: %s\n", pcie_device_table[ep->device.type], description);
     if (!enabled) {
@@ -338,7 +396,7 @@ static int p2actl_report(struct bridgectl *bridge, int fd, enum bridge_mode *mod
         return rc;
     }
 
-    if ((rc = soc_readl(ctx->soc, ctx->scu.start + SCU_MISC, &misc)) < 0) {
+    if ((rc = soc_readl(ctx->soc, ctx->scu.start + ctx->pdata->misc, &misc)) < 0) {
         loge("Failed to read P2A region filter configuration: %d\n", rc);
         return rc;
     }
@@ -520,7 +578,7 @@ static const struct pciectl_endpoint ast2400_pcie_bridges[] = {
         .function = {
             .type = device_function_xdma,
             .mask = SCU_PCIE_CONFIG_BMC_XDMA,
-        }
+        },
     },
     {
         .device = {
@@ -536,6 +594,8 @@ static const struct pciectl_endpoint ast2400_pcie_bridges[] = {
 };
 
 static const struct pciectl_pdata ast2400_pdata = {
+    .misc = G4_SCU_MISC,
+    .config = G4_SCU_PCIE_CONFIG,
     .endpoints = ast2400_pcie_bridges,
     .regions = ast2400_p2a_regions,
 };
@@ -631,13 +691,71 @@ static const struct pciectl_endpoint ast2500_pcie_bridges[] = {
 };
 
 static const struct pciectl_pdata ast2500_pdata = {
+    .misc = G4_SCU_MISC,
+    .config = G4_SCU_PCIE_CONFIG,
     .endpoints = ast2500_pcie_bridges,
+    .regions = ast2500_p2a_regions,
+};
+
+static const struct pciectl_endpoint ast2600_pcie_bridges[] = {
+    {
+        .device = {
+            .type = pcie_device_bmc,
+            .mask = SCU_PCIE_CONFIG_BMC,
+        },
+        .function = {
+            .type = device_function_mmio,
+            .mask = SCU_PCIE_CONFIG_BMC_MMIO,
+        },
+        .gate = "p2a",
+    },
+    {
+        .device = {
+            .type = pcie_device_vga,
+            .mask = SCU_PCIE_CONFIG_VGA,
+        },
+        .function = {
+            .type = device_function_mmio,
+            .mask = SCU_PCIE_CONFIG_VGA_MMIO,
+        },
+        .gate = "p2a",
+    },
+    {
+        .device = {
+            .type = pcie_device_bmc,
+            .mask = SCU_PCIE_CONFIG_BMC,
+        },
+        .function = {
+            .type = device_function_xdma,
+            .mask = SCU_PCIE_CONFIG_BMC_XDMA,
+        },
+        .gate = "xdma",
+    },
+    {
+        .device = {
+            .type = pcie_device_vga,
+            .mask = SCU_PCIE_CONFIG_VGA,
+        },
+        .function = {
+            .type = device_function_xdma,
+            .mask = SCU_PCIE_CONFIG_VGA_XDMA,
+        },
+        .gate = "xdma-vga",
+    },
+    { }
+};
+
+static const struct pciectl_pdata ast2600_pdata = {
+    .misc = G6_SCU_MISC,
+    .config = G6_SCU_PCIE_CONFIG,
+    .endpoints = ast2600_pcie_bridges,
     .regions = ast2500_p2a_regions,
 };
 
 static const struct soc_device_id pciectl_matches[] = {
     { .compatible = "aspeed,ast2400-pcie-device-controller", .data = &ast2400_pdata },
     { .compatible = "aspeed,ast2500-pcie-device-controller", .data = &ast2500_pdata },
+    { .compatible = "aspeed,ast2600-pcie-device-controller", .data = &ast2600_pdata },
     { },
 };
 
@@ -661,7 +779,15 @@ static int pciectl_driver_init(struct soc *soc, struct soc_device *dev)
     }
 
     ctx->soc = soc;
+    ctx->dev = dev;
     ctx->pdata = soc_device_get_match_data(soc, pciectl_matches, &dev->node);
+    if (ctx->pdata == &ast2600_pdata) {
+        ctx->bridges = bridges_get_by_device(soc, dev);
+        if (!ctx->bridges) {
+            loge("Failed to aquire bridge controller\n");
+            goto cleanup_ctx;
+        }
+    }
 
     soc_device_set_drvdata(dev, ctx);
 

@@ -555,6 +555,21 @@ void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *m
 	return NULL;
 }
 
+void *soc_driver_get_drvdata_by_node(struct soc *soc, const struct soc_device_node *dn)
+{
+	struct soc_device *dev;
+
+	list_for_each(&soc->devices, dev, entry) {
+		if (!(dev->node.offset == dn->offset)) {
+			continue;
+		}
+
+		return soc_device_init_driver(soc, dev);
+	}
+
+	return NULL;
+}
+
 int
 soc_bridge_controller_register(struct soc *ctx, struct bridgectl *bridge, const struct bridgectl_ops *ops)
 {

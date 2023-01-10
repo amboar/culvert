@@ -156,6 +156,7 @@ AUTODATA_TYPE(soc_drivers, struct soc_driver);
 void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match);
 void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *match, const char
 		*name);
+void *soc_driver_get_drvdata_by_node(struct soc *soc, const struct soc_device_node *dn);
 
 int soc_bridge_controller_register(struct soc *soc, struct bridgectl *bridge,
 				   const struct bridgectl_ops *ops);

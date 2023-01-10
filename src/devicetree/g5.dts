@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2021 IBM Corp.
 
+#include "soc/bridge-ids.h"
+
 /dts-v1/;
 
 / {
@@ -84,8 +86,13 @@
 					compatible = "aspeed,ast2500-superio";
 				};
 
+				bridges: bridge-controller {
+					compatible = "aspeed,ast2500-bridge-controller";
+				};
+
 				debug-bridge-controller {
 					compatible = "aspeed,ast2500-debug-ahb-bridge", "bridge-controller";
+					bridge-gates = <&bridges AST2500_DEBUG_UART_GATE>;
 				};
 
 				pcie-bridge-controller {
