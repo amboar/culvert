@@ -11,6 +11,7 @@
 
 #include <errno.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define LPC_HICRB               0x100
@@ -105,6 +106,9 @@ static int ast2400_ilpcctl_status(struct bridgectl *bridge, enum bridge_mode *mo
 
 static int ilpcctl_report(struct bridgectl *bridge, int fd, enum bridge_mode *mode)
 {
+    struct ilpcctl *ctx = to_ilpcctl(bridge);
+    enum sioctl_decode decode;
+    int address;
     int rc;
 
     if ((rc = bridgectl_status(bridge, mode)) < 0) {
@@ -113,6 +117,18 @@ static int ilpcctl_report(struct bridgectl *bridge, int fd, enum bridge_mode *mo
     }
 
     bridgectl_log_status(bridge, fd, *mode);
+
+    if (*mode == bm_disabled) {
+        return 0;
+    }
+
+    if ((rc = sioctl_decode_status(ctx->sioctl, &decode)) < 0) {
+        loge("Failed to get SuperIO decode status: %d\n", rc);
+        return rc;
+    }
+
+    address = (decode == sioctl_decode_2e) ? 0x2e : 0x4e;
+    dprintf(fd, "\tSuperIO address: 0x%02x\n", address);
 
     return 0;
 }
