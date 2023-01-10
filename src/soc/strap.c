@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2023 IBM Corp.
+
 #include "soc/strap.h"
 
 #include <errno.h>
