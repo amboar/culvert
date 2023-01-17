@@ -65,7 +65,7 @@ static const uint32_t ast2600_dram_sizes[4] = {
 static const struct sdmc_pdata ast2600_sdmc_pdata = {
     .dram_sizes = &ast2600_dram_sizes,
     .vram_sizes = &ast_vram_sizes,
-    .gmp_xdma_mask = BIT(18),
+    .gmp_xdma_mask = BIT(18) | BIT(25),
 };
 
 static int sdmc_readl(struct sdmc *ctx, uint32_t off, uint32_t *val)
