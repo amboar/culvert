@@ -59,17 +59,17 @@ int64_t rev_probe(struct ahb *ahb)
      *      [27:26]: Reserved, 0b11
      *
      * - AST2500:
-     *      [31:26]: Reserved, 0b111111
+     *      [31:26]: Reserved, 0b111111 according to one line of the
+     *               datasheet, 0b111101 according to another line, but
+     *               0b000000 has also been seen in practice.
      *
      * - AST2600:
      *      [31:24]: Reserved, 0x05
      *
-     * The AST2600 reserved value of 0x05 = 0b00000101. Given Aspeed have used
-     * 0x05 for the AST2600 we can assume they're not using bit positions to
-     * indicate the SoC generation. This suggests it should be safe for a while
-     * to use the top nibble to sense whether we're looking at the Silicon
-     * Revision ID Register of the 2600 or the System Reset Control Register of
-     * the 2400 and 2500.
+     * The somewhat unpredictable behavior of the upper bits on AST2500 make
+     * it a bit tricky to use this confidently, but we can at least treat all
+     * of the bits of the top nibble being clear as a fairly strong (but not
+     * entirely conclusive) indicator that it's an AST2600.
      */
     rc = ahb_readl(ahb, AST_SCU | 0x004, &probe[0]);
     if (rc < 0) { return rc; }
@@ -98,7 +98,11 @@ int64_t rev_probe(struct ahb *ahb)
     rc = ahb_readl(ahb, AST_SCU | 0x07c, &probe[1]);
     if (rc < 0) { return rc; }
 
-    is_g6 = !(((probe[0] >> 28) & 0xf) && ((probe[1] >> 24) & 0xff));
+    /*
+     * Given the above, assume we're on a g6 if the top 4 bits of SCU004 and
+     * top 8 of SCU07C are all zero.
+     */
+    is_g6 = !((probe[0] >> 28) & 0xf) && !((probe[1] >> 24) & 0xff);
 
     /* Based on the above observations, extract the true silicon revision ID */
     if (is_g6) {
