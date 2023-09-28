@@ -87,7 +87,9 @@ static void scu_driver_destroy(struct soc_device *dev)
 }
 
 static const struct soc_device_id scu_match[] = {
+	{ .compatible = "aspeed,ast2400-scu" },
 	{ .compatible = "aspeed,ast2500-scu" },
+	{ .compatible = "aspeed,ast2600-scu" },
 	{ },
 };
 
