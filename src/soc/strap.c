@@ -2,6 +2,7 @@
 // Copyright (C) 2023 IBM Corp.
 
 #include "log.h"
+#include "scu.h"
 #include "soc/strap.h"
 
 #include <errno.h>
@@ -13,8 +14,7 @@ struct strap_ops {
 };
 
 struct strap {
-    struct soc *soc;
-    struct soc_region scu;
+    struct scu *scu;
     const struct strap_ops *ops;
 };
 
@@ -33,23 +33,13 @@ int strap_clear(struct strap *ctx, int reg, uint32_t update, uint32_t mask)
     return ctx->ops->clear(ctx, reg, update, mask);
 }
 
-static int scu_readl(struct strap *ctx, uint32_t reg, uint32_t *val)
-{
-    return soc_readl(ctx->soc, ctx->scu.start + reg, val);
-}
-
-static int scu_writel(struct strap *ctx, uint32_t reg, uint32_t val)
-{
-    return soc_writel(ctx->soc, ctx->scu.start + reg, val);
-}
-
 static int ast2400_strap_read(struct strap *ctx, int reg, uint32_t *val)
 {
     if (!(reg == AST2400_SCU_HW_STRAP1 || reg == AST2400_SCU_HW_STRAP2)) {
         return -EINVAL;
     }
 
-    return scu_readl(ctx, reg, val);
+    return scu_readl(ctx->scu, reg, val);
 }
 
 static int ast2400_strap_set(struct strap *ctx, int reg, uint32_t update, uint32_t mask)
@@ -65,13 +55,13 @@ static int ast2400_strap_set(struct strap *ctx, int reg, uint32_t update, uint32
         return -EINVAL;
     }
 
-    if ((rc = scu_readl(ctx, reg, &val)) < 0) {
+    if ((rc = scu_readl(ctx->scu, reg, &val)) < 0) {
         return rc;
     }
 
     val |= update;
 
-    return scu_writel(ctx, reg, val);
+    return scu_writel(ctx->scu, reg, val);
 }
 
 static int ast2400_strap_clear(struct strap *ctx, int reg, uint32_t update, uint32_t mask)
@@ -87,13 +77,13 @@ static int ast2400_strap_clear(struct strap *ctx, int reg, uint32_t update, uint
         return -EINVAL;
     }
 
-    if ((rc = scu_readl(ctx, reg, &val)) < 0) {
+    if ((rc = scu_readl(ctx->scu, reg, &val)) < 0) {
         return rc;
     }
 
     val &= ~update;
 
-    return scu_writel(ctx, reg, val);
+    return scu_writel(ctx->scu, reg, val);
 }
 
 static const struct strap_ops ast2400_strap_ops = {
@@ -108,7 +98,7 @@ static int ast2500_strap_read(struct strap *ctx, int reg, uint32_t *val)
         return -EINVAL;
     }
 
-    return scu_readl(ctx, reg, val);
+    return scu_readl(ctx->scu, reg, val);
 }
 
 static int ast2500_strap_set(struct strap *ctx, int reg, uint32_t update, uint32_t mask)
@@ -117,7 +107,7 @@ static int ast2500_strap_set(struct strap *ctx, int reg, uint32_t update, uint32
         return -EINVAL;
     }
 
-    return scu_writel(ctx, reg, update);
+    return scu_writel(ctx->scu, reg, update);
 }
 
 static int ast2500_strap_clear(struct strap *ctx, int reg, uint32_t update, uint32_t mask)
@@ -127,7 +117,7 @@ static int ast2500_strap_clear(struct strap *ctx, int reg, uint32_t update, uint
     }
 
     /* The silicon ID register is W1C for the strap register */
-    return scu_writel(ctx, AST2500_SCU_SILICON_ID, update);
+    return scu_writel(ctx->scu, AST2500_SCU_SILICON_ID, update);
 }
 
 static const struct strap_ops ast2500_strap_ops = {
@@ -144,7 +134,7 @@ static int ast2600_strap_read(struct strap *ctx, int reg, uint32_t *val)
         return -EINVAL;
     }
 
-    return scu_readl(ctx, reg, val);
+    return scu_readl(ctx->scu, reg, val);
 }
 
 static int ast2600_strap_is_protected(struct strap *ctx, int reg, uint32_t mask)
@@ -159,7 +149,7 @@ static int ast2600_strap_is_protected(struct strap *ctx, int reg, uint32_t mask)
         uint32_t protect;
         int rc;
 
-        if ((rc = scu_readl(ctx, reg + 8, &protect)) < 0) {
+        if ((rc = scu_readl(ctx->scu, reg + 8, &protect)) < 0) {
             loge("Failed to read protection register for strapping register %d: %d\n", reg, rc);
             return rc;
         }
@@ -190,7 +180,7 @@ static int ast2600_strap_set(struct strap *ctx, int reg, uint32_t update, uint32
         return -EPERM;
     }
 
-    return scu_writel(ctx, reg, update);
+    return scu_writel(ctx->scu, reg, update);
 }
 
 static int ast2600_strap_clear(struct strap *ctx, int reg, uint32_t update, uint32_t mask)
@@ -209,7 +199,7 @@ static int ast2600_strap_clear(struct strap *ctx, int reg, uint32_t update, uint
 
     /* W1S/W1C pairs */
     if (reg == AST2600_SCU_HW_STRAP1 || reg == AST2600_SCU_HW_STRAP2) {
-        return scu_writel(ctx, reg + 4, update);
+        return scu_writel(ctx->scu, reg + 4, update);
     }
 
     /* RMW, because register layout is hard */
@@ -217,11 +207,11 @@ static int ast2600_strap_clear(struct strap *ctx, int reg, uint32_t update, uint
         uint32_t val;
         int rc;
 
-        if ((rc = scu_readl(ctx, reg, &val)) < 0) {
+        if ((rc = scu_readl(ctx->scu, reg, &val)) < 0) {
             return rc;
         }
 
-        return scu_writel(ctx, reg, val & ~(update & mask));
+        return scu_writel(ctx->scu, reg, val & ~(update & mask));
     }
 
     return -EINVAL;
@@ -250,11 +240,12 @@ static int strap_driver_init(struct soc *soc, struct soc_device *dev)
         return -ENOMEM;
     }
 
-    if ((rc = soc_device_get_memory(soc, &dev->node, &ctx->scu)) < 0) {
+    ctx->scu = scu_get(soc);
+    if (!ctx->scu) {
+        rc = -ENODEV;
         goto cleanup_ctx;
     }
 
-    ctx->soc = soc;
     ctx->ops = soc_device_get_match_data(soc, strap_matches, &dev->node);
 
     soc_device_set_drvdata(dev, ctx);
@@ -269,7 +260,9 @@ cleanup_ctx:
 
 static void strap_driver_destroy(struct soc_device *dev)
 {
-    free(soc_device_get_drvdata(dev));
+    struct strap *ctx = soc_device_get_drvdata(dev);
+    scu_put(ctx->scu);
+    free(ctx);
 }
 
 static const struct soc_driver strap_driver = {

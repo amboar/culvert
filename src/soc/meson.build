@@ -6,6 +6,7 @@ src += files(
 	'ilpcctl.c',
 	'otp.c',
 	'pciectl.c',
+	'scu.c',
 	'sdmc.c',
 	'sfc.c',
 	'sioctl.c',
