@@ -5,6 +5,7 @@
 
 #include "bits.h"
 #include "clk.h"
+#include "scu.h"
 #include "soc.h"
 
 #include <assert.h>
@@ -21,19 +22,8 @@
 #define SCU_SILICON_REVISION		0x7c
 
 struct clk {
-	struct soc *soc;
-	struct soc_region scu;
+	struct scu *scu;
 };
-
-static int scu_readl(struct clk *ctx, uint32_t offset, uint32_t *val)
-{
-    return soc_readl(ctx->soc, ctx->scu.start + offset, val);
-}
-
-static int scu_writel(struct clk *ctx, uint32_t offset, uint32_t val)
-{
-    return soc_writel(ctx->soc, ctx->scu.start + offset, val);
-}
 
 static int64_t clk_rate_ahb(struct clk *ctx)
 {
@@ -54,7 +44,7 @@ static int64_t clk_rate_ahb(struct clk *ctx)
     int rc;
 
     /* HW strapping gives us the CPU freq and AHB divisor */
-    if ((rc = scu_readl(ctx, SCU_HW_STRAP, &strap)) < 0)
+    if ((rc = scu_readl(ctx->scu, SCU_HW_STRAP, &strap)) < 0)
         return rc;
 
     if (strap & 0x00800000)
@@ -82,14 +72,14 @@ int clk_disable(struct clk *ctx, enum clksrc src)
 
     switch (src) {
     case clk_arm:
-        return scu_writel(ctx, SCU_HW_STRAP, SCU_HW_STRAP_ARM_CLK);
+        return scu_writel(ctx->scu, SCU_HW_STRAP, SCU_HW_STRAP_ARM_CLK);
     case clk_uart3:
-        if ((rc = scu_readl(ctx, SCU_CLK_STOP, &reg)) < 0)
+        if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
             return rc;
 
         reg |= SCU_CLK_STOP_UART3;
 
-        if ((rc = scu_writel(ctx, SCU_CLK_STOP, reg)) < 0)
+        if ((rc = scu_writel(ctx->scu, SCU_CLK_STOP, reg)) < 0)
             return rc;
 
         return 0;
@@ -107,14 +97,14 @@ int clk_enable(struct clk *ctx, enum clksrc src)
 
     switch (src) {
     case clk_arm:
-        return scu_writel(ctx, SCU_SILICON_REVISION, SCU_HW_STRAP_ARM_CLK);
+        return scu_writel(ctx->scu, SCU_SILICON_REVISION, SCU_HW_STRAP_ARM_CLK);
     case clk_uart3:
-        if ((rc = scu_readl(ctx, SCU_CLK_STOP, &reg)) < 0)
+        if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
             return rc;
 
         reg &= ~SCU_CLK_STOP_UART3;
 
-        if ((rc = scu_writel(ctx, SCU_CLK_STOP, reg)) < 0)
+        if ((rc = scu_writel(ctx->scu, SCU_CLK_STOP, reg)) < 0)
             return rc;
 
         return 0;
@@ -125,8 +115,8 @@ int clk_enable(struct clk *ctx, enum clksrc src)
     return -ENOTSUP;
 }
 
-static const struct soc_device_id scu_match[] = {
-    { .compatible = "aspeed,ast2500-scu" },
+static const struct soc_device_id clk_match[] = {
+    { .compatible = "aspeed,ast2500-clock" },
     { },
 };
 
@@ -140,11 +130,11 @@ static int clk_driver_init(struct soc *soc, struct soc_device *dev)
         return -ENOMEM;
     }
 
-    if ((rc = soc_device_get_memory(soc, &dev->node, &ctx->scu)) < 0) {
+    ctx->scu = scu_get(soc);
+    if (!ctx->scu) {
+        rc = -ENODEV;
         goto cleanup_ctx;
     }
-
-    ctx->soc = soc;
 
     soc_device_set_drvdata(dev, ctx);
 
@@ -158,12 +148,14 @@ cleanup_ctx:
 
 static void clk_driver_destroy(struct soc_device *dev)
 {
-    free(soc_device_get_drvdata(dev));
+    struct clk *ctx = soc_device_get_drvdata(dev);
+    scu_put(ctx->scu);
+    free(ctx);
 }
 
 static const struct soc_driver clk_driver = {
     .name = "clk",
-    .matches = scu_match,
+    .matches = clk_match,
     .init = clk_driver_init,
     .destroy = clk_driver_destroy,
 };

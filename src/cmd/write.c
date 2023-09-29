@@ -27,7 +27,6 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
     struct soc _soc, *soc = &_soc;
     struct flash_chip *chip;
     struct vuart *vuart;
-    bool live = false;
     struct ahb *ahb;
     struct clk *clk;
     ssize_t ingress;
@@ -62,8 +61,7 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
 
         switch (c) {
             case 'l':
-                logi("BMC is live, will take actions to halt its execution\n");
-                live = true;
+                /* no-op flag retained for backwards compatibility */
                 break;
         }
     }
@@ -97,7 +95,7 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
 
     if (ahb->type == ahb_devmem)
         loge("I hope you know what you are doing\n");
-    else if (live) {
+    else {
         logi("Preventing system reset\n");
         if ((rc = wdt_prevent_reset(soc)) < 0)
             goto cleanup_state;
@@ -160,39 +158,37 @@ cleanup_flash:
     flash_destroy(chip);
 
 cleanup_state:
-    if (live) {
-        if (rc == 0) {
-            if (ahb->type != ahb_devmem) {
-                struct wdt *wdt;
-                int64_t wait;
+    if (rc == 0) {
+        if (ahb->type != ahb_devmem) {
+            struct wdt *wdt;
+            int64_t wait;
 
-                logi("Performing SoC reset\n");
-                if (!(wdt = wdt_get_by_name(soc, "wdt2"))) {
-                    loge("Failed to acquire wdt2 controller, exiting\n");
-                    goto cleanup_soc;
-                }
-
-                wait = wdt_perform_reset(wdt);
-
-                if (wait < 0) {
-                    rc = wait;
-                    goto cleanup_soc;
-                }
-
-                usleep(wait);
-            }
-        } else {
-            logi("Deconfiguring VUART host Tx discard\n");
-            if ((cleanup = vuart_set_host_tx_discard(vuart, discard_disable))) {
-                errno = -cleanup;
-                perror("vuart_set_host_tx_discard");
+            logi("Performing SoC reset\n");
+            if (!(wdt = wdt_get_by_name(soc, "wdt2"))) {
+                loge("Failed to acquire wdt2 controller, exiting\n");
+                goto cleanup_soc;
             }
 
-            logi("Ungating ARM clock\n");
-            if ((cleanup = clk_enable(clk, clk_arm))) {
-                errno = -cleanup;
-                perror("clk_enable");
+            wait = wdt_perform_reset(wdt);
+
+            if (wait < 0) {
+                rc = wait;
+                goto cleanup_soc;
             }
+
+            usleep(wait);
+        }
+    } else {
+        logi("Deconfiguring VUART host Tx discard\n");
+        if ((cleanup = vuart_set_host_tx_discard(vuart, discard_disable))) {
+            errno = -cleanup;
+            perror("vuart_set_host_tx_discard");
+        }
+
+        logi("Ungating ARM clock\n");
+        if ((cleanup = clk_enable(clk, clk_arm))) {
+            errno = -cleanup;
+            perror("clk_enable");
         }
     }
 
