@@ -178,11 +178,11 @@ int l2ab_destroy(struct l2ab *ctx)
     struct ilpcb *ilpcb = &ctx->ilpcb;
     int rc;
 
-    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), 0x1e78908c, ctx->restore8);
+    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR8, ctx->restore8);
     if (rc)
         return rc;
 
-    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), 0x1e789088, ctx->restore7);
+    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR7, ctx->restore7);
     if (rc)
         return rc;
 

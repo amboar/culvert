@@ -177,8 +177,8 @@ int devmem_init(struct devmem *ctx)
     if (ctx->fd < 0)
         return -errno;
 
-    ctx->io = mmap(NULL, 0x00200000, PROT_READ | PROT_WRITE, MAP_SHARED,
-                   ctx->fd, 0x1e600000);
+    ctx->io = mmap(NULL, AST_SOC_IO_LEN, PROT_READ | PROT_WRITE, MAP_SHARED,
+                   ctx->fd, AST_SOC_IO);
     if (ctx->io == MAP_FAILED) { rc = -errno; goto cleanup_fd; }
 
     ctx->win = NULL;
@@ -200,7 +200,7 @@ int devmem_destroy(struct devmem *ctx)
 
     assert(!ctx->win);
 
-    rc = munmap(ctx->io, 0x00200000);
+    rc = munmap(ctx->io, AST_SOC_IO_LEN);
     if (rc < 0) { perror("munmap"); }
 
     rc = close(ctx->fd);
