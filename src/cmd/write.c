@@ -63,6 +63,8 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
             case 'l':
                 /* no-op flag retained for backwards compatibility */
                 break;
+            case '?':
+                exit(EXIT_FAILURE);
         }
     }
 
