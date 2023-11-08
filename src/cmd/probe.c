@@ -78,6 +78,9 @@ int cmd_probe(const char *name, int argc, char *argv[])
                 }
                 break;
             }
+            case '?':
+                rc = EXIT_FAILURE;
+                goto done;
         }
     }
 
