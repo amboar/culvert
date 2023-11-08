@@ -41,7 +41,7 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
     }
 
     if (strcmp("firmware", argv[0])) {
-        loge("Unsupported write type '%s'", argv[0]);
+        loge("Unsupported write type '%s'\n", argv[0]);
         return -EINVAL;
     }
 
