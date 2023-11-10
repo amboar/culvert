@@ -311,7 +311,7 @@ static const struct ahb_ops ilpcb_ops = {
 static struct ahb *ilpcb_driver_probe(int argc, char *argv[]);
 static void ilpcb_driver_destroy(struct ahb *ahb);
 
-static const struct bridge_driver ilpcb_driver = {
+static struct bridge_driver ilpcb_driver = {
     .name = "ilpc",
     .probe = ilpcb_driver_probe,
     .destroy = ilpcb_driver_destroy,

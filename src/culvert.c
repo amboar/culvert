@@ -13,8 +13,11 @@
 #include <string.h>
 
 #include "config.h"
+#include "compiler.h"
 #include "log.h"
 #include "version.h"
+#include "ahb.h"
+#include "host.h"
 
 int cmd_ilpc(const char *name, int argc, char *argv[]);
 int cmd_p2a(const char *name, int argc, char *argv[]);
@@ -98,6 +101,8 @@ int main(int argc, char *argv[])
         static struct option long_options[] = {
             { "help", no_argument, NULL, 'h' },
             { "quiet", no_argument, NULL, 'q' },
+            { "skip-bridge", required_argument, NULL, 's' },
+            { "list-bridges", no_argument, NULL, 'l' },
             { "verbose", no_argument, NULL, 'v' },
             { "version", no_argument, NULL, 'V' },
             { },
@@ -105,13 +110,17 @@ int main(int argc, char *argv[])
         int option_index = 0;
         int c;
 
-        c = getopt_long(argc, argv, "+hqvV", long_options, &option_index);
+        c = getopt_long(argc, argv, "+hlqs:vV", long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
             case 'h':
                 show_help = true;
+                break;
+            case 'l':
+                print_bridge_drivers();
+                exit(EXIT_SUCCESS);
                 break;
             case 'v':
                 verbose++;
@@ -121,6 +130,12 @@ int main(int argc, char *argv[])
                 exit(EXIT_SUCCESS);
             case 'q':
                 quiet = true;
+                break;
+            case 's':
+                if (disable_bridge_driver(optarg)) {
+                    fprintf(stderr, "Error: '%s' not a recognized bridge name (use '-l' to list)\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
                 break;
             case '?':
                 exit(EXIT_FAILURE);

@@ -21,6 +21,9 @@ struct bridge_driver {
 	 * (i.e. devmem)
 	 */
 	bool local;
+
+	/* Set if this driver has been explicitly disabled */
+	bool disabled;
 };
 
 AUTODATA_TYPE(bridge_drivers, struct bridge_driver);

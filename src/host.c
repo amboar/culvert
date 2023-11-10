@@ -20,6 +20,44 @@ struct bridge {
 	struct ahb *ahb;
 };
 
+void print_bridge_drivers(void)
+{
+    struct bridge_driver **bridges;
+    size_t n_bridges = 0;
+
+    printf("Available bridges:\n");
+
+    bridges = autodata_get(bridge_drivers, &n_bridges);
+
+    for (size_t i = 0; i < n_bridges; i++) {
+        printf("  %s\n", bridges[i]->name);
+    }
+
+    autodata_free(bridges);
+}
+
+int disable_bridge_driver(const char *drv)
+{
+    struct bridge_driver **bridges;
+    size_t n_bridges = 0;
+    int ret = -ENOENT;
+
+    bridges = autodata_get(bridge_drivers, &n_bridges);
+
+    for (size_t i = 0; i < n_bridges; i++) {
+        if (!strcmp(bridges[i]->name, drv)) {
+            bridges[i]->disabled = true;
+            ret = 0;
+            goto out;
+        }
+    }
+
+out:
+    autodata_free(bridges);
+
+    return ret;
+}
+
 int host_init(struct host *ctx, int argc, char *argv[])
 {
     struct bridge_driver **bridges;
@@ -35,6 +73,11 @@ int host_init(struct host *ctx, int argc, char *argv[])
 
     for (i = 0; i < n_bridges; i++) {
         struct ahb *ahb;
+
+        if (bridges[i]->disabled) {
+            logd("Skipping bridge driver %s\n", bridges[i]->name);
+            continue;
+        }
 
         logd("Trying bridge driver %s\n", bridges[i]->name);
 
