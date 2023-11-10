@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 
     if (optind == argc) {
         if (!show_help)
-            loge("Not enough arguments\n");
+            fprintf(stderr, "Error: not enough arguments\n");
         help(program_invocation_short_name);
         exit(EXIT_FAILURE);
     }
@@ -150,6 +150,6 @@ int main(int argc, char *argv[])
         cmd++;
     }
 
-    loge("Unknown command: %s\n", argv[1]);
+    fprintf(stderr, "Error: unknown command: %s\n", argv[1]);
     exit(EXIT_FAILURE);
 }
