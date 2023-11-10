@@ -140,7 +140,7 @@ static const struct ahb_ops l2ab_ahb_ops = {
 static struct ahb *l2ab_driver_probe(int argc, char *argv[]);
 static void l2ab_driver_destroy(struct ahb *ahb);
 
-static const struct bridge_driver l2ab_driver = {
+static struct bridge_driver l2ab_driver = {
     .name = "l2a",
     .probe = l2ab_driver_probe,
     .destroy = l2ab_driver_destroy,

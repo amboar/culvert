@@ -169,7 +169,7 @@ static const struct ahb_ops devmem_ahb_ops = {
 static struct ahb *devmem_driver_probe(int argc, char *argv[]);
 static void devmem_driver_destroy(struct ahb *ahb);
 
-static const struct bridge_driver devmem_driver = {
+static struct bridge_driver devmem_driver = {
     .name = "devmem",
     .probe = devmem_driver_probe,
     .destroy = devmem_driver_destroy,

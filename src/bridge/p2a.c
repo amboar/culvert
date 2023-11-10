@@ -203,7 +203,7 @@ static struct ahb *p2ab_driver_probe(int argc, char *argv[]);
 static int p2ab_driver_reinit(struct ahb *ahb);
 static void p2ab_driver_destroy(struct ahb *ahb);
 
-static const struct bridge_driver p2ab_driver = {
+static struct bridge_driver p2ab_driver = {
     .name = "p2a",
     .probe = p2ab_driver_probe,
     .reinit = p2ab_driver_reinit,

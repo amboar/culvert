@@ -12,6 +12,8 @@ struct host {
 	struct list_head bridges;
 };
 
+int on_each_bridge_driver(int (*fn)(struct bridge_driver*, void*), void *arg);
+
 int host_init(struct host *ctx, int argc, char *argv[]);
 void host_destroy(struct host *ctx);
 

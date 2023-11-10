@@ -448,7 +448,7 @@ static const struct ahb_ops debug_ahb_ops = {
 static struct ahb *debug_driver_probe(int argc, char *argv[]);
 static void debug_driver_destroy(struct ahb *ahb);
 
-static const struct bridge_driver debug_driver = {
+static struct bridge_driver debug_driver = {
     .name = "debug-uart",
     .probe = debug_driver_probe,
     .destroy = debug_driver_destroy,

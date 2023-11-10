@@ -13,7 +13,10 @@
 #include <string.h>
 
 #include "config.h"
+#include "compiler.h"
 #include "log.h"
+#include "ahb.h"
+#include "host.h"
 
 int cmd_ilpc(const char *name, int argc, char *argv[]);
 int cmd_p2a(const char *name, int argc, char *argv[]);
@@ -81,6 +84,22 @@ static const struct command cmds[] = {
     { },
 };
 
+static int print_bridge_driver(struct bridge_driver *drv, void *arg __unused)
+{
+    printf("  %s\n", drv->name);
+    return 0;
+}
+
+static int disable_bridge_driver(struct bridge_driver *drv, void *arg)
+{
+    const char *name = arg;
+    if (!strcmp(drv->name, name)) {
+        drv->disabled = true;
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     const struct command *cmd = &cmds[0];
@@ -92,13 +111,15 @@ int main(int argc, char *argv[])
         static struct option long_options[] = {
             { "help", no_argument, NULL, 'h' },
             { "quiet", no_argument, NULL, 'q' },
+            { "skip-bridge", required_argument, NULL, 's' },
+            { "list-bridges", no_argument, NULL, 'l' },
             { "verbose", no_argument, NULL, 'v' },
             { },
         };
         int option_index = 0;
         int c;
 
-        c = getopt_long(argc, argv, "+hqv", long_options, &option_index);
+        c = getopt_long(argc, argv, "+hlqs:v", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -106,11 +127,22 @@ int main(int argc, char *argv[])
             case 'h':
                 show_help = true;
                 break;
+            case 'l':
+                printf("Available bridges:\n");
+                on_each_bridge_driver(print_bridge_driver, NULL);
+                exit(EXIT_SUCCESS);
+                break;
             case 'v':
                 verbose++;
                 break;
             case 'q':
                 quiet = true;
+                break;
+            case 's':
+                if (!on_each_bridge_driver(disable_bridge_driver, optarg)) {
+                    fprintf(stderr, "Error: '%s' not a recognized bridge name (use '-l' to list)\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
                 break;
             case '?':
                 exit(EXIT_FAILURE);
