@@ -88,7 +88,7 @@ int debug_probe(struct debug *ctx)
 {
     int rc;
 
-    logd("Probing %s\n", ahb_interface_names[ahb_debug]);
+    logd("Probing %s\n", ctx->ahb.drv->name);
 
     rc = debug_enter(ctx);
     if (rc < 0)
@@ -445,6 +445,16 @@ static const struct ahb_ops debug_ahb_ops = {
     .writel = debug_writel
 };
 
+static struct ahb *debug_driver_probe(int argc, char *argv[]);
+static void debug_driver_destroy(struct ahb *ahb);
+
+static const struct bridge_driver debug_driver = {
+    .name = "debug-uart",
+    .probe = debug_driver_probe,
+    .destroy = debug_driver_destroy,
+};
+REGISTER_BRIDGE_DRIVER(debug_driver);
+
 int debug_init_v(struct debug *ctx, va_list args)
 {
     const char *interface;
@@ -478,7 +488,7 @@ int debug_init_v(struct debug *ctx, va_list args)
     rc = prompt_init(&ctx->prompt, fd, "\r", false);
     if (rc < 0) { goto cleanup_ts16; }
 
-    ahb_init_ops(&ctx->ahb, ahb_debug, &debug_ahb_ops);
+    ahb_init_ops(&ctx->ahb, &debug_driver, &debug_ahb_ops);
 
     return 0;
 
@@ -559,10 +569,3 @@ static void debug_driver_destroy(struct ahb *ahb)
 
     free(ctx);
 }
-
-static const struct bridge_driver debug_driver = {
-    .type = ahb_debug,
-    .probe = debug_driver_probe,
-    .destroy = debug_driver_destroy,
-};
-REGISTER_BRIDGE_DRIVER(debug_driver);

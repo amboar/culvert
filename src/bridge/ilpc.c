@@ -24,7 +24,7 @@ int ilpcb_probe(struct ilpcb *ctx)
 {
     int rc;
 
-    logd("Probing %s\n", ahb_interface_names[ahb_ilpcb]);
+    logd("Probing %s\n", ctx->ahb.drv->name);
 
     if (!sio_probe(&ctx->sio))
         return 0;
@@ -308,9 +308,19 @@ static const struct ahb_ops ilpcb_ops = {
     .writel = ilpcb_writel
 };
 
+static struct ahb *ilpcb_driver_probe(int argc, char *argv[]);
+static void ilpcb_driver_destroy(struct ahb *ahb);
+
+static const struct bridge_driver ilpcb_driver = {
+    .name = "ilpc",
+    .probe = ilpcb_driver_probe,
+    .destroy = ilpcb_driver_destroy,
+};
+REGISTER_BRIDGE_DRIVER(ilpcb_driver);
+
 int ilpcb_init(struct ilpcb *ctx)
 {
-    ahb_init_ops(&ctx->ahb, ahb_ilpcb, &ilpcb_ops);
+    ahb_init_ops(&ctx->ahb, &ilpcb_driver, &ilpcb_ops);
 
     return sio_init(&ctx->sio);
 }
@@ -368,10 +378,3 @@ static void ilpcb_driver_destroy(struct ahb *ahb)
 
     free(ctx);
 }
-
-static const struct bridge_driver ilpcb_driver = {
-    .type = ahb_ilpcb,
-    .probe = ilpcb_driver_probe,
-    .destroy = ilpcb_driver_destroy,
-};
-REGISTER_BRIDGE_DRIVER(ilpcb_driver);

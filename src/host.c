@@ -36,7 +36,7 @@ int host_init(struct host *ctx, int argc, char *argv[])
     for (i = 0; i < n_bridges; i++) {
         struct ahb *ahb;
 
-        logd("Trying bridge driver %s\n", ahb_interface_names[bridges[i]->type]);
+        logd("Trying bridge driver %s\n", bridges[i]->name);
 
         if ((ahb = bridges[i]->probe(argc, argv))) {
             struct bridge *bridge;

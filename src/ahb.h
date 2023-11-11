@@ -5,23 +5,13 @@
 #define _AHB_H
 
 #include "log.h"
+#include "bridge.h"
 
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
-
-enum ahb_bridge {
-    ahb_ilpcb,
-    ahb_l2ab,
-    ahb_p2ab,
-    ahb_debug,
-    ahb_devmem,
-    ahb_max_interfaces
-};
-
-extern const char *ahb_interface_names[ahb_max_interfaces];
 
 struct ahb_range {
     const char *name;
@@ -40,13 +30,14 @@ struct ahb_ops {
 };
 
 struct ahb {
-    enum ahb_bridge type;
+    const struct bridge_driver *drv;
     const struct ahb_ops *ops;
 };
 
-static inline void ahb_init_ops(struct ahb *ctx, enum ahb_bridge type, const struct ahb_ops *ops)
+static inline void ahb_init_ops(struct ahb *ctx, const struct bridge_driver *drv,
+                                const struct ahb_ops *ops)
 {
-    ctx->type = type;
+    ctx->drv = drv;
     ctx->ops = ops;
 }
 

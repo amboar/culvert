@@ -33,7 +33,7 @@ int devmem_probe(struct devmem *ctx)
 {
     int rc;
 
-    logd("Probing %s\n", ahb_interface_names[ahb_devmem]);
+    logd("Probing %s\n", ctx->ahb.drv->name);
 
 #ifndef __arm__
     return -ENOTSUP;
@@ -166,6 +166,17 @@ static const struct ahb_ops devmem_ahb_ops = {
     .writel = devmem_writel
 };
 
+static struct ahb *devmem_driver_probe(int argc, char *argv[]);
+static void devmem_driver_destroy(struct ahb *ahb);
+
+static const struct bridge_driver devmem_driver = {
+    .name = "devmem",
+    .probe = devmem_driver_probe,
+    .destroy = devmem_driver_destroy,
+    .local = true,
+};
+REGISTER_BRIDGE_DRIVER(devmem_driver);
+
 int devmem_init(struct devmem *ctx)
 {
     int cleanup;
@@ -183,7 +194,7 @@ int devmem_init(struct devmem *ctx)
 
     ctx->win = NULL;
 
-    ahb_init_ops(&ctx->ahb, ahb_devmem, &devmem_ahb_ops);
+    ahb_init_ops(&ctx->ahb, &devmem_driver, &devmem_ahb_ops);
 
     return 0;
 
@@ -257,10 +268,3 @@ static void devmem_driver_destroy(struct ahb *ahb)
 
     free(ctx);
 }
-
-static const struct bridge_driver devmem_driver = {
-    .type = ahb_devmem,
-    .probe = devmem_driver_probe,
-    .destroy = devmem_driver_destroy,
-};
-REGISTER_BRIDGE_DRIVER(devmem_driver);
