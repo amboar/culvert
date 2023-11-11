@@ -79,7 +79,7 @@ int p2ab_probe(struct p2ab *ctx)
 {
     int64_t rc;
 
-    logd("Probing %s\n", ahb_interface_names[ahb_p2ab]);
+    logd("Probing %s\n", ctx->ahb.drv->name);
 
     rc = rev_probe(p2ab_as_ahb(ctx));
     if (rc < 0)
@@ -199,6 +199,18 @@ static const struct ahb_ops p2ab_ahb_ops = {
     .writel = p2ab_writel,
 };
 
+static struct ahb *p2ab_driver_probe(int argc, char *argv[]);
+static int p2ab_driver_reinit(struct ahb *ahb);
+static void p2ab_driver_destroy(struct ahb *ahb);
+
+static const struct bridge_driver p2ab_driver = {
+    .name = "p2a",
+    .probe = p2ab_driver_probe,
+    .reinit = p2ab_driver_reinit,
+    .destroy = p2ab_driver_destroy,
+};
+REGISTER_BRIDGE_DRIVER(p2ab_driver);
+
 int p2ab_init(struct p2ab *ctx, uint16_t vid, uint16_t did)
 {
     int rc;
@@ -222,7 +234,7 @@ int p2ab_init(struct p2ab *ctx, uint16_t vid, uint16_t did)
     if ((rc = p2ab_unlock(ctx)) < 0)
         goto cleanup_mmap;
 
-    ahb_init_ops(&ctx->ahb, ahb_p2ab, &p2ab_ahb_ops);
+    ahb_init_ops(&ctx->ahb, &p2ab_driver, &p2ab_ahb_ops);
 
     return 0;
 
@@ -306,11 +318,3 @@ static void p2ab_driver_destroy(struct ahb *ahb)
 
     free(ctx);
 }
-
-static const struct bridge_driver p2ab_driver = {
-    .type = ahb_p2ab,
-    .probe = p2ab_driver_probe,
-    .reinit = p2ab_driver_reinit,
-    .destroy = p2ab_driver_destroy,
-};
-REGISTER_BRIDGE_DRIVER(p2ab_driver);

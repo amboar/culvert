@@ -95,7 +95,7 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if (ahb->type == ahb_devmem)
+    if (ahb->drv->local)
         loge("I hope you know what you are doing\n");
     else {
         logi("Preventing system reset\n");
@@ -161,7 +161,7 @@ cleanup_flash:
 
 cleanup_state:
     if (rc == 0) {
-        if (ahb->type != ahb_devmem) {
+        if (!ahb->drv->local) {
             struct wdt *wdt;
             int64_t wait;
 

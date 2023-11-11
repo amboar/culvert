@@ -111,7 +111,7 @@ int cmd_trace(const char *name __unused, int argc, char *argv[])
      * between when we start tracing and when we stop. Especially if other functions
      * of this tool are being used. Work around that by re-initing the bridge.
      */
-    if ((rc = host_bridge_reinit_from_ahb(host, ahb)) < 0) {
+    if ((rc = host_bridge_reinit_from_ahb(ahb)) < 0) {
         loge("Failed to reinitialise AHB bridge: %d\n", rc);
         goto cleanup_soc;
     }

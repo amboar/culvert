@@ -137,6 +137,16 @@ static const struct ahb_ops l2ab_ahb_ops = {
     .writel = l2ab_writel,
 };
 
+static struct ahb *l2ab_driver_probe(int argc, char *argv[]);
+static void l2ab_driver_destroy(struct ahb *ahb);
+
+static const struct bridge_driver l2ab_driver = {
+    .name = "l2a",
+    .probe = l2ab_driver_probe,
+    .destroy = l2ab_driver_destroy,
+};
+REGISTER_BRIDGE_DRIVER(l2ab_driver);
+
 int l2ab_init(struct l2ab *ctx)
 {
     struct ilpcb *ilpcb = &ctx->ilpcb;
@@ -162,7 +172,7 @@ int l2ab_init(struct l2ab *ctx)
     if (rc)
         goto cleanup;
 
-    ahb_init_ops(&ctx->ahb, ahb_l2ab, &l2ab_ahb_ops);
+    ahb_init_ops(&ctx->ahb, &l2ab_driver, &l2ab_ahb_ops);
 
     return 0;
 
@@ -233,10 +243,3 @@ static void l2ab_driver_destroy(struct ahb *ahb)
 
     free(ctx);
 }
-
-static const struct bridge_driver l2ab_driver = {
-    .type = ahb_l2ab,
-    .probe = l2ab_driver_probe,
-    .destroy = l2ab_driver_destroy,
-};
-REGISTER_BRIDGE_DRIVER(l2ab_driver);

@@ -36,7 +36,7 @@ int host_init(struct host *ctx, int argc, char *argv[])
     for (i = 0; i < n_bridges; i++) {
         struct ahb *ahb;
 
-        logd("Trying bridge driver %s\n", ahb_interface_names[bridges[i]->type]);
+        logd("Trying bridge driver %s\n", bridges[i]->name);
 
         if ((ahb = bridges[i]->probe(argc, argv))) {
             struct bridge *bridge;
@@ -80,19 +80,4 @@ struct ahb *host_get_ahb(struct host *ctx)
     bridge = list_top(&ctx->bridges, struct bridge, entry);
 
     return bridge ? bridge->ahb : NULL;
-}
-
-int host_bridge_reinit_from_ahb(struct host *ctx, struct ahb *ahb)
-{
-    struct bridge *bridge, *next;
-
-    list_for_each_safe(&ctx->bridges, bridge, next, entry) {
-        if (bridge->ahb != ahb) {
-            continue;
-        }
-
-        return bridge->driver->reinit ? bridge->driver->reinit(bridge->ahb) : 0;
-    }
-
-    return 0;
 }

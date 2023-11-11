@@ -67,7 +67,7 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
     }
 
     /* Do the reset */
-    if (ahb->type != ahb_devmem) {
+    if (!ahb->drv->local) {
         logi("Gating ARM clock\n");
         rc = clk_disable(clk, clk_arm);
         if (rc < 0)
