@@ -13,8 +13,7 @@
 /* Registers */
 #define WDT_RELOAD	        0x04
 #define WDT_CTRL	        0x0c
-#define   WDT_CTRL_BOOT_1       (0 << 7)
-#define   WDT_CTRL_BOOT_2       (1 << 7)
+#define   WDT_CTRL_ALT_BOOT     (1 << 7)
 #define   WDT_CTRL_RESET_SOC    (0b00 << 5)
 #define   WDT_CTRL_RESET_SYS    (0b01 << 5)
 #define   WDT_CTRL_RESET_CPU    (0b10 << 5)
@@ -149,6 +148,7 @@ int64_t wdt_perform_reset(struct wdt *ctx)
         return rc;
 
     mode |= WDT_CTRL_RESET_SOC | WDT_CTRL_SYS_RESET | WDT_CTRL_ENABLE;
+    mode &= ~WDT_CTRL_ALT_BOOT;
 
     if ((rc = wdt_writel(ctx, WDT_CTRL, mode)) < 0)
         return rc;
