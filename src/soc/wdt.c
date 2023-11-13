@@ -12,6 +12,8 @@
 
 /* Registers */
 #define WDT_RELOAD	        0x04
+#define WDT_RESTART	        0x08
+#define   WDT_RESTART_MAGIC     0x4755
 #define WDT_CTRL	        0x0c
 #define   WDT_CTRL_ALT_BOOT     (1 << 7)
 #define   WDT_CTRL_RESET_SOC    (0b00 << 5)
@@ -141,6 +143,10 @@ int64_t wdt_perform_reset(struct wdt *ctx)
         return wait;
 
     rc = wdt_writel(ctx, WDT_RELOAD, wait);
+    if (rc < 0)
+        return rc;
+
+    rc = wdt_writel(ctx, WDT_RESTART, WDT_RESTART_MAGIC);
     if (rc < 0)
         return rc;
 
