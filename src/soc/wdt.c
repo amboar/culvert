@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 
 /* Registers */
 #define WDT_RELOAD	        0x04
@@ -119,7 +120,7 @@ static int64_t wdt_usecs_to_ticks(struct wdt *ctx, uint32_t usecs)
     return usecs;
 }
 
-int64_t wdt_perform_reset(struct wdt *ctx)
+int wdt_perform_reset(struct wdt *ctx)
 {
     uint32_t mode;
     int64_t wait;
@@ -159,6 +160,22 @@ int64_t wdt_perform_reset(struct wdt *ctx)
     if ((rc = wdt_writel(ctx, WDT_CTRL, mode)) < 0)
         return rc;
 
+    if ((rc = ahb_release_bridge(ctx->soc->ahb)) < 0)
+        return rc;
+
+    /*
+     * Allow a little extra time for reset to occur (we're timing this
+     * asynchronously after all) before we try to reinitialize the bridge
+     */
+    wait += 1000000;
+    logd("Waiting %"PRId64" microseconds for watchdog timer to expire\n", wait);
+    usleep(wait);
+
+    if ((rc = ahb_reinit_bridge(ctx->soc->ahb)) < 0) {
+        loge("Failed to reinitialize bridge after reset: %d\n", rc);
+        return rc;
+    }
+
     /* The ARM clock gate is sticky on reset?! Ensure it's clear  */
     if ((rc = clk_enable(ctx->clk, clk_arm)) < 0)
         return rc;
@@ -167,7 +184,7 @@ int64_t wdt_perform_reset(struct wdt *ctx)
     if (rc < 0)
         return rc;
 
-    return wait;
+    return 0;
 }
 
 static const struct soc_device_id wdt_match[] = {

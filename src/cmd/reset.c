@@ -20,7 +20,6 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    int64_t wait = 0;
     struct ahb *ahb;
     struct clk *clk;
     struct wdt *wdt;
@@ -83,11 +82,8 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
 
     /* wdt_perform_reset ungates the ARM if required */
     logi("Performing SoC reset\n");
-    if ((wait = wdt_perform_reset(wdt)) > 0)
-        usleep(wait);
-
-    /* Cleanup */
-    if (wait < 0) {
+    rc = wdt_perform_reset(wdt);
+    if (rc < 0) {
 clk_enable_arm:
         if ((cleanup = clk_enable(clk, clk_arm)) < 0) {
             errno = -cleanup;

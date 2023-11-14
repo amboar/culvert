@@ -163,7 +163,6 @@ cleanup_state:
     if (rc == 0) {
         if (!ahb->drv->local) {
             struct wdt *wdt;
-            int64_t wait;
 
             logi("Performing SoC reset\n");
             if (!(wdt = wdt_get_by_name(soc, "wdt2"))) {
@@ -171,14 +170,9 @@ cleanup_state:
                 goto cleanup_soc;
             }
 
-            wait = wdt_perform_reset(wdt);
-
-            if (wait < 0) {
-                rc = wait;
+            rc = wdt_perform_reset(wdt);
+            if (rc < 0)
                 goto cleanup_soc;
-            }
-
-            usleep(wait);
         }
     } else {
         logi("Deconfiguring VUART host Tx discard\n");
