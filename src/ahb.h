@@ -75,4 +75,7 @@ static inline int ahb_writel(struct ahb *ctx, uint32_t phys, uint32_t val)
 ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd);
 ssize_t ahb_siphon_out(struct ahb *ctx, uint32_t phys, int infd);
 
+int ahb_release_bridge(struct ahb *ctx);
+int ahb_reinit_bridge(struct ahb *ctx);
+
 #endif

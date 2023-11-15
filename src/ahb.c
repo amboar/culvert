@@ -83,3 +83,13 @@ done:
 
     return rc;
 }
+
+int ahb_release_bridge(struct ahb *ctx)
+{
+    return ctx->drv->release ? ctx->drv->release(ctx) : 0;
+}
+
+int ahb_reinit_bridge(struct ahb *ctx)
+{
+    return ctx->drv->reinit ? ctx->drv->reinit(ctx) : 0;
+}

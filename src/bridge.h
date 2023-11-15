@@ -13,6 +13,7 @@
 struct bridge_driver {
 	const char *name;
 	struct ahb *(*probe)(int argc, char *argv[]);
+	int (*release)(struct ahb *ahb);
 	int (*reinit)(struct ahb *ahb);
 	void (*destroy)(struct ahb *ahb);
 
