@@ -1,5 +1,9 @@
 fs = import('fs')
 
+if get_option('prefer_static')
+	add_project_link_arguments('-static', language: 'c')
+endif
+
 incdirs = [ '.' ]
 
 src = files(
