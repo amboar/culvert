@@ -12,7 +12,10 @@ jobs:
         run: sudo apt-get install -qq
           gcc
           gcc-arm-linux-gnueabi libc-dev-armel-cross
-          git meson device-tree-compiler qemu-user
+          git device-tree-compiler qemu-user
+          python3-pip ninja-build
+      - name: Install minimum meson
+        run: pip3 install --user meson~=0.63
       - uses: actions/checkout@v2
       - name: arm32
         # meson compile requires 0.54, but Ubuntu 20.04 ships 0.53, so run ninja directly

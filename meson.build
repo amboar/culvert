@@ -7,7 +7,7 @@ project('culvert', 'c',
 		'b_lto=true',
 		'b_ndebug=true',
 		],
-	meson_version: '>=0.53.0',
+	meson_version: '>=0.63.0',
 	version: 'v0.4.0')
 
 add_global_link_arguments('-z', 'noexecstack', language: 'c')
