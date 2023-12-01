@@ -28,6 +28,9 @@ static const struct flash_info flash_info[] = {
 	{ 0xef4019, 0x02000000, FL_ERASE_ALL | FL_ERASE_64K | FL_CAN_4B |
 				FL_ERASE_BULK,
 							"Winbond W25Q256BV"},
+	{ 0xef4020, 0x04000000, FL_ERASE_ALL | FL_ERASE_64K | FL_CAN_4B |
+				FL_ERASE_BULK,
+							"Winbond W25Q512JV"},
 	{ 0x20ba20, 0x04000000, FL_ERASE_4K  | FL_ERASE_64K | FL_CAN_4B |
                                 FL_ERASE_BULK | FL_MICRON_BUGS,
                                                           "Micron N25Qx512Ax"   },
