@@ -14,6 +14,7 @@
 
 #include "config.h"
 #include "log.h"
+#include "version.h"
 
 int cmd_ilpc(const char *name, int argc, char *argv[]);
 int cmd_p2a(const char *name, int argc, char *argv[]);
@@ -31,7 +32,7 @@ int cmd_trace(const char *name, int argc, char *argv[]);
 
 static void help(const char *name)
 {
-    printf("%s: " VERSION "\n", name);
+    printf("%s: " CULVERT_VERSION "\n", name);
     printf("Usage:\n");
     printf("\n");
     printf("%s probe [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
