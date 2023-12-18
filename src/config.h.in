@@ -81,4 +81,3 @@
 #endif /* CCAN_CONFIG_H */
 
 #define HAVE_LPC @have_lpc@
-#define VERSION @version@

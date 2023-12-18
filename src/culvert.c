@@ -14,6 +14,7 @@
 
 #include "config.h"
 #include "log.h"
+#include "version.h"
 
 int cmd_ilpc(const char *name, int argc, char *argv[]);
 int cmd_p2a(const char *name, int argc, char *argv[]);
@@ -29,9 +30,14 @@ int cmd_sfc(const char *name, int argc, char *argv[]);
 int cmd_otp(const char *name, int argc, char *argv[]);
 int cmd_trace(const char *name, int argc, char *argv[]);
 
-static void help(const char *name)
+static void print_version(const char *name)
 {
-    printf("%s: " VERSION "\n", name);
+    printf("%s: " CULVERT_VERSION "\n", name);
+}
+
+static void print_help(const char *name)
+{
+    print_version(name);
     printf("Usage:\n");
     printf("\n");
     printf("%s probe [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
@@ -93,12 +99,13 @@ int main(int argc, char *argv[])
             { "help", no_argument, NULL, 'h' },
             { "quiet", no_argument, NULL, 'q' },
             { "verbose", no_argument, NULL, 'v' },
+            { "version", no_argument, NULL, 'V' },
             { },
         };
         int option_index = 0;
         int c;
 
-        c = getopt_long(argc, argv, "+hqv", long_options, &option_index);
+        c = getopt_long(argc, argv, "+hqvV", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -109,6 +116,9 @@ int main(int argc, char *argv[])
             case 'v':
                 verbose++;
                 break;
+            case 'V':
+                print_version(program_invocation_short_name);
+                exit(EXIT_SUCCESS);
             case 'q':
                 quiet = true;
                 break;
@@ -122,7 +132,7 @@ int main(int argc, char *argv[])
     if (optind == argc) {
         if (!show_help)
             loge("Not enough arguments\n");
-        help(program_invocation_short_name);
+        print_help(program_invocation_short_name);
         exit(EXIT_FAILURE);
     }
 

@@ -1,0 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+#ifndef CULVERT_VERSION_H
+#define CULVERT_VERSION_H
+#define CULVERT_VERSION "@culvert_version@"
+#endif

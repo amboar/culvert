@@ -28,11 +28,6 @@ src = files(
 
 conf_data = configuration_data()
 
-# Version
-p = run_command('git', 'describe', '--tags', '--dirty', '--always')
-version = p.stdout().strip()
-conf_data.set_quoted('version', version)
-
 # Architecture-specific capabilities
 host = host_machine.cpu_family()
 host_inc = 'arch/@0@'.format(host)
@@ -59,7 +54,15 @@ subdir('cmd')
 subdir('devicetree')
 subdir('soc')
 
-executable('culvert', src, dtbos,
+# Version
+git = find_program('git')
+version = vcs_tag(command: [git, 'describe', '--tags', '--dirty', '--always'],
+                  fallback: meson.project_version(),
+                  input: 'version.h.in',
+                  output: 'version.h',
+                  replace_string: '@culvert_version@')
+
+executable('culvert', src, dtbos, version,
 	   include_directories: incdirs,
 	   dependencies: [ libfdt_dep ],
 	   link_with: [ libccan ],
