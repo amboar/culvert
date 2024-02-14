@@ -137,6 +137,44 @@ static const struct ahb_ops l2ab_ahb_ops = {
     .writel = l2ab_writel,
 };
 
+static int l2ab_save_hicr78(struct l2ab *ctx)
+{
+    struct ilpcb *ilpcb = &ctx->ilpcb;
+    int rc;
+
+    rc = ilpcb_readl(ilpcb_as_ahb(ilpcb), LPC_HICR7, &ctx->restore7);
+    if (rc)
+        return rc;
+
+    return ilpcb_readl(ilpcb_as_ahb(ilpcb), LPC_HICR8, &ctx->restore8);
+}
+
+static int l2ab_restore_hicr78(struct l2ab *ctx)
+{
+    struct ilpcb *ilpcb = &ctx->ilpcb;
+    int rc;
+
+    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR8, ctx->restore8);
+    if (rc)
+        return rc;
+
+    return ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR7, ctx->restore7);
+}
+
+static struct ahb *l2ab_driver_probe(int argc, char *argv[]);
+static void l2ab_driver_destroy(struct ahb *ahb);
+static int l2ab_driver_release(struct ahb *ahb);
+static int l2ab_driver_reinit(struct ahb *ahb);
+
+static struct bridge_driver l2ab_driver = {
+    .name = "l2a",
+    .probe = l2ab_driver_probe,
+    .destroy = l2ab_driver_destroy,
+    .reinit = l2ab_driver_reinit,
+    .release = l2ab_driver_release,
+};
+REGISTER_BRIDGE_DRIVER(l2ab_driver);
+
 int l2ab_init(struct l2ab *ctx)
 {
     struct ilpcb *ilpcb = &ctx->ilpcb;
@@ -154,15 +192,11 @@ int l2ab_init(struct l2ab *ctx)
     if (rc)
         goto cleanup;
 
-    rc = ilpcb_readl(ilpcb_as_ahb(ilpcb), LPC_HICR7, &ctx->restore7);
+    rc = l2ab_save_hicr78(ctx);
     if (rc)
         goto cleanup;
 
-    rc = ilpcb_readl(ilpcb_as_ahb(ilpcb), LPC_HICR8, &ctx->restore8);
-    if (rc)
-        goto cleanup;
-
-    ahb_init_ops(&ctx->ahb, ahb_l2ab, &l2ab_ahb_ops);
+    ahb_init_ops(&ctx->ahb, &l2ab_driver, &l2ab_ahb_ops);
 
     return 0;
 
@@ -175,14 +209,9 @@ cleanup:
 
 int l2ab_destroy(struct l2ab *ctx)
 {
-    struct ilpcb *ilpcb = &ctx->ilpcb;
     int rc;
 
-    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR8, ctx->restore8);
-    if (rc)
-        return rc;
-
-    rc = ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR7, ctx->restore7);
+    rc = l2ab_restore_hicr78(ctx);
     if (rc)
         return rc;
 
@@ -234,9 +263,12 @@ static void l2ab_driver_destroy(struct ahb *ahb)
     free(ctx);
 }
 
-static const struct bridge_driver l2ab_driver = {
-    .type = ahb_l2ab,
-    .probe = l2ab_driver_probe,
-    .destroy = l2ab_driver_destroy,
-};
-REGISTER_BRIDGE_DRIVER(l2ab_driver);
+static int l2ab_driver_release(struct ahb *ahb)
+{
+    return l2ab_restore_hicr78(to_l2ab(ahb));
+}
+
+static int l2ab_driver_reinit(struct ahb *ahb)
+{
+    return l2ab_save_hicr78(to_l2ab(ahb));
+}

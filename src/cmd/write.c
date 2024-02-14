@@ -95,7 +95,7 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if (ahb->type == ahb_devmem)
+    if (ahb->drv->local)
         loge("I hope you know what you are doing\n");
     else {
         logi("Preventing system reset\n");
@@ -161,9 +161,8 @@ cleanup_flash:
 
 cleanup_state:
     if (rc == 0) {
-        if (ahb->type != ahb_devmem) {
+        if (!ahb->drv->local) {
             struct wdt *wdt;
-            int64_t wait;
 
             logi("Performing SoC reset\n");
             if (!(wdt = wdt_get_by_name(soc, "wdt2"))) {
@@ -171,14 +170,9 @@ cleanup_state:
                 goto cleanup_soc;
             }
 
-            wait = wdt_perform_reset(wdt);
-
-            if (wait < 0) {
-                rc = wait;
+            rc = wdt_perform_reset(wdt);
+            if (rc < 0)
                 goto cleanup_soc;
-            }
-
-            usleep(wait);
         }
     } else {
         logi("Deconfiguring VUART host Tx discard\n");

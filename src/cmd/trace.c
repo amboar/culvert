@@ -98,6 +98,18 @@ int cmd_trace(const char *name __unused, int argc, char *argv[])
         goto cleanup_soc;
     }
 
+    /*
+     * The trace command waits for an unbounded amount of time while the trace
+     * is collected; it's possible the bridge state may change while we're
+     * waiting (for example if other culvert functions are being used).  We
+     * attempt to handle this gracefully by releasing the bridge and then
+     * reinitializing it later when we need to dump the trace.
+     */
+    if ((rc = host_bridge_release_from_ahb(ahb)) < 0) {
+        loge("Failed to release AHB bridge: %d\n", rc);
+        goto cleanup_soc;
+    }
+
     sigprocmask(SIG_BLOCK, &set, NULL);
     if ((rc = sigwait(&set, &sig))) {
         rc = -rc;
@@ -106,12 +118,7 @@ int cmd_trace(const char *name __unused, int argc, char *argv[])
     }
     sigprocmask(SIG_UNBLOCK, &set, NULL);
 
-    /*
-     * The trace app is long-lived so it's possible the bridge state has changed
-     * between when we start tracing and when we stop. Especially if other functions
-     * of this tool are being used. Work around that by re-initing the bridge.
-     */
-    if ((rc = host_bridge_reinit_from_ahb(host, ahb)) < 0) {
+    if ((rc = host_bridge_reinit_from_ahb(ahb)) < 0) {
         loge("Failed to reinitialise AHB bridge: %d\n", rc);
         goto cleanup_soc;
     }

@@ -12,7 +12,7 @@ int wdt_prevent_reset(struct soc *soc);
 struct wdt;
 
 int wdt_init(struct wdt *ctx, struct soc *soc, const char *name);
-int64_t wdt_perform_reset(struct wdt *ctx);
+int wdt_perform_reset(struct wdt *ctx);
 void wdt_destroy(struct wdt *ctx);
 
 struct wdt *wdt_get_by_name(struct soc *soc, const char *name);

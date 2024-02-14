@@ -12,14 +12,6 @@
 #include <string.h>
 #include <unistd.h>
 
-const char *ahb_interface_names[ahb_max_interfaces] = {
-    [ahb_ilpcb] = "iLPC2AHB",
-    [ahb_l2ab] = "LPC2AHB",
-    [ahb_p2ab] = "P2A",
-    [ahb_debug] = "Debug UART",
-    [ahb_devmem] = "devmem",
-};
-
 #define AHB_CHUNK (1 << 20)
 
 ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd)
@@ -90,4 +82,14 @@ done:
     free(chunk);
 
     return rc;
+}
+
+int ahb_release_bridge(struct ahb *ctx)
+{
+    return ctx->drv->release ? ctx->drv->release(ctx) : 0;
+}
+
+int ahb_reinit_bridge(struct ahb *ctx)
+{
+    return ctx->drv->reinit ? ctx->drv->reinit(ctx) : 0;
 }

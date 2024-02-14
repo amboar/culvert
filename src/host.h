@@ -15,7 +15,19 @@ struct host {
 int host_init(struct host *ctx, int argc, char *argv[]);
 void host_destroy(struct host *ctx);
 
+int disable_bridge_driver(const char *drv);
+void print_bridge_drivers(void);
+
 struct ahb *host_get_ahb(struct host *ctx);
-int host_bridge_reinit_from_ahb(struct host *ctx, struct ahb *ahb);
+
+static inline int host_bridge_release_from_ahb(struct ahb *ahb)
+{
+	return ahb->drv->release ? ahb->drv->release(ahb) : 0;
+}
+
+static inline int host_bridge_reinit_from_ahb(struct ahb *ahb)
+{
+	return ahb->drv->reinit ? ahb->drv->reinit(ahb) : 0;
+}
 
 #endif
