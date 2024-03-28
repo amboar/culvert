@@ -12,11 +12,91 @@
 #include "soc/sdmc.h"
 #include "soc/sfc.h"
 
+#include <libfdt.h>
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static int cmd_dump_controller(struct soc *soc, const char *controller)
+{
+    struct soc_device_node dn;
+    struct soc_region region;
+    const uint32_t *pwidth;
+    const uint32_t *pshift;
+    uint32_t stride;
+    uint32_t width;
+    uint32_t shift;
+    uint32_t addr;
+    uint32_t end;
+    int len;
+    int rc;
+    
+    if (strcmp("fmc", controller)) {
+        return -EINVAL;
+    }
+
+    rc = soc_device_from_name(soc, controller, &dn);
+    if (rc < 0) {
+        loge("failed to find device by name '%s': %d\n", controller, rc);
+        return -EINVAL;
+    }
+
+    // FIXME: Move this to src/soc.c
+    pwidth = fdt_getprop(soc->fdt.start, dn.offset, "reg-io-width", &len);
+    if (len < 0) {
+        loge("'%s' lacks reg-io-width\n", controller);
+        return -ENOTSUP;
+    }
+    width = be32toh(*pwidth);
+    if (width > 0xf) {
+        loge("Invalid value for reg-io-width: %"PRIu32"\n", width);
+        return -EINVAL;
+    }
+
+    pshift = fdt_getprop(soc->fdt.start, dn.offset, "reg-shift", &len);
+    if (len < 0) {
+        loge("'%s' lacks reg-shift\n", controller);
+        return -ENOTSUP;
+    }
+    shift = be32toh(*pshift);
+    if (shift > 2) {
+        loge("Invalid value for reg-shift: %"PRIu32"\n", shift);
+        return -EINVAL;
+    }
+
+    rc = soc_device_get_memory(soc, &dn, &region);
+    if (rc < 0) {
+        loge("Failed to retrieve device memory: %d\n", rc);
+        return -ENODEV;
+    }
+
+    end = region.start + region.length;
+    if (end == UINT32_MAX || end < region.start) {
+        loge("Invalid region: { start: 0x%"PRIx32", length: 0x%"PRIx32"}\n",
+             region.start, region.length);
+        return -EINVAL;
+    }
+
+    // FIXME: Generalise
+    if (width != 4) {
+        loge("Unsupported reg-io-width: %"PRIu32"\n", width);
+        return -ENOTSUP;
+    }
+
+    stride = width << shift;
+    for (addr = region.start; addr < end; addr += stride) {
+        uint32_t val;
+        rc = soc_readl(soc, addr, &val);
+        if (!rc) {
+            printf("0x%08"PRIx32": 0x%08"PRIx32"\n", addr, val);
+        }
+    }
+    
+    return 0;
+}
 
 static int cmd_dump_firmware(struct soc *soc)
 {
@@ -117,11 +197,18 @@ int cmd_read(const char *name __unused, int argc, char *argv[])
     if ((rc = soc_probe(soc, ahb)) < 0)
         goto cleanup_host;
 
-    if (!strcmp("firmware", argv[0]))
+    if (!strcmp("controller", argv[0])) {
+        if (argc < 2) {
+            loge("Not enough arguments for controller subcommand\n");
+            goto cleanup_host;
+        }
+        // FIXME: Don't hardcode the controller name
+        rc = cmd_dump_controller(soc, "fmc");
+    } else if (!strcmp("firmware", argv[0])) {
         rc = cmd_dump_firmware(soc);
-    else if (!strcmp("ram", argv[0]))
+    } else if (!strcmp("ram", argv[0])) {
         rc = cmd_dump_ram(soc);
-    else {
+    } else {
         loge("Unsupported read type '%s'", argv[0]);
         rc = -EINVAL;
     }

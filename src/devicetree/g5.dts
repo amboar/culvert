@@ -55,6 +55,8 @@
 				reg = <0x1e620000 0xc4
 				       0x20000000 0x10000000>;
 				compatible = "aspeed,ast2500-fmc";
+				reg-io-width = <4>;
+				reg-shift = <0>;
 			};
 
 			spi1: spi@1e630000 {
