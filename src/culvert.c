@@ -32,6 +32,7 @@ int cmd_reset(const char *name, int argc, char *argv[]);
 int cmd_sfc(const char *name, int argc, char *argv[]);
 int cmd_otp(const char *name, int argc, char *argv[]);
 int cmd_trace(const char *name, int argc, char *argv[]);
+int cmd_coprocessor(const char *name, int argc, char *argv[]);
 
 static void print_version(const char *name)
 {
@@ -66,6 +67,7 @@ static void print_help(const char *name)
     printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s coprocessor run ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
 }
 
 struct command {
@@ -87,6 +89,7 @@ static const struct command cmds[] = {
     { "sfc", cmd_sfc },
     { "otp", cmd_otp },
     { "trace", cmd_trace },
+    { "coprocessor", cmd_coprocessor},
     { },
 };
 
