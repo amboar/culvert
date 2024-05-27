@@ -24,6 +24,17 @@
 
 #define to_debug(ahb) container_of(ahb, struct debug, ahb)
 
+/*
+ * Aspeed have self-published the debug UART password. Given that it's no-longer
+ * secret, embed it directly in culvert rather than require the user to specify
+ * it in the environment.
+ *
+ * Page 381, under "5. start use debug command"
+ *
+ * https://github.com/AspeedTech-BMC/openbmc/releases/download/v09.01/SDK_User_Guide_v09.01.pdf
+ */
+static const char *password = "5z&0VK{@`HW}H~V310=l=JB+M]IV-f;Sz98XfCA&Rp)i|Jo=2?IBN$QaQ2\"Kb|Ov";
+
 static inline int streq(const char *a, const char *b)
 {
     return !strcmp(a, b);
@@ -31,16 +42,9 @@ static inline int streq(const char *a, const char *b)
 
 int debug_enter(struct debug *ctx)
 {
-    const char *password;
     int rc;
 
     logi("Entering debug mode\n");
-
-    password = getenv("AST_DEBUG_PASSWORD");
-    if (!password) {
-        loge("AST_DEBUG_PASSWORD environment variable is not defined\n");
-        return -ENOTSUP;
-    }
 
     rc = console_set_baud(ctx->console, 1200);
     if (rc < 0)
@@ -463,15 +467,6 @@ int debug_init_v(struct debug *ctx, va_list args)
 {
     const char *interface;
     int rc, fd;
-
-    /*
-     * Sanity-check presence of the password, though we also test again below
-     * where we use it to avoid TOCTOU.
-     */
-    if (!getenv("AST_DEBUG_PASSWORD")) {
-        loge("AST_DEBUG_PASSWORD environment variable is not defined\n");
-        return -ENOTSUP;
-    }
 
     interface = va_arg(args, const char *);
 
