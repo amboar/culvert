@@ -237,12 +237,12 @@ devmem_driver_probe(int argc, char *argv[] __unused)
     }
 
     if ((rc = devmem_init(ctx)) < 0) {
-        loge("failed to initialise devmem bridge: %d\n", rc);
+        logd("failed to initialise devmem bridge: %d\n", rc);
         goto cleanup_ctx;
     }
 
     if ((rc = devmem_probe(ctx)) < 0) {
-        loge("Failed devmem probe: %d\n", rc);
+        logd("Failed devmem probe: %d\n", rc);
         goto destroy_ctx;
     }
 

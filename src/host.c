@@ -122,5 +122,12 @@ struct ahb *host_get_ahb(struct host *ctx)
 
     bridge = list_top(&ctx->bridges, struct bridge, entry);
 
-    return bridge ? bridge->ahb : NULL;
+    if (bridge) {
+        logd("Accessing the BMC's AHB via the %s bridge\n",
+             bridge->driver->name);
+        return bridge->ahb;
+    }
+
+    loge("Bridge discovery failed, cannot access BMC AHB\n");
+    return NULL;
 }
