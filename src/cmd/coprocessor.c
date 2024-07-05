@@ -30,9 +30,9 @@
 #define SCU_COPROC_CACHE_RANGE 0xa40
 #define   SCU_COPROC_CACHE_1ST_16MB_EN BIT(0)
 
-int cmd_coprocessor(const char *name __unused, int argc, char *argv[])
+static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[])
 {
-    const char *arg_subcmd, *arg_mem_base, *arg_mem_size;
+    const char *arg_mem_base, *arg_mem_size;
     struct host _host, *host = &_host;
     unsigned long mem_base, mem_size;
     struct soc _soc, *soc = &_soc;
@@ -49,14 +49,8 @@ int cmd_coprocessor(const char *name __unused, int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    arg_subcmd = argv[0];
     arg_mem_base = argv[1];
     arg_mem_size = argv[2];
-
-    if (strcmp("run", arg_subcmd)) {
-        loge("Unknown coprocessor subcommand '%s'\n", arg_subcmd);
-        return EXIT_FAILURE;
-    }
 
     errno = 0;
     mem_base = strtoul(arg_mem_base, &endp, 0);
@@ -209,4 +203,79 @@ cleanup_host:
     host_destroy(host);
 
     return rc;
+}
+
+static int cmd_coprocessor_stop(const char *name __unused, int argc, char *argv[])
+{
+    struct host _host, *host = &_host;
+    struct soc _soc, *soc = &_soc;
+    struct ahb *ahb;
+    struct scu *scu;
+    int rc;
+
+    if ((rc = host_init(host, argc - 3, argv + 3)) < 0) {
+        loge("Failed to initialise host interface: %d\n", rc);
+        return EXIT_FAILURE;
+    }
+
+    if (!(ahb = host_get_ahb(host))) {
+        loge("Failed to acquire AHB interface\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
+    }
+
+    if ((rc = soc_probe(soc, ahb)) < 0) {
+        loge("Failed to probe SoC: %d\n", rc);
+        rc = EXIT_FAILURE;
+        goto cleanup_host;
+    }
+
+    if (soc_generation(soc) != ast_g6) {
+        loge("We currently only support the AST2600-series coprocessor\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_soc;
+    }
+
+    if (!(scu = scu_get(soc))) {
+        loge("Failed to acquire SCU driver\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_soc;
+    }
+
+    if ((rc = scu_writel(scu, SCU_COPROC_CTRL, 0)) < 0) {
+        loge("Failed to disable coprocoessor: %d\n", rc);
+        rc = EXIT_FAILURE;
+    }
+
+    scu_put(scu);
+
+cleanup_soc:
+    soc_destroy(soc);
+
+cleanup_host:
+    host_destroy(host);
+
+    return rc;
+}
+
+int cmd_coprocessor(const char *name __unused, int argc, char *argv[])
+{
+    const char *arg_subcmd;
+
+    if (argc < 1) {
+        loge("Not enough arguments for coprocessor command\n");
+        return EXIT_FAILURE;
+    }
+
+    arg_subcmd = argv[0];
+
+    if (!strcmp("run", arg_subcmd)) {
+        return cmd_coprocessor_run(name, argc, argv);
+    } else if (!strcmp("stop", arg_subcmd)) {
+        return cmd_coprocessor_stop(name, argc, argv);
+    } else {
+        loge("Unknown coprocessor subcommand '%s'\n", arg_subcmd);
+    }
+
+    return EXIT_FAILURE;
 }
