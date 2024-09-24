@@ -56,8 +56,9 @@ static void print_help(const char *name)
     printf("%s devmem write ADDRESS VALUE\n", name);
     printf("%s console HOST_UART BMC_UART BAUD USER PASSWORD\n", name);
     printf("%s read firmware [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s read ram [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s read ram ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s write ram ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s replace ram MATCH REPLACE\n", name);
     printf("%s reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s jtag [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
@@ -171,7 +172,7 @@ int main(int argc, char *argv[])
             int rc;
 
             /* probe uses getopt, but for subcommands not using getopt */
-            if (strcmp("probe", argv[optind])) {
+            if (!(!strcmp("probe", argv[optind]) || !strcmp("write", argv[optind]))) {
                 offset += 1;
             }
             optind = 1;
