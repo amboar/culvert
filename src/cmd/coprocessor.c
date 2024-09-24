@@ -29,6 +29,8 @@
 #define SCU_COPROC_DMEM_LIMIT 0xa0c
 #define SCU_COPROC_CACHE_RANGE 0xa40
 #define   SCU_COPROC_CACHE_1ST_16MB_EN BIT(0)
+#define SCU_COPROC_CACHE_FUNC 0xa48
+#define   SCU_COPROC_CACHE_EN BIT(0)
 
 static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[])
 {
@@ -138,12 +140,25 @@ static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[]
         goto cleanup_soc;
     }
 
+    /* 4.1.2 SSP Cache Programming Procedure
+     *
+     * 'AST2600 SECONDARY SERVICE PROCESSOR v0.1f.pdf'
+     */
+    /* 1. */
     if ((rc = scu_writel(scu, SCU_COPROC_CTRL, 0)) < 0) {
         loge("Failed to disable coprocoessor: %d\n", rc);
         rc = EXIT_FAILURE;
         goto cleanup_scu;
     }
 
+    /* 2. */
+    if ((rc = scu_writel(scu, SCU_COPROC_CTRL, SCU_COPROC_CTRL_RESET_ASSERT)) < 0) {
+        loge("Failed to assert the coprocessor reset: %d", rc);
+        rc = EXIT_FAILURE;
+        goto cleanup_scu;
+    }
+
+    /* 3. */
     /* TODO: Verify firmware fits inside specified region, somehow? */
     if ((src = soc_siphon_out(soc, mem_base, STDIN_FILENO)) < 0) {
         loge("Failed to load coprocessor firmware to provided region: %d\n", src);
@@ -151,18 +166,18 @@ static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[]
         goto cleanup_scu;
     }
 
+        /* 4. */
     if (scu_writel(scu, SCU_COPROC_MEM_BASE, mem_base) ||
+        /* 5. */
         scu_writel(scu, SCU_COPROC_IMEM_LIMIT,
                    mem_base + COPROC_CACHED_MEM_SIZE) ||
+        /* 6. */
         scu_writel(scu, SCU_COPROC_DMEM_LIMIT, mem_base + mem_size) ||
-        scu_writel(scu, SCU_COPROC_CACHE_RANGE, SCU_COPROC_CACHE_1ST_16MB_EN)) {
+        /* 7. */
+        scu_writel(scu, SCU_COPROC_CACHE_RANGE, SCU_COPROC_CACHE_1ST_16MB_EN) ||
+        /* 8. */
+        scu_writel(scu, SCU_COPROC_CACHE_FUNC, SCU_COPROC_CACHE_EN)) {
         loge("Failed to configure coprocessor control registers\n");
-        rc = EXIT_FAILURE;
-        goto cleanup_scu;
-    }
-
-    if ((rc = scu_writel(scu, SCU_COPROC_CTRL, SCU_COPROC_CTRL_RESET_ASSERT)) < 0) {
-        loge("Failed to assert the coprocessor reset: %d", rc);
         rc = EXIT_FAILURE;
         goto cleanup_scu;
     }
@@ -173,6 +188,7 @@ static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[]
         goto cleanup_scu;
     }
 
+    /* 9. */
     if ((rc = scu_writel(scu, SCU_COPROC_CTRL, 0)) < 0) {
         loge("Failed to disable coprocessor: %d\n", rc);
         rc = EXIT_FAILURE;
@@ -185,6 +201,7 @@ static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[]
         goto cleanup_scu;
     }
 
+    /* 10. */
     if ((rc = scu_writel(scu, SCU_COPROC_CTRL, SCU_COPROC_CTRL_EN)) < 0) {
         loge("Failed to start coprocessor: %d\n", rc);
         rc = EXIT_FAILURE;
