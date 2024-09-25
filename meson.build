@@ -19,7 +19,7 @@ libfdt_dep = dependency('libfdt',
 
 libfdt_native_dep = dependency('dtc',
 		     native: true,
-		     default_options: [ 'tools=enable' ],
+		     default_options: [ 'tools=true' ],
 		     fallback: [ 'dtc', 'libfdt_dep' ],
 		     required: true)
 
