@@ -12,6 +12,7 @@
 		vuart = &vuart;
 		wdt1 = &wdt1;
 		wdt2 = &wdt2;
+		jtag = &jtag;
 	};
 
 	memory@80000000 {
@@ -65,6 +66,11 @@
 				bridge-controller {
 					compatible = "aspeed,ast2400-pcie-device-controller", "bridge-controller";
 				};
+			};
+
+			jtag: jtag@1e6e4000 {
+				compatible = "aspeed,ast2400-jtag";
+				reg = <0x1e6e4000 0x20>;
 			};
 
 			wdt1: watchdog@1e785000 {
