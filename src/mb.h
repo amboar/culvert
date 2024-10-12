@@ -10,6 +10,8 @@
 #elif defined(__x86_64__)
 #include "x86.h"
 #define iob() mfence()
+#elif defined(__aarch64__)
+#define iob() asm volatile("dsb osh" ::: "memory")
 #elif defined(__arm__)
 /*
  * HACK: Assumes we're running remotely or on the AST itself. If ARM is
