@@ -44,8 +44,23 @@ int debug_enter(struct debug *ctx)
 {
     int rc;
 
+    if (ctx->force_quit) {
+        logi("Foce quit requested\n");
+        rc = console_set_baud(ctx->console, 115200);
+        if (rc < 0)
+            return rc;
+
+        // Escape character should cancel previous commands
+        // q will exit debug mode
+        rc = prompt_write(&ctx->prompt,
+                          "\x1Bq\r\n\x1Bq\r\n", strlen("\x1Bq\r\n\x1Bq\r\n"));
+        if (rc < 0)
+            return rc;
+    }
+
     logi("Entering debug mode\n");
 
+    // Enter debug mode
     rc = console_set_baud(ctx->console, 1200);
     if (rc < 0)
         return rc;
