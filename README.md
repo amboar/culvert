@@ -86,6 +86,7 @@ The can be built for multiple architectures. It's known to run on the following:
 * x86\_64
 * powerpc64, powerpc64le
 * armv6
+* aarch64
 
 It can be built with:
 
