@@ -10,13 +10,13 @@
 #elif defined(__x86_64__)
 #include "x86.h"
 #define iob() mfence()
-#elif defined(__aarch64__)
+#elif (defined(__aarch64__) || defined(__arm__)) && defined(__ARM_ARCH)
+#if __ARM_ARCH >= 7
 #define iob() asm volatile("dsb osh" ::: "memory")
-#elif defined(__arm__)
-/*
- * HACK: Assumes we're running remotely or on the AST itself. If ARM is
- * the host arch then we need to fix up the barriers
- */
+#endif
+#endif
+
+#ifndef iob
 #define iob()
 #endif
 
