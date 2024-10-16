@@ -55,8 +55,7 @@ subdir('devicetree')
 subdir('soc')
 
 # Version
-git = find_program('git')
-version = vcs_tag(command: [git, 'describe', '--tags', '--dirty', '--always'],
+version = vcs_tag(command: ['git', 'describe', '--tags', '--dirty', '--always'],
                   fallback: meson.project_version(),
                   input: 'version.h.in',
                   output: 'version.h',
