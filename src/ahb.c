@@ -14,7 +14,7 @@
 
 #define AHB_CHUNK (1 << 20)
 
-ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd)
+ssize_t ahb_siphon_out(struct ahb *ctx, uint32_t phys, ssize_t len, int outfd)
 {
     ssize_t ingress, egress, remaining;
     void *chunk, *cursor;
@@ -56,7 +56,7 @@ done:
     return rc;
 }
 
-ssize_t ahb_siphon_out(struct ahb *ctx, uint32_t phys, int infd)
+ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, int infd)
 {
     ssize_t ingress, egress;
     void *chunk;

@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 static int cmd_dump_firmware(struct soc *soc)
 {
@@ -46,7 +47,7 @@ static int cmd_dump_firmware(struct soc *soc)
         goto cleanup_chip;
 
     logi("Exfiltrating BMC flash to stdout\n\n");
-    rc = soc_siphon_in(soc, flash.start, chip->info.size, 1);
+    rc = soc_siphon_out(soc, flash.start, chip->info.size, STDOUT_FILENO);
     if (rc) { errno = -rc; perror("soc_siphon_in"); }
 
     if ((cleanup = sfc_write_protect_restore(sfc, wp)) < 0) {
@@ -82,7 +83,7 @@ static int cmd_dump_ram(struct soc *soc)
          dram.length >> 20, vram.length >> 20,
          (dram.length - vram.length) >> 20, dram.start, vram.start - 1);
 
-    rc = soc_siphon_in(soc, dram.start, dram.length - vram.length, 1);
+    rc = soc_siphon_out(soc, dram.start, dram.length - vram.length, STDOUT_FILENO);
     if (rc) {
         errno = -rc;
         perror("soc_siphon_in");
