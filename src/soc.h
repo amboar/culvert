@@ -70,9 +70,9 @@ soc_siphon_out(struct soc *ctx, uint32_t phys, size_t len, int outfd)
 }
 
 static inline ssize_t
-soc_siphon_in(struct soc *ctx, uint32_t phys, int infd)
+soc_siphon_in(struct soc *ctx, uint32_t phys, ssize_t length, int infd)
 {
-	return ahb_siphon_in(ctx->ahb, phys, infd);
+	return ahb_siphon_in(ctx->ahb, phys, length, infd);
 }
 
 struct soc_device_node {

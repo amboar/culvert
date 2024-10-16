@@ -76,7 +76,7 @@ int ast_ahb_access(const char *name __unused, int argc, char *argv[],
                 exit(EXIT_FAILURE);
             }
         } else {
-            if ((rc = ahb_siphon_in(ahb, address, STDIN_FILENO))) {
+            if ((rc = ahb_siphon_in(ahb, address, -1, STDIN_FILENO))) {
                 errno = -rc;
                 perror("ahb_writel");
                 exit(EXIT_FAILURE);
