@@ -168,6 +168,7 @@ int main(int argc, char *argv[])
     while (cmd->fn) {
         if (!strcmp(cmd->name, argv[optind])) {
             int offset = optind;
+            int rc;
 
             /* probe uses getopt, but for subcommands not using getopt */
             if (strcmp("probe", argv[optind])) {
@@ -175,7 +176,8 @@ int main(int argc, char *argv[])
             }
             optind = 1;
 
-            return cmd->fn(program_invocation_short_name, argc - offset, argv + offset);
+            rc = cmd->fn(program_invocation_short_name, argc - offset, argv + offset);
+            exit(rc ? EXIT_FAILURE : EXIT_SUCCESS);
         }
 
         cmd++;
