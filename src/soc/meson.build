@@ -4,6 +4,7 @@ src += files(
 	'clk.c',
 	'debugctl.c',
 	'ilpcctl.c',
+	'jtag.c',
 	'otp.c',
 	'pciectl.c',
 	'scu.c',

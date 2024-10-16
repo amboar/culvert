@@ -29,6 +29,7 @@ int cmd_write(const char *name, int argc, char *argv[]);
 int cmd_replace(const char *name, int argc, char *argv[]);
 int cmd_probe(const char *name, int argc, char *argv[]);
 int cmd_reset(const char *name, int argc, char *argv[]);
+int cmd_jtag(const char *name, int argc, char *argv[]);
 int cmd_sfc(const char *name, int argc, char *argv[]);
 int cmd_otp(const char *name, int argc, char *argv[]);
 int cmd_trace(const char *name, int argc, char *argv[]);
@@ -59,6 +60,7 @@ static void print_help(const char *name)
     printf("%s write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s replace ram MATCH REPLACE\n", name);
     printf("%s reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+    printf("%s jtag [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
     printf("%s sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
@@ -85,6 +87,7 @@ static const struct command cmds[] = {
     { "probe", cmd_probe },
     { "debug", cmd_debug },
     { "reset", cmd_reset },
+    { "jtag", cmd_jtag },
     { "devmem", cmd_devmem },
     { "sfc", cmd_sfc },
     { "otp", cmd_otp },

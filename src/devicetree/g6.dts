@@ -22,6 +22,9 @@
 		wdt6 = &wdt6;
 		wdt7 = &wdt7;
 		wdt8 = &wdt8;
+		jtag = &jtag0;
+		jtag0 = &jtag0;
+		jtag1 = &jtag1;
 	};
 
 	memory@80000000 {
@@ -101,6 +104,16 @@
 				compatible = "aspeed,ast2600-uart", "ns16550a", "bridge-controller";
 				reg = <0x1e784000 0x20>;
 				bridge-gates = <&bridges AST2600_DEBUG_UART5_GATE>;
+			};
+
+			jtag0: jtag@1e6e4000 {
+				compatible = "aspeed,ast2600-jtag";
+				reg = <0x1e6e4000 0x20>;
+			};
+
+			jtag1: jtag@1e6e4100 {
+				compatible = "aspeed,ast2600-jtag";
+				reg = <0x1e6e4100 0x20>;
 			};
 
 			wdt1: watchdog@1e785000 {
