@@ -17,10 +17,4 @@ libfdt_dep = dependency('libfdt',
 			fallback: [ 'dtc', 'libfdt_dep' ],
 			required: true)
 
-libfdt_native_dep = dependency('dtc',
-		     native: true,
-		     default_options: [ 'tools=true' ],
-		     fallback: [ 'dtc', 'libfdt_dep' ],
-		     required: true)
-
 subdir('src')
