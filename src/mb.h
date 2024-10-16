@@ -5,11 +5,9 @@
 #define _MB_H
 
 #if defined(__PPC64__)
-#include "ppc.h"
-#define iob() eieio()
+#define iob() asm volatile("eieio" ::: "memory");
 #elif defined(__x86_64__)
-#include "x86.h"
-#define iob() mfence()
+#define iob() asm volatile("mfence" ::: "memory");
 #elif (defined(__aarch64__) || defined(__arm__)) && defined(__ARM_ARCH)
 #if __ARM_ARCH >= 7
 #define iob() asm volatile("dsb osh" ::: "memory")
