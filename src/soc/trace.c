@@ -237,7 +237,7 @@ int trace_dump(struct trace *ctx, int outfd)
 
         logd("Ring buffer has wrapped, dumping trace buffer from write pointer at 0x%" PRIx32 " for %zu\n",
              buf, len);
-        if ((rc = soc_siphon_in(ctx->soc, buf, len, outfd)))
+        if ((rc = soc_siphon_out(ctx->soc, buf, len, outfd)))
             return rc;
     }
 
@@ -245,7 +245,7 @@ int trace_dump(struct trace *ctx, int outfd)
 
     logd("Dumping from trace buffer at 0x%" PRIx32 " for %zu\n", base, len);
 
-    if ((rc = soc_siphon_in(ctx->soc, base, len, outfd)))
+    if ((rc = soc_siphon_out(ctx->soc, base, len, outfd)))
         return rc;
 
     return rc;
