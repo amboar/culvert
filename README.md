@@ -79,6 +79,11 @@ and runtime environments.
 
 * Also supports the Linux `/dev/mem` interface for execution on the BMC itself
 
+* [Expose internal JTAG master as OpenOCD-compatible bitbang interface](docs/OpenOCD.md)
+
+  * Can access internal BMC/ARM CPU or externally attached JTAG devices
+    (like CPLDs or even host CPUs)
+
 ## Building
 
 The can be built for multiple architectures. It's known to run on the following:
@@ -97,6 +102,11 @@ $ meson setup build && meson compile -C build
 or to cross compile:
 ```
 $ meson setup build-arm --cross-file meson/arm-linux-gnueabi-gcc.ini && meson compile -C build-arm
+```
+
+#### Dependencies (Debian)
+```
+apt install build-essential flex swig bison meson device-tree-compiler libyaml-dev
 ```
 
 ## Execution and Example output
@@ -121,6 +131,7 @@ culvert read ram [INTERFACE [IP PORT USERNAME PASSWORD]]
 culvert write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]
 culvert replace ram MATCH REPLACE
 culvert reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert jtag TARGET [INTERFACE [IP PORT USERNAME PASSWORD]]
 culvert sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
 culvert sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
 culvert sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
@@ -129,6 +140,7 @@ culvert otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]
 culvert otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]
 culvert otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]
 culvert trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]
+culvert coprocessor run ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
 ```
 
 ```
