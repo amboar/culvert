@@ -78,6 +78,13 @@ static int run_openocd_bitbang_server(struct jtag *jtag, uint16_t port)
                 logi("New connection from %s\n", inet_ntoa(client_addr.sin_addr));
 
                 while (true) {
+			int rc;
+			uint8_t state;
+			uint8_t tdo;
+                        uint8_t tdi;
+                        uint8_t tms;
+                        uint8_t tck;
+
                         char command = 0;
                         ssize_t n = read(client_fd, &command, 1);
                         if (n <= 0) {
@@ -93,8 +100,7 @@ static int run_openocd_bitbang_server(struct jtag *jtag, uint16_t port)
                                 break;
                         /* Read state */
                         case 'R':
-                                uint8_t tdo = 0;
-                                int rc = jtag_bitbang_get(jtag, &tdo);
+                                rc = jtag_bitbang_get(jtag, &tdo);
                                 if (rc < 0) {
                                         loge("jtag_bitbang_get() failed\n");
                                         return 1;
@@ -115,11 +121,11 @@ static int run_openocd_bitbang_server(struct jtag *jtag, uint16_t port)
                                 return 1;
                         /* Data requests */
                         case '0'...'7':
-                                uint8_t state = command - '0';
+                                state = command - '0';
 
-                                uint8_t tdi = !!(state & 1);
-                                uint8_t tms = !!(state & 2);
-                                uint8_t tck = !!(state & 4);
+                                tdi = !!(state & 1);
+                                tms = !!(state & 2);
+                                tck = !!(state & 4);
 
                                 rc = jtag_bitbang_set(jtag, tck, tms, tdi);
                                 if (rc < 0) {
