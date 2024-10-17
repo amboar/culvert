@@ -9,6 +9,7 @@
 #include "ccan/container_of/container_of.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -73,16 +74,20 @@ ssize_t l2ab_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len)
     ssize_t ingress;
     int64_t offset;
 
+    if (len > SSIZE_MAX) {
+        return -1;
+    }
+
     do {
         ingress = remaining > L2AB_WINDOW_SIZE ? L2AB_WINDOW_SIZE : remaining;
 
         offset = l2ab_map(ctx, phys, ingress);
         if (offset < 0)
-            return offset;
+            return -1;
 
         ingress = lpc_read(&ctx->fw, offset, buf, ingress);
         if (ingress < 0)
-            return ingress;
+            return -1;
 
         phys += ingress;
         buf += ingress;
@@ -99,16 +104,20 @@ ssize_t l2ab_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len)
     ssize_t egress;
     int64_t offset;
 
+    if (len > SSIZE_MAX) {
+        return -1;
+    }
+
     do {
         egress = remaining > L2AB_WINDOW_SIZE ? L2AB_WINDOW_SIZE : remaining;
 
         offset = l2ab_map(ctx, phys, egress);
         if (offset < 0)
-            return offset;
+            return -1;
 
         egress = lpc_write(&ctx->fw, offset, buf, egress);
         if (egress < 0)
-            return egress;
+            return -1;
 
         phys += egress;
         buf += egress;
