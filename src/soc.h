@@ -64,15 +64,15 @@ static inline int soc_writel(struct soc *ctx, uint32_t phys, uint32_t val)
 }
 
 static inline ssize_t
-soc_siphon_in(struct soc *ctx, uint32_t phys, size_t len, int outfd)
+soc_siphon_out(struct soc *ctx, uint32_t phys, size_t len, int outfd)
 {
-	return ahb_siphon_in(ctx->ahb, phys, len, outfd);
+	return ahb_siphon_out(ctx->ahb, phys, len, outfd);
 }
 
 static inline ssize_t
-soc_siphon_out(struct soc *ctx, uint32_t phys, int infd)
+soc_siphon_in(struct soc *ctx, uint32_t phys, ssize_t length, int infd)
 {
-	return ahb_siphon_out(ctx->ahb, phys, infd);
+	return ahb_siphon_in(ctx->ahb, phys, length, infd);
 }
 
 struct soc_device_node {

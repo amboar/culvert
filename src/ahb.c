@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,9 +15,9 @@
 
 #define AHB_CHUNK (1 << 20)
 
-ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd)
+ssize_t ahb_siphon_out(struct ahb *ctx, uint32_t phys, ssize_t len, int outfd)
 {
-    ssize_t ingress, egress, remaining;
+    ssize_t ingress, egress;
     void *chunk, *cursor;
     int rc = 0;
 
@@ -27,15 +28,16 @@ ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd)
     if (!chunk)
         return -errno;
 
-    remaining = len;
     do {
-        ingress = remaining > AHB_CHUNK ? AHB_CHUNK : remaining;
+        ingress = (len > AHB_CHUNK || len == -1) ? AHB_CHUNK : len;
 
         ingress = ahb_read(ctx, phys, chunk, ingress);
-        if (ingress < 0) { rc = ingress; goto done; }
+        if (ingress < 0) { rc = -EIO; goto done; }
 
         phys += ingress;
-        remaining -= ingress;
+        if (len > 0) {
+            len -= ingress;
+        }
 
         cursor = chunk;
         while (ingress) {
@@ -47,7 +49,7 @@ ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, size_t len, int outfd)
         }
 
         fprintf(stderr, ".");
-    } while (remaining);
+    } while (!!len);
 
 done:
     fprintf(stderr, "\n");
@@ -56,7 +58,7 @@ done:
     return rc;
 }
 
-ssize_t ahb_siphon_out(struct ahb *ctx, uint32_t phys, int infd)
+ssize_t ahb_siphon_in(struct ahb *ctx, uint32_t phys, ssize_t len, int infd)
 {
     ssize_t ingress, egress;
     void *chunk;
@@ -64,15 +66,18 @@ ssize_t ahb_siphon_out(struct ahb *ctx, uint32_t phys, int infd)
 
     chunk = malloc(AHB_CHUNK);
     if (!chunk)
-        return -errno;
+        return -1;
 
-    while ((ingress = read(infd, chunk, AHB_CHUNK))) {
+    while ((ingress = read(infd, chunk, (len > AHB_CHUNK || len == -1) ? AHB_CHUNK : len))) {
         if (ingress < 0) { rc = -errno; goto done; }
 
         egress = ahb_write(ctx, phys, chunk, ingress);
-        if (egress < 0) { rc = egress; goto done; }
+        if (egress < 0) { rc = -EIO; goto done; }
 
         phys += ingress;
+        if (len > 0) {
+            len -= ingress;
+        }
 
         fprintf(stderr, ".");
     }

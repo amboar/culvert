@@ -53,10 +53,10 @@ ssize_t ilpcb_read(struct ahb *ahb, uint32_t addr, void *buf, size_t len)
     size_t remaining;
     uint8_t data;
     int locked;
-    ssize_t rc;
+    int rc;
 
     if (len > SSIZE_MAX)
-        return -EINVAL;
+        return -1;
 
     rc = sio_unlock(sio);
     if (rc)
@@ -109,7 +109,7 @@ done:
         perror("sio_lock");
     }
 
-    return rc ? rc : (ssize_t)len;
+    return rc ? -1 : (ssize_t)len;
 }
 
 ssize_t ilpcb_write(struct ahb *ahb, uint32_t addr, const void *buf, size_t len)
@@ -118,10 +118,10 @@ ssize_t ilpcb_write(struct ahb *ahb, uint32_t addr, const void *buf, size_t len)
     struct sio *sio = &ctx->sio;
     size_t remaining;
     int locked;
-    ssize_t rc;
+    int rc;
 
     if (len > SSIZE_MAX)
-        return -EINVAL;
+        return -1;
 
     rc = sio_unlock(sio);
     if (rc)
@@ -173,7 +173,7 @@ done:
         perror("sio_lock");
     }
 
-    return rc ? rc : (ssize_t)len;
+    return rc ? -1 : (ssize_t)len;
 }
 
 /* Little-endian */
