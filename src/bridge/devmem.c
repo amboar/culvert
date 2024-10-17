@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
 
+#include <assert.h>
+#include <endian.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "ahb.h"
 #include "ast.h"
 #include "bridge.h"
@@ -12,17 +23,6 @@
 #include "rev.h"
 
 #include "ccan/container_of/container_of.h"
-
-#include <assert.h>
-#include <endian.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #define AST_SOC_IO	0x1e600000
 #define AST_SOC_IO_LEN	0x00200000
