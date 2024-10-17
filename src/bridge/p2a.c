@@ -18,6 +18,7 @@
 #include <endian.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -117,12 +118,16 @@ ssize_t p2ab_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len)
     size_t ingress;
     int64_t rc;
 
+    if (len > SSIZE_MAX) {
+        return -1;
+    }
+
     do {
         ingress = remaining > P2AB_WINDOW_LEN ? P2AB_WINDOW_LEN : remaining;
 
         rc = p2ab_map(ctx, phys, ingress);
         if (rc < 0)
-            return rc;
+            return -1;
 
         mmio_memcpy(buf, (ctx->mmio + P2AB_WINDOW_BASE + rc), ingress);
         phys += ingress;
@@ -140,12 +145,16 @@ ssize_t p2ab_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len)
     size_t egress;
     int64_t rc;
 
+    if (len > SSIZE_MAX) {
+        return -1;
+    }
+
     do {
         egress = remaining > P2AB_WINDOW_LEN ? P2AB_WINDOW_LEN : remaining;
 
         rc = p2ab_map(ctx, phys, egress);
         if (rc < 0)
-            return rc;
+            return -1;
 
         mmio_memcpy((ctx->mmio + P2AB_WINDOW_BASE + rc), buf, egress);
         phys += egress;
