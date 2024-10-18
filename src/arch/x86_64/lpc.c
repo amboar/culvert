@@ -9,6 +9,55 @@
 #include <string.h>
 #include <sys/io.h>
 
+#if !defined(__GLIBC__)
+static __inline unsigned char
+inb_p (unsigned short int __port)
+{
+    unsigned char _v;
+
+    __asm__ __volatile__ ("inb %w1,%0\noutb %%al,$0x80":"=a" (_v):"Nd" (__port));
+    return _v;
+}
+
+static __inline unsigned short int
+inw_p (unsigned short int __port)
+{
+  unsigned short int _v;
+
+  __asm__ __volatile__ ("inw %w1,%0\noutb %%al,$0x80":"=a" (_v):"Nd" (__port));
+  return _v;
+}
+
+static __inline unsigned int
+inl_p (unsigned short int __port)
+{
+  unsigned int _v;
+  __asm__ __volatile__ ("inl %w1,%0\noutb %%al,$0x80":"=a" (_v):"Nd" (__port));
+  return _v;
+}
+
+static __inline void
+outb_p (unsigned char __value, unsigned short int __port)
+{
+     __asm__ __volatile__ ("outb %b0,%w1\noutb %%al,$0x80": :"a" (__value),
+                           "Nd" (__port));
+}
+
+static __inline void
+outw_p (unsigned short int __value, unsigned short int __port)
+{
+     __asm__ __volatile__ ("outw %w0,%w1\noutb %%al,$0x80": :"a" (__value),
+                           "Nd" (__port));
+}
+
+static __inline void
+outl_p (unsigned int __value, unsigned short int __port)
+{
+     __asm__ __volatile__ ("outl %0,%w1\noutb %%al,$0x80": :"a" (__value),
+                           "Nd" (__port));
+}
+#endif
+
 int lpc_init(struct lpc *ctx __unused, const char *space)
 {
     int rc;
