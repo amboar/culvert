@@ -1,0 +1,10 @@
+name: DCO
+
+on: pull_request
+
+jobs:
+  check:
+    name: Developer Certificate of Origin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: tisonkun/actions-dco@v1.1
