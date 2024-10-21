@@ -195,6 +195,10 @@ ssize_t debug_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len)
     char *cursor;
     ssize_t rc;
 
+    if (len > SSIZE_MAX) {
+        return -1;
+    }
+
     if (len < 4) {
         uint32_t val = 0;
 
@@ -202,7 +206,7 @@ ssize_t debug_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len)
         while (remaining) {
             rc = debug_read_fixed(ctx, 'i', phys, &val);
             if (rc < 0)
-                return rc;
+                return -1;
 
             *cursor++ = val & 0xff;
             remaining--;
@@ -222,34 +226,34 @@ retry:
 
         rc = asprintf(&command, "d %x %zx", phys, ingress);
         if (rc < 0)
-            return -errno;
+            return -1;
 
         rc = prompt_run(&ctx->prompt, command);
         free(command);
         if (rc < 0)
-            return rc;
+            return -1;
 
         /* Eat the echoed command */
         do {
             found = prompt_gets(&ctx->prompt, line, sizeof(line));
             if (found < 0)
-                return found;
+                return -1;
         } while (!strcmp("$ \n", line)); /* Deal any prompt from a prior run */
 
         consumed = 0;
         do {
             found = prompt_gets(&ctx->prompt, line, sizeof(line));
             if (found < 0)
-                return found;
+                return -1;
 
             rc = debug_parse_d(line, cursor);
             if (rc < 0) {
                 rc = prompt_run(&ctx->prompt, "");
                 if (rc < 0)
-                    return rc;
+                    return -1;
                 rc = prompt_expect(&ctx->prompt, "$ ");
                 if (rc < 0)
-                    return rc;
+                    return -1;
                 loge("Failed to parse line '%s'\n", line);
                 loge("Retrying from address 0x%"PRIx32"\n", phys);
                 goto retry;
@@ -283,6 +287,10 @@ ssize_t debug_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len)
     char mode;
     int rc;
 
+    if (len > SSIZE_MAX) {
+        return -1;
+    }
+
     if (len <= 4) {
         size_t remaining;
 
@@ -291,17 +299,17 @@ ssize_t debug_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len)
         while (remaining) {
             rc = asprintf(&command, "o %x %hhx", phys, *(const uint8_t *)cursor);
             if (rc < 0)
-                return -errno;
+                return -1;
 
             rc = prompt_run(&ctx->prompt, command);
             if (rc < 0)
-                return rc;
+                return -1;
 
             rc = prompt_expect(&ctx->prompt, "$ ");
             if (rc < 0)
                 return rc;
             if (rc == 0)
-                return -EINVAL;
+                return -1;
 
             cursor++;
             phys++;
@@ -320,20 +328,20 @@ ssize_t debug_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len)
 
         rc = asprintf(&command, "%c %x %zx", mode, phys, egress);
         if (rc < 0)
-            return -errno;
+            return -1;
 
         rc = prompt_run(&ctx->prompt, command);
         free(command);
         if (rc < 0)
-            return rc;
+            return -1;
 
         rc = prompt_write(&ctx->prompt, (const char *)cursor, egress);
         if (rc < 0)
-            return rc;
+            return -1;
 
         rc = prompt_expect(&ctx->prompt, "$ ");
         if (rc < 0)
-            return rc;
+            return -1;
 
         phys += egress;
         cursor += egress;

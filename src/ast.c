@@ -52,7 +52,7 @@ int ast_ahb_access(const char *name __unused, int argc, char *argv[],
         }
 
         if (len > 4) {
-            if ((rc = ahb_siphon_in(ahb, address, len, 1))) {
+            if ((rc = ahb_siphon_out(ahb, address, len, STDOUT_FILENO))) {
                 errno = -rc;
                 perror("ahb_siphon_in");
                 exit(EXIT_FAILURE);
@@ -76,7 +76,7 @@ int ast_ahb_access(const char *name __unused, int argc, char *argv[],
                 exit(EXIT_FAILURE);
             }
         } else {
-            if ((rc = ahb_siphon_out(ahb, address, 0))) {
+            if ((rc = ahb_siphon_in(ahb, address, -1, STDIN_FILENO))) {
                 errno = -rc;
                 perror("ahb_writel");
                 exit(EXIT_FAILURE);

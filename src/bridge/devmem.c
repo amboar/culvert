@@ -5,11 +5,12 @@
 #include <endian.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "ahb.h"
@@ -83,9 +84,13 @@ ssize_t devmem_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len)
     struct devmem *ctx = to_devmem(ahb);
     int64_t woff;
 
+    if (len > SSIZE_MAX) {
+        return -1;
+    }
+
     woff = devmem_setup_win(ctx, phys, len);
     if (woff < 0)
-        return woff;
+        return -1;
 
     mmio_memcpy(buf, ctx->win + woff, len);
 
@@ -97,9 +102,13 @@ ssize_t devmem_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len
     struct devmem *ctx = to_devmem(ahb);
     int64_t woff;
 
+    if (len > SSIZE_MAX) {
+        return -1;
+    }
+
     woff = devmem_setup_win(ctx, phys, len);
     if (woff < 0)
-        return woff;
+        return -1;
 
     mmio_memcpy(ctx->win + woff, buf, len);
 

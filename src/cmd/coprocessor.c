@@ -159,8 +159,7 @@ static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[]
     }
 
     /* 3. */
-    /* TODO: Verify firmware fits inside specified region, somehow? */
-    if ((src = soc_siphon_out(soc, mem_base, STDIN_FILENO)) < 0) {
+    if ((src = soc_siphon_in(soc, mem_base, mem_size, STDIN_FILENO)) < 0) {
         loge("Failed to load coprocessor firmware to provided region: %d\n", src);
         rc = EXIT_FAILURE;
         goto cleanup_scu;
