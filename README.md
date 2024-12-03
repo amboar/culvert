@@ -106,7 +106,7 @@ $ meson setup build-arm --cross-file meson/arm-linux-gnueabi-gcc.ini && meson co
 
 #### Dependencies (Debian)
 ```
-apt install build-essential flex swig bison meson device-tree-compiler libyaml-dev
+apt install build-essential flex swig bison meson device-tree-compiler libyaml-dev libpython3-dev
 ```
 
 ## Execution and Example output
