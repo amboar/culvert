@@ -36,6 +36,14 @@ static int cmd_write_firmware(int argc, char *argv[])
     uint32_t phys;
     char *buf;
 
+    if (strcmp("firmware", argv[0])) {
+        loge("Expected 'firmware' command, found '%s'\n", argv[0]);
+        return -EINVAL;
+    }
+
+    argc--;
+    argv++;
+
     if ((rc = host_init(host, argc, argv)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
         return rc;
