@@ -11,44 +11,116 @@
 #include "soc/uart/mux.h"
 #include "uart/suart.h"
 
+#include <argp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-int cmd_console(const char *name __unused, int argc, char *argv[])
+struct cmd_console_args {
+    const char *host_uart;
+    const char *bmc_uart;
+    int baud;
+    const char *user;
+    const char *pass;
+};
+
+static struct argp_option options[] = {
+    {0}
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state)
+{
+    struct cmd_console_args *arguments = state->input;
+
+    switch (key) {
+        case ARGP_KEY_ARG:
+            /* Early break in argument loop in order to not validate stuff if argc is not 5 */
+            if (state->argc < 5) {
+                argp_usage(state);
+            }
+            switch (state->arg_num) {
+                case 0:
+                    if (strcmp("uart3", arg)) {
+                        loge("Console only supports host on 'uart3'\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    arguments->host_uart = arg;
+                    break;
+                case 1:
+                    if (strcmp("uart2", arg)) {
+                        loge("Console only supports BMC on uart2\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    arguments->bmc_uart = arg;
+                    break;
+                case 2:
+                    arguments->baud = atoi(arg);
+                    break;
+                case 3:
+                    arguments->user = arg;
+                    break;
+                case 4:
+                    arguments->pass = arg;
+                    break;
+                default:
+                    argp_usage(state);
+            }
+            break;
+        case ARGP_KEY_END:
+            if (state->arg_num < 5 || state->arg_num > 5) {
+                argp_usage(state);
+            }
+            break;
+        default:
+            return ARGP_ERR_UNKNOWN;
+    }
+    return 0;
+}
+
+static struct argp argp_console = {
+    options,
+    parse_opt,
+    "HOST_UART BMC_UART BAUD USER PASSWORD",
+    "Console command",
+    NULL,
+    NULL,
+    NULL
+};
+
+int cmd_console(struct argp_state* state)
 {
     struct suart _suart, *suart = &_suart;
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    const char *user, *pass;
     struct uart_mux *mux;
     struct ahb *ahb;
     struct clk *clk;
     int cleanup;
-    int baud;
     int rc;
 
-    if (argc < 5) {
-        loge("Not enough arguments for console command\n");
-        exit(EXIT_FAILURE);
-    }
+    /* sub-command handling to have a proper help / usage */
+    /* FIXME: Right now every command is handled in the same way, but
+     * not via a generic function.
+     */
+    struct cmd_console_args arguments = {0};
+    int argc = state->argc - state->next + 1;
+    char **argv = &state->argv[state->next - 1];
+    char* argv0 = argv[0];
 
-    if (strcmp("uart3", argv[0])) {
-        loge("Console only supports host on 'uart3'\n");
-        exit(EXIT_FAILURE);
-    }
+    argv[0] = malloc(strlen(state->name) + strlen(" console") + 1);
+    if (!argv[0])
+        argp_failure(state, 1, ENOMEM, 0);
 
-    if (strcmp("uart2", argv[1])) {
-        loge("Console only supports BMC on uart2\n");
-        exit(EXIT_FAILURE);
-    }
+    sprintf(argv[0], "%s console", state->name);
 
-    baud = atoi(argv[2]);
+    argp_parse(&argp_console, argc, argv, 0, 0, &arguments);
+    free(argv[0]);
+    argv[0] = argv0;
 
-    user = argv[3];
-    pass = argv[4];
-
+    int baud = arguments.baud;
+    const char *user = arguments.user;
+    const char *pass = arguments.pass;
 
     if ((rc = host_init(host, argc - 5, argv + 5)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
