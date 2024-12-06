@@ -314,9 +314,9 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
     }
 
     if (!strcmp("firmware", argv[optind])) {
-        rc = cmd_write_firmware(argc - optind, &argv[optind]);
+        rc = cmd_write_firmware(argc - optind - 1, &argv[optind + 1]);
     } else if (!strcmp("ram", argv[optind])) {
-        rc = cmd_write_ram(argc - optind, &argv[optind]);
+        rc = cmd_write_ram(argc - optind - 1, &argv[optind + 1]);
     } else {
         loge("Unsupported write type '%s'\n", argv[optind]);
         rc = -EINVAL;
