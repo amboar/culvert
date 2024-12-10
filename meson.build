@@ -13,7 +13,8 @@ project('culvert', 'c',
 add_global_link_arguments('-z', 'noexecstack', language: 'c')
 
 libfdt_dep = dependency('libfdt',
-			default_options: [ 'warning_level=1', ],
+			default_options: [ 'warning_level=1',
+					   'python=disabled' ],
 			fallback: [ 'dtc', 'libfdt_dep' ],
 			required: true)
 
