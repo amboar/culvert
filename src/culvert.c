@@ -19,12 +19,12 @@
 /* Migrated to argp */
 int cmd_console(struct argp_state *state);
 int cmd_coprocessor(struct argp_state *state);
+int cmd_debug(struct argp_state *state);
 int cmd_devmem(struct argp_state *state);
 
 /* Still using the old argument parser -> to be migrated */
 int cmd_ilpc(const char *name, int argc, char *argv[]);
 int cmd_p2a(const char *name, int argc, char *argv[]);
-int cmd_debug(const char *name, int argc, char *argv[]);
 int cmd_read(const char *name, int argc, char *argv[]);
 int cmd_write(const char *name, int argc, char *argv[]);
 int cmd_replace(const char *name, int argc, char *argv[]);
