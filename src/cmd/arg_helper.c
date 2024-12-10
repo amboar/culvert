@@ -4,10 +4,9 @@
 #include "arg_helper.h"
 
 #include <argp.h>
-#include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 int parse_subcommand(const struct argp* argp, char* name, void *arguments,
                      struct argp_state* state, struct subcommand* subcommand)

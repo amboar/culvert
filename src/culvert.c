@@ -21,6 +21,7 @@
 
 /* Migrated to argp */
 int cmd_console(struct argp_state *state);
+int cmd_coprocessor(struct argp_state *state);
 
 /* Still using the old argument parser -> to be migrated */
 int cmd_ilpc(const char *name, int argc, char *argv[]);
@@ -36,7 +37,6 @@ int cmd_jtag(const char *name, int argc, char *argv[]);
 int cmd_sfc(const char *name, int argc, char *argv[]);
 int cmd_otp(const char *name, int argc, char *argv[]);
 int cmd_trace(const char *name, int argc, char *argv[]);
-int cmd_coprocessor(const char *name, int argc, char *argv[]);
 
 const char *argp_program_version = "culvert " CULVERT_VERSION;
 const char *argp_program_bug_address = "GitHub amboar/culvert";
