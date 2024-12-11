@@ -1,4 +1,5 @@
-src += files('console.c',
+src += files('arg_helper.c',
+	     'console.c',
 	     'coprocessor.c',
 	     'debug.c',
 	     'devmem.c',
