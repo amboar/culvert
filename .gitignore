@@ -1,3 +1,14 @@
+# Visual Studio Code config
+.vscode/
+
+# Subprojects pulled via meson
+subprojects/*
+!subprojects/*.wrap
+
+# segfault core file
+*/core
+
+# Output files
 *.d
 *.o
 *.swp
