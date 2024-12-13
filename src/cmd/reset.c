@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+
+#include "arg_helper.h"
 #include "ahb.h"
 #include "ast.h"
 #include "compiler.h"
@@ -10,13 +12,83 @@
 #include "soc/clk.h"
 #include "soc/wdt.h"
 
+#include <argp.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-int cmd_reset(const char *name __unused, int argc, char *argv[])
+static char doc[] =
+    "\n"
+    "Reset command\n"
+    "\v"
+    "Supported reset types:\n"
+    "  soc     Reset the SoC\n\n"
+    "Examples:\n\n"
+    "  culvert reset -t soc -w wdt0\n"
+    "  culvert reset -t soc -w wdt0 /dev/ttyUSB0\n";
+
+static struct argp_option options[] = {
+    {"type", 't', "TYPE", 0, "Reset type", 0},
+    {"wdt", 'w', "WDT", 0, "Watchdog timer to use", 0},
+    {0},
+};
+
+struct cmd_reset_args
+{
+    int key_arg_count;
+    // change to enum once more types are supported
+    int type;
+    const char *wdt;
+};
+
+static error_t
+parse_opt(int key, char *arg, struct argp_state *state)
+{
+    struct cmd_reset_args *arguments = state->input;
+
+    if (key == ARGP_KEY_ARG)
+        arguments->key_arg_count++;
+
+    switch (key)
+    {
+    case 't':
+        // Not in use right now, only a dumb check
+        if (!strcmp("soc", arg))
+            arguments->type = 1;
+        else
+            argp_error(state, "Invalid reset type '%s'", arg);
+        break;
+    case 'w':
+        arguments->wdt = arg;
+        break;
+    case ARGP_KEY_ARG:
+        break;
+    case ARGP_KEY_END:
+        if (!arguments->type)
+            argp_error(state, "Missing reset type");
+        if (!arguments->wdt)
+            argp_error(state, "Missing watchdog timer");
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp argp = {
+    options,
+    parse_opt,
+    "[INTERFACE]",
+    doc,
+    NULL,
+    NULL,
+    NULL,
+};
+
+int cmd_reset(struct argp_state *state)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -26,18 +98,14 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
     int cleanup;
     int rc;
 
-    /* reset subcommand argument validation and parsing */
-    if (argc < 2) {
-        loge("Not enough arguments for reset command\n");
-        exit(EXIT_FAILURE);
-    }
+    struct subcommand reset_cmd;
+    struct cmd_reset_args arguments = {0};
+    parse_subcommand(&argp, "reset", &arguments, state, &reset_cmd);
 
-    if (strcmp("soc", argv[0])) {
-        loge("Unsupported reset type: '%s'\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
+    // again, hack
+    char **argv = reset_cmd.argv + 1 + (reset_cmd.argc - 1 - arguments.key_arg_count);
 
-    if ((rc = host_init(host, argc - 2, argv + 2)) < 0) {
+    if ((rc = host_init(host, arguments.key_arg_count, argv)) < 0) {
         loge("Failed to acquire AHB interface, exiting: %d\n", rc);
         exit(EXIT_FAILURE);
     }
@@ -60,8 +128,8 @@ int cmd_reset(const char *name __unused, int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if (!(wdt = wdt_get_by_name(soc, argv[1]))) {
-        loge("Failed to acquire %s controller, exiting\n", argv[1]);
+    if (!(wdt = wdt_get_by_name(soc, arguments.wdt))) {
+        loge("Failed to acquire %s controller, exiting\n", arguments.wdt);
         goto cleanup_soc;
     }
 

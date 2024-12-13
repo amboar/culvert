@@ -2,6 +2,7 @@
 // Copyright (C) 2018,2021 IBM Corp.
 // Copyright (C) 2021, Oracle and/or its affiliates.
 
+#include "arg_helper.h"
 #include "ahb.h"
 #include "ast.h"
 #include "compiler.h"
@@ -11,6 +12,7 @@
 #include "soc.h"
 #include "soc/trace.h"
 
+#include <argp.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <signal.h>
@@ -19,47 +21,107 @@
 #include <stdlib.h>
 #include <string.h>
 
-//culvert trace ADDRESS WIDTH:OFFSET MODE
-//culvert trace 0x1e788000 1:0 read
-//culvert trace 0x1e788000 2:2 read
-//culvert trace 0x1e788000 4:0 write
-int cmd_trace(const char *name __unused, int argc, char *argv[])
+static char doc[] =
+    "\n"
+    "Trace command\n"
+    "\v"
+    "Supported trace modes:\n"
+    "  read        Trace read accesses\n"
+    "  write       Trace write accesses\n\n"
+    "Supported access widths:\n"
+    "  1           8-bit access\n"
+    "  2           16-bit access\n"
+    "  4           32-bit access\n\n"
+    "Example:\n\n"
+    "  culvert trace -m read -a 0x1e788000 -w 1:0\n"
+    "  culvert trace -m read -a 0x1e788000 -w 2:2\n"
+    "  culvert trace -m write -a 0x1e788000 -w 4:0\n";
+
+struct cmd_trace_args {
+    uint32_t address;
+    uint32_t width;
+    enum trace_mode mode;
+    int key_arg_count;
+};
+
+static struct argp_option options[] = {
+    {"mode", 'm', "MODE", 0, "Trace mode (REQUIRED)", 0},
+    {"address", 'a', "ADDRESS", 0, "Address to trace (REQUIRED)", 0},
+    {"width", 'w', "WIDTH", 0, "Access width (REQUIRED)", 0},
+    {0},
+};
+
+static error_t
+parse_opt(int key, char *arg, struct argp_state *state)
+{
+    struct cmd_trace_args *arguments = state->input;
+
+    if (key == ARGP_KEY_ARG)
+        arguments->key_arg_count++;
+
+    switch (key) {
+        case 'm':
+            if (!strcmp("read", arg))
+                arguments->mode = trace_read;
+            else if (!strcmp("write", arg))
+                arguments->mode = trace_write;
+            else
+                argp_error(state, "Invalid trace mode '%s'", arg);
+            break;
+        case 'a':
+            arguments->address = strtoul(arg, NULL, 0);
+            break;
+        case 'w':
+            arguments->width = strtoul(arg, NULL, 0);
+            if (arguments->width != 1 && arguments->width != 2 && arguments->width != 4)
+                argp_error(state, "Invalid access width '%s'", arg);
+            break;
+        case ARGP_KEY_ARG:
+            break;
+        case ARGP_KEY_END:
+            if (!arguments->address)
+                argp_error(state, "Missing address");
+            if (!arguments->width)
+                argp_error(state, "Missing width");
+            /* trace_read is 0, so this is a valid check */
+            if (arguments->mode != trace_read && arguments->mode != trace_write)
+                argp_error(state, "Missing mode");
+
+            if (arguments->address & (arguments->width - 1))
+                argp_error(state, "Address must be aligned to the access size");
+            break;
+        default:
+            return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp argp = {
+    options,
+    parse_opt,
+    "[INTERFACE]",
+    doc,
+    NULL,
+    NULL,
+    NULL,
+};
+
+int cmd_trace(struct argp_state *state)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    enum trace_mode mode;
-    uint32_t addr, width;
     struct trace *trace;
     struct ahb *ahb;
     sigset_t set;
     int sig;
     int rc;
 
-    if (argc < 3) {
-        loge("Not enough arguments for trace command\n");
-        return -EINVAL;
-    }
+    struct subcommand trace_cmd;
+    struct cmd_trace_args arguments = {0};
+    parse_subcommand(&argp, "trace", &arguments, state, &trace_cmd);
 
-    addr = strtoul(argv[0], NULL, 0);
-    width = strtoul(argv[1], NULL, 0);
-    if (width != 1 && width != 2 && width != 4) {
-        loge("invalid access size\n");
-        return -EINVAL;
-    }
-
-    if (addr & (width - 1)) {
-        loge("listening address must be aligned to the access size\n");
-        return -EINVAL;
-    }
-
-    if (!strcmp("read", argv[2])) {
-        mode = trace_read;
-    } else if (!strcmp("write", argv[2])) {
-        mode = trace_write;
-    } else {
-        loge("Unrecognised trace mode: %s\n", argv[2]);
-        return -EINVAL;
-    }
+    char **argv = trace_cmd.argv + 1 + (trace_cmd.argc - 1 - arguments.key_arg_count);
 
     if (sigemptyset(&set)) {
         rc = -errno;
@@ -73,7 +135,7 @@ int cmd_trace(const char *name __unused, int argc, char *argv[])
         return rc;
     }
 
-    if ((rc = host_init(host, argc - 3, argv + 3)) < 0) {
+    if ((rc = host_init(host, arguments.key_arg_count, argv)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
         exit(EXIT_FAILURE);
     }
@@ -92,9 +154,9 @@ int cmd_trace(const char *name __unused, int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if ((rc = trace_start(trace, addr, width, mode))) {
+    if ((rc = trace_start(trace, arguments.address, arguments.width, arguments.mode))) {
         loge("Unable to start trace for 0x%08x %db %s: %d\n",
-             addr, width, mode, rc);
+             arguments.address, arguments.width, arguments.mode, rc);
         goto cleanup_soc;
     }
 

@@ -12,6 +12,9 @@
 #define SFC_TYPE_FMC 		1U
 #define SFC_TYPE_SMC 		2U
 
+/* Related to SFC writing */
+#define SFC_FLASH_WIN (64 << 10)
+
 /* Flash commands */
 #define CMD_BE			0xd8	/* Block (64K) Erase */
 #define CMD_BE32K		0x52	/* Block (32K) Erase */

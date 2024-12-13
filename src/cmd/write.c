@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+
+#include "arg_helper.h"
 #include "ahb.h"
 #include "ast.h"
 #include "compiler.h"
@@ -13,16 +15,69 @@
 #include "soc/uart/vuart.h"
 #include "soc/wdt.h"
 
+#include <argp.h>
 #include <errno.h>
-#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define SFC_FLASH_WIN (64 << 10)
+static char doc_global[] =
+    "\n"
+    "Write command"
+    "\v"
+    "Supported subcommands:\n"
+    "  firmware    Write firmware to flash\n"
+    "  ram         Write data to RAM\n";
 
-static int cmd_write_firmware(int argc, char *argv[])
+static char doc_firmware[] =
+    "\n"
+    "Write firmware command\n"
+    "\v"
+    "Write firmware image to flash\n"
+    "\n"
+    "Examples:\n\n"
+    "  culvert write firmware < image.bin\n"
+    "  culvert write firmware /dev/ttyUSB0 < image.bin\n";
+
+struct cmd_write_firmware_args {
+    int key_arg_count;
+};
+
+static struct argp_option options[] = {
+    {0},
+};
+
+static error_t
+parse_opt_firmware(int key, char *arg __unused, struct argp_state *state)
+{
+    struct cmd_write_firmware_args *arguments = state->input;
+
+    if (key == ARGP_KEY_ARG)
+        arguments->key_arg_count++;
+
+    switch (key) {
+    case ARGP_KEY_ARG:
+    case ARGP_KEY_END:
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp argp_firmware = {
+    options,
+    parse_opt_firmware,
+    "[INTERFACE [IP PORT USERNAME PASSWORD]]",
+    doc_firmware,
+    NULL,
+    NULL,
+    NULL,
+};
+
+static int cmd_write_firmware(struct argp_state *state)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -36,15 +91,13 @@ static int cmd_write_firmware(int argc, char *argv[])
     uint32_t phys;
     char *buf;
 
-    if (strcmp("firmware", argv[0])) {
-        loge("Expected 'firmware' command, found '%s'\n", argv[0]);
-        return -EINVAL;
-    }
+    struct subcommand firmware_cmd;
+    struct cmd_write_firmware_args arguments = {0};
+    parse_subcommand(&argp_firmware, "firmware", &arguments, state, &firmware_cmd);
 
-    argc--;
-    argv++;
+    char **argv_host = firmware_cmd.argv + 1 + (firmware_cmd.argc - 1 - arguments.key_arg_count);
 
-    if ((rc = host_init(host, argc, argv)) < 0) {
+    if ((rc = host_init(host, arguments.key_arg_count, argv_host)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
         return rc;
     }
@@ -178,60 +231,98 @@ cleanup_host:
     return rc;
 }
 
-static int cmd_write_ram(int argc, char *argv[])
+static char doc_ram[] =
+    "\n"
+    "Write RAM command"
+    "\v"
+    "Write data to RAM\n"
+    "\n"
+    "Examples:\n\n"
+    "  culvert write ram -a 0x10000000 -l 1000 < test.bin\n"
+    "  culvert write ram -a 0x10000000 -l 1000 /dev/ttyUSB0 < test.bin\n";
+
+static struct argp_option options_ram[] = {
+    {"address", 'a', "ADDRESS", 0, "Address to write to (required)", 0},
+    {"length", 'l', "LENGTH", 0, "Length of data to write (required)", 0},
+    {0},
+};
+
+struct cmd_write_ram_args {
+    unsigned long start;
+    unsigned long length;
+    int key_arg_count;
+};
+
+static error_t
+parse_opt_ram(int key, char *arg, struct argp_state *state)
+{
+    struct cmd_write_ram_args *arguments = state->input;
+    unsigned long val;
+
+    if (key == ARGP_KEY_ARG)
+        arguments->key_arg_count++;
+
+    switch (key) {
+    case 'a':
+        errno = 0;
+        val = strtoul(arg, NULL, 0);
+        if (val == ULONG_MAX && errno)
+            argp_error(state, "Failed to parse address '%s': %s", arg, strerror(errno));
+#if ULONG_MAX > UINT32_MAX
+        else if (val > UINT32_MAX)
+            argp_error(state, "Address '%s' exceeds address space", arg);
+#endif // ULONG_MAX > UINT32_MAX
+        arguments->start = val;
+        break;
+    case 'l':
+        errno = 0;
+        val = strtoul(arg, NULL, 0);
+        if (val == ULONG_MAX && errno)
+            argp_error(state, "Failed to parse length '%s': %s", arg, strerror(errno));
+#if ULONG_MAX > UINT32_MAX
+        else if (val > UINT32_MAX)
+            argp_error(state, "Length '%s' exceeds address space", arg);
+#endif // ULONG_MAX > UINT32_MAX
+        arguments->length = val;
+        break;
+    case ARGP_KEY_ARG:
+    case ARGP_KEY_END:
+        if (!arguments->start || !arguments->length)
+            argp_error(state, "Missing start or length");
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp argp_ram = {
+    options_ram,
+    parse_opt_ram,
+    "[INTERFACE [IP PORT USERNAME PASSWORD]]",
+    doc_ram,
+    NULL,
+    NULL,
+    NULL,
+};
+
+static int cmd_write_ram(struct argp_state *state)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    unsigned long start, length;
     struct soc_region dram;
     struct sdmc *sdmc;
     struct ahb *ahb;
     int rc;
-    char *endp;
 
-    /* FIXME: doesn't handle bridge argument parsing */
-    if (argc < 3) {
-        loge("Not enough arguments for `write ram` command\n");
-        return -EINVAL;
-    }
+    struct subcommand ram_cmd;
+    struct cmd_write_ram_args arguments = {0};
+    parse_subcommand(&argp_ram, "ram", &arguments, state, &ram_cmd);
 
-    if (strcmp("ram", argv[0])) {
-        loge("Expected 'ram' command, found '%s'\n", argv[0]);
-        return -EINVAL;
-    }
+    char **argv_host = ram_cmd.argv + 1 + (ram_cmd.argc - 1 - arguments.key_arg_count);
 
-    argc--;
-    argv++;
-
-    errno = 0;
-    start = strtoul(argv[0], &endp, 0);
-    if (start == ULONG_MAX && errno) {
-        loge("Failed to parse RAM region start address '%s': %s\n", argv[0], strerror(errno));
-        return -errno;
-#if ULONG_MAX > UINT32_MAX
-    } else if (start > UINT32_MAX) {
-        loge("RAM region start address '%s' exceeds address space\n", argv[0]);
-        return -EINVAL;
-#endif
-    }
-    argc--;
-    argv++;
-
-    errno = 0;
-    length = strtoul(argv[0], &endp, 0);
-    if (length == ULONG_MAX && errno) {
-        loge("Failed to parse RAM region length '%s': %s\n", argv[0], strerror(errno));
-        return -errno;
-#if ULONG_MAX > UINT32_MAX
-    } else if (length > UINT32_MAX) {
-        loge("RAM region length '%s' exceeds address space\n", argv[0]);
-        return -EINVAL;
-#endif
-    }
-    argc--;
-    argv++;
-
-    if ((rc = host_init(host, argc, argv)) < 0) {
+    if ((rc = host_init(host, arguments.key_arg_count, argv_host)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
         return rc;
     }
@@ -258,25 +349,26 @@ static int cmd_write_ram(int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if (((start + length) & UINT32_MAX) < start) {
+    if (((arguments.start + arguments.length) & UINT32_MAX) < arguments.start) {
         loge("Invalid RAM region provided for write\n");
         rc = -EINVAL;
         goto cleanup_soc;
     }
 
-    if (start < dram.start || (start + length) > (dram.start + dram.length)) {
+    if (arguments.start < dram.start ||
+        (arguments.start + arguments.length) > (dram.start + dram.length)) {
         loge("Ill-formed RAM region provided for write\n");
         rc = -EINVAL;
         goto cleanup_soc;
     }
 
 #if UINT32_MAX > SSIZE_MAX
-    if (SSIZE_MAX < length) {
+    if (SSIZE_MAX < arguments.length) {
         return -EINVAL;
     }
 #endif
 
-    if ((rc = soc_siphon_in(soc, start, length, STDIN_FILENO))) {
+    if ((rc = soc_siphon_in(soc, arguments.start, arguments.length, STDIN_FILENO))) {
         loge("Failed to write to provided memory region: %d\n", rc);
     }
 
@@ -289,47 +381,46 @@ cleanup_host:
     return rc;
 }
 
-int cmd_write(const char *name __unused, int argc, char *argv[])
+static error_t
+parse_opt_global(int key, char *arg, struct argp_state *state)
 {
-    int rc;
-
-    if (argc < 1) {
-        loge("Not enough arguments for write command\n");
-        exit(EXIT_FAILURE);
-    }
-
-    /* Do option parsing for the "firmware" write type */
-    while (1) {
-        int option_index = 0;
-        int c;
-
-        static struct option long_options[] = {
-            { "live", no_argument, NULL, 'l' },
-            { },
-        };
-
-        c = getopt_long(argc, argv, "l", long_options, &option_index);
-        if (c == -1)
-            break;
-
-        switch (c) {
-            case 'l':
-                /* no-op flag retained for backwards compatibility */
-                break;
-            case '?':
-                return -EINVAL;
+    switch (key) {
+    case ARGP_KEY_ARG:
+        if (state->arg_num == 0) {
+            if (!strcmp("firmware", arg))
+                cmd_write_firmware(state);
+            else if (!strcmp("ram", arg))
+                cmd_write_ram(state);
+            else
+                argp_error(state, "Invalid write type '%s'", arg);
         }
+        break;
+    case ARGP_KEY_END:
+        if (state->arg_num < 1)
+            argp_usage(state);
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
     }
 
-    if (!strcmp("firmware", argv[optind])) {
-        rc = cmd_write_firmware(argc - optind, &argv[optind]);
-    } else if (!strcmp("ram", argv[optind])) {
-        rc = cmd_write_ram(argc - optind, &argv[optind]);
-    } else {
-        loge("Unsupported write type '%s'\n", argv[optind]);
-        rc = -EINVAL;
-    }
-
-    return rc;
+    return 0;
 }
 
+static struct argp argp_global = {
+    options,
+    parse_opt_global,
+    "firmware|ram",
+    doc_global,
+    NULL,
+    NULL,
+    NULL,
+};
+
+int cmd_write(struct argp_state *state)
+{
+    struct subcommand global_cmd;
+    struct cmd_write_firmware_args arguments = {0};
+    parse_subcommand(&argp_global, "write", &arguments, state, &global_cmd);
+
+    return 0;
+}
