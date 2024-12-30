@@ -2,6 +2,7 @@
 // Copyright (C) 2018,2021 IBM Corp.
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "flash.h"
 #include "host.h"
@@ -289,7 +290,7 @@ cleanup_host:
     return rc;
 }
 
-int cmd_write(const char *name __unused, int argc, char *argv[])
+static int do_write(const char *name __unused, int argc, char *argv[])
 {
     int rc;
 
@@ -333,3 +334,9 @@ int cmd_write(const char *name __unused, int argc, char *argv[])
     return rc;
 }
 
+static const struct cmd write_cmd = {
+    "write",
+    "<firmware|ram ADDRESS LENGTH> [INTERFACE [IP PORT USERNAME PASSWORD]]",
+    do_write,
+};
+REGISTER_CMD(write_cmd);

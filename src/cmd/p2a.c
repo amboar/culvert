@@ -8,10 +8,11 @@
 #include "ahb.h"
 #include "ast.h"
 #include "bridge/p2a.h"
+#include "cmd.h"
 #include "log.h"
 #include "priv.h"
 
-int cmd_p2a(const char *name, int argc, char *argv[])
+static int do_p2a(const char *name, int argc, char *argv[])
 {
     struct p2ab _p2ab, *p2ab = &_p2ab;
     struct ahb *ahb;
@@ -55,3 +56,10 @@ int cmd_p2a(const char *name, int argc, char *argv[])
 
     return 0;
 }
+
+static const struct cmd p2a_cmd = {
+    "p2a",
+    "vga <read ADDRESS|write ADDRESS VALUE>",
+    do_p2a,
+};
+REGISTER_CMD(p2a_cmd);

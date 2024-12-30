@@ -4,6 +4,7 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
@@ -18,7 +19,7 @@
 
 #define DUMP_RAM_WIN  (8 << 20)
 
-int cmd_replace(const char *name __unused, int argc, char *argv[])
+static int do_replace(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -128,3 +129,10 @@ win_chunk_cleanup:
 
     return rc;
 }
+
+static const struct cmd replace_cmd = {
+    "replace",
+    "ram MATCH REPLACE",
+    do_replace,
+};
+REGISTER_CMD(replace_cmd);

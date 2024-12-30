@@ -113,34 +113,24 @@ apt install build-essential flex swig bison meson device-tree-compiler libyaml-d
 
 ```
 $ ./build/src/culvert -h
-culvert: v0.4.0-10-gb30b8364b75a
+culvert: v0.4.0-196-g34001fbe828a
 Usage:
 
-culvert probe [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert ilpc read ADDRESS
-culvert ilpc write ADDRESS VALUE
-culvert p2a vga read ADDRESS
-culvert p2a vga write ADDRESS VALUE
-culvert debug read ADDRESS INTERFACE [IP PORT USERNAME PASSWORD]
-culvert debug write ADDRESS VALUE INTERFACE [IP PORT USERNAME PASSWORD]
-culvert devmem read ADDRESS
-culvert devmem write ADDRESS VALUE
-culvert console HOST_UART BMC_UART BAUD USER PASSWORD
-culvert read firmware [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert read ram [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert replace ram MATCH REPLACE
-culvert reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert jtag TARGET [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert otp read conf [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]
-culvert coprocessor run ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert console HOST_UART BMC_UART BAUD USER PASSWORD
+        culvert coprocessor <run ADDRESS LENGTH|stop> [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert debug <read ADDRESS|write ADDRESS VALUE> INTERFACE [IP PORT USERNAME PASSWORD]
+        culvert devmem <read ADDRESS|write ADDRESS VALUE>
+        culvert ilpc <read ADDRESS|write ADDRESS VALUE
+        culvert jtag [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert otp <read <conf|strap>|write <conf WORD BIT|strap BIT VALUE>> [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert p2a vga <read ADDRESS|write ADDRESS VALUE>
+        culvert probe [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert read <firmware|ram ADDRESS LENGTH> [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert replace ram MATCH REPLACE
+        culvert reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert sfc fmc <erase|read|write> ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]
+        culvert write <firmware|ram ADDRESS LENGTH> [INTERFACE [IP PORT USERNAME PASSWORD]]
 ```
 
 ```

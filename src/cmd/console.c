@@ -3,6 +3,7 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
@@ -16,7 +17,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int cmd_console(const char *name __unused, int argc, char *argv[])
+static int do_console(const char *name __unused, int argc, char *argv[])
 {
     struct suart _suart, *suart = &_suart;
     struct host _host, *host = &_host;
@@ -179,3 +180,9 @@ host_cleanup:
     return rc;
 }
 
+static const struct cmd console_cmd = {
+    "console",
+    "HOST_UART BMC_UART BAUD USER PASSWORD",
+    do_console
+};
+REGISTER_CMD(console_cmd);

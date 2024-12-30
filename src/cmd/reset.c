@@ -2,6 +2,7 @@
 // Copyright (C) 2018,2021 IBM Corp.
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
@@ -16,7 +17,7 @@
 #include <string.h>
 #include <unistd.h>
 
-int cmd_reset(const char *name __unused, int argc, char *argv[])
+static int do_reset(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -99,3 +100,10 @@ cleanup_host:
 
     return rc;
 }
+
+static const struct cmd reset_cmd = {
+    "reset",
+    "TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]",
+    do_reset,
+};
+REGISTER_CMD(reset_cmd);

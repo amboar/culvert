@@ -3,6 +3,7 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
@@ -147,7 +148,7 @@ static int run_openocd_bitbang_server(struct jtag *jtag, uint16_t port)
         }
 }
 
-int cmd_jtag(const char *name, int argc, char *argv[])
+static int do_jtag(const char *name, int argc, char *argv[])
 {
         struct host _host, *host = &_host;
         struct soc _soc, *soc = &_soc;
@@ -260,3 +261,10 @@ cleanup_host:
 done:
         exit(rc);
 }
+
+static const struct cmd jtag_cmd = {
+        "jtag",
+        "[INTERFACE [IP PORT USERNAME PASSWORD]]",
+        do_jtag,
+};
+REGISTER_CMD(jtag_cmd);

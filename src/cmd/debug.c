@@ -6,9 +6,10 @@
 #include "ahb.h"
 #include "ast.h"
 #include "bridge/debug.h"
+#include "cmd.h"
 #include "log.h"
 
-int cmd_debug(const char *name, int argc, char *argv[])
+static int do_debug(const char *name, int argc, char *argv[])
 {
     struct debug _debug, *debug = &_debug;
     struct ahb *ahb;
@@ -73,3 +74,10 @@ cleanup_debug:
 
     return rc;
 }
+
+static const struct cmd debug_cmd = {
+    "debug",
+    "<read ADDRESS|write ADDRESS VALUE> INTERFACE [IP PORT USERNAME PASSWORD]",
+    do_debug
+};
+REGISTER_CMD(debug_cmd);

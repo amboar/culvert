@@ -4,6 +4,7 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
@@ -23,7 +24,7 @@
 //culvert trace 0x1e788000 1:0 read
 //culvert trace 0x1e788000 2:2 read
 //culvert trace 0x1e788000 4:0 write
-int cmd_trace(const char *name __unused, int argc, char *argv[])
+static int do_trace(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -139,3 +140,10 @@ cleanup_host:
 
     return rc;
 }
+
+static const struct cmd trace_cmd = {
+    "trace",
+    "ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]",
+    do_trace,
+};
+REGISTER_CMD(trace_cmd);

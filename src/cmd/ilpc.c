@@ -6,9 +6,10 @@
 #include "ahb.h"
 #include "ast.h"
 #include "bridge/ilpc.h"
+#include "cmd.h"
 #include "priv.h"
 
-int cmd_ilpc(const char *name, int argc, char *argv[])
+static int do_ilpc(const char *name, int argc, char *argv[])
 {
     struct ilpcb _ilpcb, *ilpcb = &_ilpcb;
     struct ahb *ahb;
@@ -44,3 +45,10 @@ int cmd_ilpc(const char *name, int argc, char *argv[])
 
     return 0;
 }
+
+static const struct cmd ilpc_cmd = {
+    "ilpc",
+    "<read ADDRESS|write ADDRESS VALUE",
+    do_ilpc,
+};
+REGISTER_CMD(ilpc_cmd);

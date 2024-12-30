@@ -2,6 +2,7 @@
 // Copyright (C) 2024 Code Construct
 
 #include "bits.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
@@ -274,7 +275,7 @@ cleanup_host:
     return rc;
 }
 
-int cmd_coprocessor(const char *name __unused, int argc, char *argv[])
+static int do_coprocessor(const char *name __unused, int argc, char *argv[])
 {
     const char *arg_subcmd;
 
@@ -295,3 +296,10 @@ int cmd_coprocessor(const char *name __unused, int argc, char *argv[])
 
     return EXIT_FAILURE;
 }
+
+static const struct cmd coprocessor_cmd = {
+    "coprocessor",
+    "<run ADDRESS LENGTH|stop> [INTERFACE [IP PORT USERNAME PASSWORD]]",
+    do_coprocessor
+};
+REGISTER_CMD(coprocessor_cmd);
