@@ -7,9 +7,10 @@
 #include "ahb.h"
 #include "ast.h"
 #include "bridge/devmem.h"
+#include "cmd.h"
 #include "priv.h"
 
-int cmd_devmem(const char *name, int argc, char *argv[])
+static int do_devmem(const char *name, int argc, char *argv[])
 {
     struct devmem _devmem, *devmem = &_devmem;
     struct ahb *ahb;
@@ -46,3 +47,9 @@ int cmd_devmem(const char *name, int argc, char *argv[])
     return 0;
 }
 
+static const struct cmd devmem_cmd = {
+    "devmem",
+    "<read ADDRESS|write ADDRESS VALUE>",
+    do_devmem,
+};
+REGISTER_CMD(devmem_cmd);

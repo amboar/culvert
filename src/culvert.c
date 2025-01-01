@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cmd.h"
 #include "config.h"
 #include "compiler.h"
 #include "log.h"
@@ -19,90 +20,32 @@
 #include "ahb.h"
 #include "host.h"
 
-int cmd_ilpc(const char *name, int argc, char *argv[]);
-int cmd_p2a(const char *name, int argc, char *argv[]);
-int cmd_debug(const char *name, int argc, char *argv[]);
-int cmd_devmem(const char *name, int argc, char *argv[]);
-int cmd_console(const char *name, int argc, char *argv[]);
-int cmd_read(const char *name, int argc, char *argv[]);
-int cmd_write(const char *name, int argc, char *argv[]);
-int cmd_replace(const char *name, int argc, char *argv[]);
-int cmd_probe(const char *name, int argc, char *argv[]);
-int cmd_reset(const char *name, int argc, char *argv[]);
-int cmd_jtag(const char *name, int argc, char *argv[]);
-int cmd_sfc(const char *name, int argc, char *argv[]);
-int cmd_otp(const char *name, int argc, char *argv[]);
-int cmd_trace(const char *name, int argc, char *argv[]);
-int cmd_coprocessor(const char *name, int argc, char *argv[]);
+#include "ccan/autodata/autodata.h"
 
 static void print_version(const char *name)
 {
     printf("%s: " CULVERT_VERSION "\n", name);
 }
 
-static void print_help(const char *name)
+static void print_help(const char *name, struct cmd **cmds, size_t n_cmds)
 {
     print_version(name);
     printf("Usage:\n");
     printf("\n");
-    printf("%s probe [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s ilpc read ADDRESS\n", name);
-    printf("%s ilpc write ADDRESS VALUE\n", name);
-    printf("%s p2a vga read ADDRESS\n", name);
-    printf("%s p2a vga write ADDRESS VALUE\n", name);
-    printf("%s debug read ADDRESS INTERFACE [IP PORT USERNAME PASSWORD]\n", name);
-    printf("%s debug write ADDRESS VALUE INTERFACE [IP PORT USERNAME PASSWORD]\n", name);
-    printf("%s devmem read ADDRESS\n", name);
-    printf("%s devmem write ADDRESS VALUE\n", name);
-    printf("%s console HOST_UART BMC_UART BAUD USER PASSWORD\n", name);
-    printf("%s read firmware [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s read ram ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s write firmware [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s write ram ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s replace ram MATCH REPLACE\n", name);
-    printf("%s reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s jtag [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s sfc fmc read ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s sfc fmc erase ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s sfc fmc write ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s otp read conf [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s otp read strap [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s otp write strap BIT VALUE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s otp write conf WORD BIT [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
-    printf("%s coprocessor run ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]\n", name);
+
+    for (size_t i = 0; i < n_cmds; i++) {
+        printf("\t%s %s %s\n", name, cmds[i]->name, cmds[i]->help);
+    }
 }
-
-struct command {
-    const char *name;
-    int (*fn)(const char *, int, char *[]);
-};
-
-static const struct command cmds[] = {
-    { "ilpc", cmd_ilpc },
-    { "p2a", cmd_p2a },
-    { "console", cmd_console },
-    { "read", cmd_read },
-    { "write", cmd_write },
-    { "replace", cmd_replace },
-    { "probe", cmd_probe },
-    { "debug", cmd_debug },
-    { "reset", cmd_reset },
-    { "jtag", cmd_jtag },
-    { "devmem", cmd_devmem },
-    { "sfc", cmd_sfc },
-    { "otp", cmd_otp },
-    { "trace", cmd_trace },
-    { "coprocessor", cmd_coprocessor},
-    { },
-};
 
 int main(int argc, char *argv[])
 {
-    const struct command *cmd = &cmds[0];
     bool show_help = false;
     bool quiet = false;
+    struct cmd **cmds;
+    size_t n_cmds = 0;
     int verbose = 0;
+    int rc;
 
     while (1) {
         static struct option long_options[] = {
@@ -151,11 +94,18 @@ int main(int argc, char *argv[])
         }
     }
 
+    cmds = autodata_get(cmds, &n_cmds);
+    qsort(cmds, n_cmds, sizeof(void *), cmd_cmp);
+
     if (optind == argc) {
-        if (!show_help)
+        if (show_help) {
+            rc = 0;
+        } else {
             fprintf(stderr, "Error: not enough arguments\n");
-        print_help(program_invocation_short_name);
-        exit(EXIT_FAILURE);
+            rc = -EINVAL;
+        }
+        print_help(program_invocation_short_name, cmds, n_cmds);
+        goto cleanup_cmds;
     }
 
     if (quiet) {
@@ -166,24 +116,33 @@ int main(int argc, char *argv[])
         log_set_level(level_trace);
     }
 
-    while (cmd->fn) {
-        if (!strcmp(cmd->name, argv[optind])) {
-            int offset = optind;
-            int rc;
+    rc = -EINVAL;
+    for (size_t i = 0; i < n_cmds; i++) {
+        struct cmd *cmd = cmds[i];
+        int offset;
 
-            /* probe uses getopt, but for subcommands not using getopt */
-            if (!(!strcmp("probe", argv[optind]) || !strcmp("write", argv[optind]))) {
-                offset += 1;
-            }
-            optind = 1;
-
-            rc = cmd->fn(program_invocation_short_name, argc - offset, argv + offset);
-            exit(rc ? EXIT_FAILURE : EXIT_SUCCESS);
+        if (strcmp(cmd->name, argv[optind])) {
+            continue;
         }
 
-        cmd++;
+        offset = optind;
+
+        /* probe uses getopt, but for subcommands not using getopt */
+        if (!(!strcmp("probe", argv[optind]) || !strcmp("write", argv[optind]))) {
+            offset += 1;
+        }
+        optind = 1;
+
+        rc = cmd->fn(program_invocation_short_name, argc - offset, argv + offset);
+        break;
     }
 
-    fprintf(stderr, "Error: unknown command: %s\n", argv[1]);
-    exit(EXIT_FAILURE);
+    if (rc == -EINVAL) {
+        fprintf(stderr, "Unrecognised command\n\n");
+        print_help(program_invocation_short_name, cmds, n_cmds);
+    }
+
+cleanup_cmds:
+    autodata_free(cmds);
+    exit(rc ? EXIT_FAILURE : EXIT_SUCCESS);
 }

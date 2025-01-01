@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
 
+#include "cmd.h"
 #include "compiler.h"
-
 #include "host.h"
 #include "log.h"
 #include "soc.h"
@@ -24,7 +24,7 @@ cmd_probe_help(const char *name, int argc __unused, char *argv[] __unused)
     printf(probe_help, name, name, name, name);
 }
 
-int cmd_probe(const char *name, int argc, char *argv[])
+static int do_probe(const char *name, int argc, char *argv[])
 {
     enum bridge_mode required = bm_permissive;
     struct host _host, *host = &_host;
@@ -123,3 +123,10 @@ cleanup_host:
 done:
     exit(rc);
 }
+
+static const struct cmd probe_cmd = {
+    "probe",
+    "[INTERFACE [IP PORT USERNAME PASSWORD]]",
+    do_probe,
+};
+REGISTER_CMD(probe_cmd);

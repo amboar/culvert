@@ -2,6 +2,7 @@
 // Copyright (C) 2018,2021 IBM Corp.
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "flash.h"
 #include "host.h"
@@ -19,7 +20,7 @@
 
 enum flash_op { flash_op_read, flash_op_write, flash_op_erase };
 
-int cmd_sfc(const char *name __unused, int argc, char *argv[])
+static int do_sfc(const char *name __unused, int argc, char *argv[])
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -132,3 +133,10 @@ cleanup_host:
 
     return rc;
 }
+
+static const struct cmd sfc_cmd = {
+    "sfc",
+    "fmc <erase|read|write> ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]",
+    do_sfc,
+};
+REGISTER_CMD(sfc_cmd);

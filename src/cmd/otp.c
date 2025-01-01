@@ -2,6 +2,7 @@
 // Copyright (C) 2018,2021 IBM Corp.
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
@@ -13,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int cmd_otp(const char *name __unused, int argc, char *argv[])
+static int do_otp(const char *name __unused, int argc, char *argv[])
 {
     enum otp_region reg = otp_region_conf;
     struct host _host, *host = &_host;
@@ -104,3 +105,10 @@ cleanup_host:
 
     return rc;
 }
+
+static const struct cmd otp_cmd = {
+    "otp",
+    "<read <conf|strap>|write <conf WORD BIT|strap BIT VALUE>> [INTERFACE [IP PORT USERNAME PASSWORD]]",
+    do_otp,
+};
+REGISTER_CMD(otp_cmd);

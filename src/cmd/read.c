@@ -3,6 +3,7 @@
 
 #include "ahb.h"
 #include "ast.h"
+#include "cmd.h"
 #include "compiler.h"
 #include "flash.h"
 #include "host.h"
@@ -194,7 +195,7 @@ cleanup_host:
     return rc;
 }
 
-int cmd_read(const char *name __unused, int argc, char *argv[])
+static int do_read(const char *name __unused, int argc, char *argv[])
 {
     int rc;
 
@@ -214,3 +215,10 @@ int cmd_read(const char *name __unused, int argc, char *argv[])
 
     return rc < 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
+
+static const struct cmd read_cmd = {
+    "read",
+    "<firmware|ram ADDRESS LENGTH> [INTERFACE [IP PORT USERNAME PASSWORD]]",
+    do_read,
+};
+REGISTER_CMD(read_cmd);
