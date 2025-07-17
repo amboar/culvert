@@ -32,6 +32,32 @@ static inline int cmd_cmp(const void *a, const void *b)
 }
 
 /**
+ * Parse the memory values of a command
+ *
+ * @param state The argp state
+ * @param label The name of the value to be parsed
+ * @param out Pointer to the unsigned long in the commands' arguments struct
+ * @param arg The input value
+ */
+static inline void parse_mem_arg(struct argp_state *state, const char *label,
+                                 unsigned long *out, const char *arg)
+{
+    char *endp;
+    errno = 0;
+    *out = strtoul(arg, &endp, 0);
+    if (*out == ULONG_MAX && errno) {
+        argp_error(state, "Failed to parse %s '%s': %s", label, arg, strerror(errno));
+#if ULONG_MAX > UINT32_MAX
+    } else if (*out > UINT32_MAX) {
+        argp_error(state, "Failed to parse %s: '%s' exceeds address space", label, arg);
+#endif
+    }
+
+    if (arg == endp || *endp)
+        argp_error(state, "Invalid %s format: '%s'", label, arg);
+}
+
+/**
  * Parse everything after the `via` word.
  * The `via` word itself is not included in the arguments.
  * The arguments are expected to be in the following order:
