@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "bridge.h"
 #include "console.h"
+#include "connection.h"
 #include "debug.h"
 #include "log.h"
 #include "prompt.h"
@@ -472,7 +473,7 @@ static const struct ahb_ops debug_ahb_ops = {
     .writel = debug_writel
 };
 
-static struct ahb *debug_driver_probe(int argc, char *argv[]);
+static struct ahb *debug_driver_probe(struct connection_args *connection);
 static void debug_driver_destroy(struct ahb *ahb);
 static int debug_driver_release(struct ahb *ahb);
 static int debug_driver_reinit(struct ahb *ahb);
@@ -531,7 +532,7 @@ int debug_destroy(struct debug *ctx)
     return rc ? -EBADF : 0;
 }
 
-static struct ahb *debug_driver_probe(int argc, char *argv[])
+static struct ahb *debug_driver_probe(struct connection_args *connection)
 {
     struct debug *ctx;
     int rc;
@@ -541,24 +542,27 @@ static struct ahb *debug_driver_probe(int argc, char *argv[])
         return NULL;
     }
 
-    if (argc == 1) {
+    /* Early abort if no interface at all is defined */
+    if (connection->interface == NULL) {
+        logd("No interface for debug provided, skipping...\n");
+        return NULL;
+    }
+
+    if (!connection->internet_args) {
         /* Local debug interface */
-        if ((rc = debug_init(ctx, argv[0])) < 0) {
+        if ((rc = debug_init(ctx, connection->interface)) < 0) {
             loge("Failed to initialise local debug interace on %s: %d\n",
-                    argv[0], rc);
+                    connection->interface, rc);
             goto cleanup_ctx;
         }
-    } else if (argc == 5) {
+    } else {
         /* Remote debug interface */
-        rc = debug_init(ctx, argv[0], argv[1], strtoul(argv[2], NULL, 0),
-                        argv[3], argv[4]);
+        rc = debug_init(ctx, connection->interface, connection->ip, connection->port,
+                        connection->username, connection->password);
         if (rc < 0) {
             loge("Failed to initialise remote debug interface: %d\n", rc);
             goto cleanup_ctx;
         }
-    } else {
-        logd("Unrecognised argument list for debug interface (%d)\n", argc);
-        return NULL;
     }
 
     if ((rc = debug_enter(ctx)) < 0) {
