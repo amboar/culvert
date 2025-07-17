@@ -7,12 +7,13 @@
 #include <stdbool.h>
 
 #include "ahb.h"
+#include "connection.h"
 
 #include "ccan/autodata/autodata.h"
 
 struct bridge_driver {
 	const char *name;
-	struct ahb *(*probe)(int argc, char *argv[]);
+	struct ahb *(*probe)(struct connection_args *connection);
 	int (*release)(struct ahb *ahb);
 	int (*reinit)(struct ahb *ahb);
 	void (*destroy)(struct ahb *ahb);

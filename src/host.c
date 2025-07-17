@@ -8,6 +8,7 @@
 #include "bridge/ilpc.h"
 #include "bridge/l2a.h"
 #include "bridge/p2a.h"
+#include "connection.h"
 #include "compiler.h"
 #include "host.h"
 #include "log.h"
@@ -58,7 +59,7 @@ out:
     return ret;
 }
 
-int host_init(struct host *ctx, int argc, char *argv[])
+int host_init(struct host *ctx, struct connection_args *connection)
 {
     struct bridge_driver **bridges;
     size_t n_bridges = 0;
@@ -81,7 +82,7 @@ int host_init(struct host *ctx, int argc, char *argv[])
 
         logd("Trying bridge driver %s\n", bridges[i]->name);
 
-        if ((ahb = bridges[i]->probe(argc, argv))) {
+        if ((ahb = bridges[i]->probe(connection))) {
             struct bridge *bridge;
 
             bridge = malloc(sizeof(*bridge));

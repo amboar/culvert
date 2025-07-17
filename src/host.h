@@ -5,6 +5,7 @@
 #define _HOST_H
 
 #include "ahb.h"
+#include "connection.h"
 
 #include "ccan/list/list.h"
 
@@ -12,7 +13,7 @@ struct host {
 	struct list_head bridges;
 };
 
-int host_init(struct host *ctx, int argc, char *argv[]);
+int host_init(struct host *ctx, struct connection_args *connection);
 void host_destroy(struct host *ctx);
 
 int disable_bridge_driver(const char *drv);
