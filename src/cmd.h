@@ -15,8 +15,8 @@
 
 struct cmd {
     const char *name;
-    const char *help;
-    int (*fn)(const char *, int, char *[]);
+    const char *description;
+    int (*fn)(int argc, char **argv);
 };
 
 AUTODATA_TYPE(cmds, struct cmd);

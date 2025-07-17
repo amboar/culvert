@@ -5,6 +5,7 @@
 /* For program_invocation_short_name */
 #define _GNU_SOURCE
 
+#include <argp.h>
 #include <errno.h>
 #include <getopt.h>
 #include <stdbool.h>
@@ -22,125 +23,166 @@
 
 #include "ccan/autodata/autodata.h"
 
-static void print_version(const char *name)
-{
-    printf("%s: " CULVERT_VERSION "\n", name);
-}
+const char *argp_program_version = "culvert " CULVERT_VERSION;
+const char *argp_program_bug_address = "GitHub amboar/culvert";
 
-static void print_help(const char *name, struct cmd **cmds, size_t n_cmds)
+struct root_arguments {
+    char *name;
+    char **args;
+    int argc;
+    struct cmd *cmd;
+};
+
+static struct argp_option root_options[] = {
+    { "verbose", 'v', 0, 0, "Get verbose output", 0 },
+    { "quiet", 'q', 0, 0, "Don't produce any output", 0 },
+    { "skip-bridge", 's', "BRIDGE", 0, "Skip BRIDGE driver", 0 },
+    { "list-bridges", 'l', 0, 0, "List available bridge drivers", 0 },
+    {0}
+};
+
+static char *make_root_doc(struct cmd **cmds, size_t n_cmds)
 {
-    print_version(name);
-    printf("Usage:\n");
-    printf("\n");
+    char *doc = NULL;
+    if (asprintf(&doc, "\nCulvert — A Test and Debug Tool for BMC AHB Interfaces\n"
+                       "\vAvailable commands:\n") < 0)
+        return NULL;
 
     for (size_t i = 0; i < n_cmds; i++) {
-        printf("\t%s %s %s\n", name, cmds[i]->name, cmds[i]->help);
+        char *new_doc;
+        if (asprintf(&new_doc, "%s  %-20s %s\n", doc, cmds[i]->name,
+                     cmds[i]->description ? cmds[i]->description : "") < 0) {
+            free(doc);
+            return NULL;
+        }
+        free(doc);
+        doc = new_doc;
     }
+
+    return doc;
 }
 
-int main(int argc, char *argv[])
+static error_t
+parse_root_opt(int key, char *arg, struct argp_state *state)
 {
-    bool show_help = false;
-    bool quiet = false;
-    struct cmd **cmds;
-    size_t n_cmds = 0;
-    int verbose = 0;
-    int rc;
+    struct root_arguments *arguments = state->input;
 
-    while (1) {
-        static struct option long_options[] = {
-            { "help", no_argument, NULL, 'h' },
-            { "quiet", no_argument, NULL, 'q' },
-            { "skip-bridge", required_argument, NULL, 's' },
-            { "list-bridges", no_argument, NULL, 'l' },
-            { "verbose", no_argument, NULL, 'v' },
-            { "version", no_argument, NULL, 'V' },
-            { },
-        };
-        int option_index = 0;
-        int c;
-
-        c = getopt_long(argc, argv, "+hlqs:vV", long_options, &option_index);
-        if (c == -1)
+    switch (key) {
+        case 'q':
+            log_set_level(level_none);
             break;
+        case 'v':
+            log_set_level(level_trace);
+            break;
+        case 's':
+            if (disable_bridge_driver(arg)) {
+                fprintf(stderr, "Error: '%s' not a recognized bridge name (use '-l' to list)\n", arg);
+                return -EINVAL;
+            }
+            break;
+        case 'l':
+            print_bridge_drivers();
+            /* Early exit as we only print the bridge drivers */
+            exit(EXIT_SUCCESS);
+            break;
+        case ARGP_KEY_ARG:
+            /* Ensure that only the first argument is being used as name */
+            if (!arguments->name)
+                arguments->name = arg;
+            else
+                argp_usage(state);
 
-        switch (c) {
-            case 'h':
-                show_help = true;
-                break;
-            case 'l':
-                print_bridge_drivers();
-                exit(EXIT_SUCCESS);
-                break;
-            case 'v':
-                verbose++;
-                break;
-            case 'V':
-                print_version(program_invocation_short_name);
-                exit(EXIT_SUCCESS);
-            case 'q':
-                quiet = true;
-                break;
-            case 's':
-                if (disable_bridge_driver(optarg)) {
-                    fprintf(stderr, "Error: '%s' not a recognized bridge name (use '-l' to list)\n", optarg);
-                    exit(EXIT_FAILURE);
-                }
-                break;
-            case '?':
-                exit(EXIT_FAILURE);
-            default:
-                continue;
-        }
+            /* Skip other arguments but save them to args array */
+            arguments->args = &state->argv[state->next];
+            arguments->argc = state->argc - state->next;
+            state->next = state->argc;
+            break;
+        case ARGP_KEY_END:
+            if (!arguments->name)
+                argp_usage(state);
+            break;
+        default:
+            return ARGP_ERR_UNKNOWN;
     }
 
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    struct cmd **cmds;
+    struct root_arguments args = {0};
+    size_t n_cmds = 0;
+    int rc = 0;
+
+    /*
+     * Always initialise the log level and set a different level if an
+     * argument is passed.
+     */
+    log_set_level(level_info);
+
+    /* Get all commands via autodata */
     cmds = autodata_get(cmds, &n_cmds);
     qsort(cmds, n_cmds, sizeof(void *), cmd_cmp);
 
-    if (optind == argc) {
-        if (show_help) {
-            rc = 0;
-        } else {
-            fprintf(stderr, "Error: not enough arguments\n");
-            rc = -EINVAL;
+    char *doc = make_root_doc(cmds, n_cmds);
+
+    /* argp struct must be in main because of doc generation. */
+    struct argp root_argp = {
+        .options = root_options,
+        .parser = parse_root_opt,
+        .args_doc = "<cmd> [CMD_OPTIONS]...",
+        .doc = doc,
+    };
+
+    /*
+     * Parse command-line arguments
+     * NOTE: `ARGP_IN_ORDER` is required to make sub-commands work
+     * properly and to enforce options to be in order.
+     */
+    rc = argp_parse(&root_argp, argc, argv, ARGP_IN_ORDER, 0, &args);
+    free(doc);
+    if (rc != 0)
+        goto cleanup_cmds;
+
+    /* If for some reason args.name is still empty but rc is 0, break here */
+    if (args.name == 0)
+        goto cleanup_cmds;
+
+    struct cmd *selected = NULL;
+    for (size_t i = 0; i < n_cmds; i++) {
+        if (!strcmp(args.name, cmds[i]->name)) {
+            selected = cmds[i];
+            break;
         }
-        print_help(program_invocation_short_name, cmds, n_cmds);
+    }
+
+    if (!selected) {
+        fprintf(stderr, "Unknown command: %s\n", args.name);
+        rc = -EINVAL;
         goto cleanup_cmds;
     }
 
-    if (quiet) {
-        log_set_level(level_none);
-    } else if ((level_info + verbose) <= level_trace) {
-        log_set_level(level_info + verbose);
-    } else {
-        log_set_level(level_trace);
+    /* Allocate new array for the command */
+    char **subcmd_argv = calloc(args.argc + 1, sizeof(char *));
+    if (!subcmd_argv) {
+        rc = -ENOMEM;
+        goto cleanup_cmds;
     }
 
-    rc = -EINVAL;
-    for (size_t i = 0; i < n_cmds; i++) {
-        struct cmd *cmd = cmds[i];
-        int offset;
-
-        if (strcmp(cmd->name, argv[optind])) {
-            continue;
-        }
-
-        offset = optind;
-
-        /* probe uses getopt, but for subcommands not using getopt */
-        if (!(!strcmp("probe", argv[optind]) || !strcmp("write", argv[optind]))) {
-            offset += 1;
-        }
-        optind = 1;
-
-        rc = cmd->fn(program_invocation_short_name, argc - offset, argv + offset);
-        break;
+    /* Set argv[0] to a combined name like "culvert coprocessor" */
+    if (asprintf(&subcmd_argv[0], "%s %s", argv[0], args.name) < 0) {
+        rc = -ENOMEM;
+        goto cleanup_cmds;
     }
 
-    if (rc == -EINVAL) {
-        fprintf(stderr, "Unrecognised command\n\n");
-        print_help(program_invocation_short_name, cmds, n_cmds);
-    }
+    /* Copy the remaining arguments from args.args */
+    for (int i = 0; i < args.argc; i++)
+        subcmd_argv[i + 1] = args.args[i];
+
+    rc = selected->fn(args.argc + 1, subcmd_argv);
+    free(subcmd_argv[0]);
+    free(subcmd_argv);
 
 cleanup_cmds:
     autodata_free(cmds);
