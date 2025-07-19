@@ -13,6 +13,8 @@
 #include "host.h"
 #include "log.h"
 
+#include "ccan/autodata/autodata.h"
+
 #include <errno.h>
 
 struct bridge {
@@ -48,6 +50,28 @@ int disable_bridge_driver(const char *drv)
     for (size_t i = 0; i < n_bridges; i++) {
         if (!strcmp(bridges[i]->name, drv)) {
             bridges[i]->disabled = true;
+            ret = 0;
+            goto out;
+        }
+    }
+
+out:
+    autodata_free(bridges);
+
+    return ret;
+}
+
+int get_bridge_driver(const char *drv, struct bridge_driver **bridge)
+{
+    struct bridge_driver **bridges;
+    size_t n_bridges = 0;
+    int ret = -ENOENT;
+
+    bridges = autodata_get(bridge_drivers, &n_bridges);
+
+    for (size_t i = 0; i < n_bridges; i++) {
+        if (!strcmp(bridges[i]->name, drv) && !bridges[i]->disabled) {
+            *bridge = bridges[i];
             ret = 0;
             goto out;
         }
