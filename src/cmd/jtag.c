@@ -12,6 +12,7 @@
 #include "soc/clk.h"
 #include "soc/jtag.h"
 
+#include <argp.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
@@ -24,17 +25,86 @@
 #include <unistd.h>
 #include <getopt.h>
 
-static void
-cmd_jtag_help(const char *name, int argc __unused, char *argv[] __unused)
-{
-        static const char *jtag_help =
-                "Usage:\n"
-                "%s jtag --help\n"
-                "%s jtag --port OPENOCD-PORT ...\n"
-                "%s jtag --target <arm|pcie|external>\n";
+static char cmd_jtag_args_doc[] = "via DRIVER [INTERFACE [IP PORT USERNAME PASSWORD]]";
+static char cmd_jtag_doc[] =
+    "\n"
+    "JTAG OpenOCD Bitbang server command"
+    "\v"
+    "Supported target types:\n"
+    "  arm      Route JTAG to the internal ARM core\n"
+    "  pcie     Route JTAG to the internal PCIe PHY\n"
+    "  external Route JTAG to the external GPIO pins\n";
 
-        printf(jtag_help, name, name, name, name);
+static struct argp_option cmd_jtag_options[] = {
+    { "controller", 'c', "CTRL", 0, "JTAG controller to use (default: jtag)", 0 },
+    { "port", 'p', "PORT", 0, "Port to listen on (default: 33333)", 0 },
+    { "target-type", 't', "TYPE", 0, "JTAG target to route to (default: arm)", 0 },
+    {0},
+};
+
+struct cmd_jtag_args
+{
+    struct connection_args connection;
+    const char *controller;
+    uint32_t target_bits;
+    int listen_port;
+};
+
+static error_t cmd_jtag_parse_opt(int key, char *arg, struct argp_state *state)
+{
+    struct cmd_jtag_args *arguments = state->input;
+    int rc;
+
+    switch (key) {
+    case 'c':
+        arguments->controller = arg;
+        break;
+    case 'p':
+        arguments->listen_port = atoi(arg);
+        if (!arguments->listen_port && arguments->listen_port > UINT16_MAX)
+            argp_error(state, "Invalid port '%s'", arg);
+        break;
+    case 't':
+        if (!strcmp(arg, "arm"))
+            arguments->target_bits = SCU_JTAG_MASTER_TO_ARM;
+        else if (!strcmp(arg, "pcie"))
+            arguments->target_bits = SCU_JTAG_MASTER_TO_PCIE;
+        else if (!strcmp(arg, "external"))
+            arguments->target_bits = SCU_JTAG_NORMAL;
+        else
+            argp_error(state, "Invalid target '%s'", arg);
+        break;
+    case ARGP_KEY_ARG:
+        if (!strcmp(arg, "via")) {
+            rc = cmd_parse_via(state->next - 1, state, &arguments->connection);
+            if (rc != 0)
+                argp_error(state, "Failed to parse connection arguments. Returned code %d", rc);
+        }
+        break;
+    case ARGP_KEY_END:
+        if (!arguments->controller)
+            arguments->controller = "jtag";
+        if (!arguments->listen_port)
+            arguments->listen_port = 33333;
+        if (!arguments->target_bits)
+            arguments->target_bits = SCU_JTAG_MASTER_TO_ARM;
+
+        if (arguments->connection.bridge_driver == NULL)
+            argp_error(state, "Explicit driver must be defined");
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
 }
+
+static struct argp cmd_jtag_argp = {
+    .options = cmd_jtag_options,
+    .parser = cmd_jtag_parse_opt,
+    .args_doc = cmd_jtag_args_doc,
+    .doc = cmd_jtag_doc,
+};
 
 static int run_openocd_bitbang_server(struct jtag *jtag, uint16_t port)
 {
@@ -143,86 +213,25 @@ static int run_openocd_bitbang_server(struct jtag *jtag, uint16_t port)
                                 break;
                         default:
                                 loge("Received unknown command from OpenOCD: %c\n", command);
-                        } 
+                        }
                 }
         }
 }
 
-static int do_jtag(const char *name, int argc, char *argv[])
+static int do_jtag(int argc, char **argv)
 {
         struct host _host, *host = &_host;
         struct soc _soc, *soc = &_soc;
         struct ahb *ahb;
         struct jtag *jtag;
         int rc;
-        uint32_t target_bits = SCU_JTAG_MASTER_TO_ARM;
-        int port = 33333;
-        const char *controller = "jtag";
 
-        // getopt() expects the first argument to be a program name
-        // somewhat ugly trick, but works
-        argc += 1;
-        argv -= 1;
+        struct cmd_jtag_args arguments = {0};
+        rc = argp_parse(&cmd_jtag_argp, argc, argv, ARGP_IN_ORDER, 0, &arguments);
+        if (rc != 0)
+            return rc;
 
-        while (1) {
-                int option_index = 0;
-                int c;
-
-                static struct option long_options[] = {
-                        { "controller", required_argument, NULL, 'c' },
-                        { "help", no_argument, NULL, 'h' },
-                        { "port", required_argument, NULL, 'p' },
-                        { "target", required_argument, NULL, 't' },
-                        { },
-                };
-
-                c = getopt_long(argc, argv, "c:hp:t:", long_options, &option_index);
-                if (c == -1)
-                        break;
-
-                switch (c) {
-                        case 'c':
-                                controller = optarg;
-                                break;
-                        case 'h':
-                                cmd_jtag_help(name, argc, argv);
-                                rc = EXIT_SUCCESS;
-                                goto done;
-                        case 'p':
-                                port = atoi(optarg);
-                                if (!port || port > UINT16_MAX) {
-                                        loge("Invalid port '%s'\n", optarg);
-                                        rc = EXIT_FAILURE;
-                                        goto done;
-                                }
-                                break;
-                        case 't':
-                        {
-                                if (!strcmp("arm", optarg)) {
-                                        target_bits = SCU_JTAG_MASTER_TO_ARM;
-                                } else if (!strcmp("pcie", optarg)) {
-                                        target_bits = SCU_JTAG_MASTER_TO_PCIE;
-                                } else if (!strcmp("external", optarg)) {
-                                        target_bits = SCU_JTAG_NORMAL;
-                                } else {
-                                        loge("Unsupported JTAG target: '%s', valid targets:\n", optarg);
-                                        loge("- arm:      Routes JTAG to the BMC internal ARM core\n");
-                                        loge("- pcie:     Routes JTAG to the BMC internal PCIe PHY\n");
-                                        loge("- external: Routes JTAG to the external GPIO pins (CPLDs, host CPUs, etc.)\n");
-                                        rc = EXIT_FAILURE;
-                                        goto done;
-
-                                }
-                                break;
-                        }
-                        case '?':
-                                loge("Unknown command line option: %s\n", optopt);
-                                rc = EXIT_FAILURE;
-                                goto done;
-                }
-        }
-
-        if ((rc = host_init(host, argc - optind, &argv[optind])) < 0) {
+        if ((rc = host_init(host, &arguments.connection)) < 0) {
                 loge("Failed to initialise host interfaces: %d\n", rc);
                 rc = EXIT_FAILURE;
                 goto done;
@@ -241,15 +250,15 @@ static int do_jtag(const char *name, int argc, char *argv[])
         }
 
         /* Initialise the required SoC drivers */
-        if (!(jtag = jtag_get(soc, controller))) {
+        if (!(jtag = jtag_get(soc, arguments.controller))) {
                 loge("Failed to acquire JTAG controller, exiting\n");
                 goto cleanup_soc;
         }
 
-        jtag_route(jtag, target_bits);
+        jtag_route(jtag, arguments.target_bits);
 
         while (true) {
-                run_openocd_bitbang_server(jtag, port);
+                run_openocd_bitbang_server(jtag, arguments.listen_port);
         }
 
 cleanup_soc:
@@ -263,8 +272,8 @@ done:
 }
 
 static const struct cmd jtag_cmd = {
-        "jtag",
-        "[INTERFACE [IP PORT USERNAME PASSWORD]]",
-        do_jtag,
+    .name = "jtag",
+    .description = "Start a JTAG OpenOCD Bitbang server",
+    .fn = do_jtag,
 };
 REGISTER_CMD(jtag_cmd);
