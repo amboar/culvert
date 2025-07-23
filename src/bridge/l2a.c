@@ -3,6 +3,7 @@
 
 #include "bridge.h"
 #include "compiler.h"
+#include "connection.h"
 #include "l2a.h"
 #include "log.h"
 
@@ -170,7 +171,7 @@ static int l2ab_restore_hicr78(struct l2ab *ctx)
     return ilpcb_writel(ilpcb_as_ahb(ilpcb), LPC_HICR7, ctx->restore7);
 }
 
-static struct ahb *l2ab_driver_probe(int argc, char *argv[]);
+static struct ahb *l2ab_driver_probe(struct connection_args *connection);
 static void l2ab_driver_destroy(struct ahb *ahb);
 static int l2ab_driver_release(struct ahb *ahb);
 static int l2ab_driver_reinit(struct ahb *ahb);
@@ -232,15 +233,10 @@ int l2ab_destroy(struct l2ab *ctx)
 }
 
 static struct ahb *
-l2ab_driver_probe(int argc, char *argv[] __unused)
+l2ab_driver_probe(struct connection_args *connection __unused)
 {
     struct l2ab *ctx;
     int rc;
-
-    // This driver doesn't require args, so if there are any we're not trying to probe it
-    if (argc > 0) {
-        return NULL;
-    }
 
     ctx = malloc(sizeof(*ctx));
     if (!ctx) {
