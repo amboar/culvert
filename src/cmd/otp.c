@@ -1,60 +1,122 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+
 #include "ahb.h"
 #include "ast.h"
 #include "cmd.h"
 #include "compiler.h"
+#include "connection.h"
 #include "host.h"
 #include "log.h"
 #include "priv.h"
 #include "soc/otp.h"
 
+#include <argp.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int do_otp(const char *name __unused, int argc, char *argv[])
+static char cmd_otp_args_doc[] =
+    "<conf|strap> <read|write <WORD BIT|BIT VALUE>>"
+    " [via DRIVER [INTERFACE [IP PORT USERNAME PASSWORD]]]";
+
+static char cmd_otp_doc[] =
+    "\n"
+    "Otp command"
+    "\v"
+    "Supported regions:\n"
+    "  conf        OTP configuration (word and bit for write)\n"
+    "  strap       OTP strap (bit and value for write)"
+    "\v"
+    "Supported commands:\n"
+    "  read        Read data to OTP storage\n"
+    "  write       Write data to OTP storage\n";
+
+static struct argp_option cmd_otp_options[] = {
+    {0},
+};
+
+struct cmd_otp_args {
+    struct connection_args connection;
+    enum otp_region region;
+    bool read;
+    unsigned int key;
+    unsigned int value;
+};
+
+static error_t cmd_otp_parse_opt(int key, char *arg, struct argp_state *state)
 {
-    enum otp_region reg = otp_region_conf;
+    struct cmd_otp_args *arguments = state->input;
+    int rc;
+
+    switch (key) {
+    case ARGP_KEY_ARG:
+        if (!strcmp(arg, "via")) {
+            rc = cmd_parse_via(state->next - 1, state, &arguments->connection);
+            if (rc != 0)
+                argp_error(state, "Failed to parse connection arguments. Returned code %d", rc);
+            break;
+        }
+
+        switch (state->arg_num) {
+        case 0:
+            if (strcmp("conf", arg) && strcmp("strap", arg))
+                argp_error(state, "Invalid region '%s'", arg);
+
+            arguments->region = !strcmp("conf", arg) ? otp_region_conf : otp_region_strap;
+            break;
+        case 1:
+            if (strcmp("read", arg) && strcmp("write", arg))
+                argp_error(state, "Invalid command '%s'", arg);
+
+            arguments->read = !(strcmp(arg, "read"));
+            break;
+        case 2:
+            arguments->key = strtoul(arg, NULL, 0);
+            break;
+        case 3:
+            arguments->key = strtoul(arg, NULL, 0);
+            break;
+        }
+        break;
+    case ARGP_KEY_END:
+        if (state->arg_num < 2)
+            argp_error(state, "Not enough arguments");
+        if (!arguments->read && state->arg_num < 4)
+            argp_error(state, "Not enough arguments for write");
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp cmd_otp_argp = {
+    .options = cmd_otp_options,
+    .parser = cmd_otp_parse_opt,
+    .args_doc = cmd_otp_args_doc,
+    .doc = cmd_otp_doc,
+};
+
+static int do_otp(int argc, char **argv)
+{
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     struct otp *otp;
     struct ahb *ahb;
-    bool rd = true;
-    int argo = 2;
     int rc;
 
-    if (argc < 2) {
-        loge("Not enough arguments for otp command\n");
-        exit(EXIT_FAILURE);
-    }
+    struct cmd_otp_args arguments = {0};
+    rc = argp_parse(&cmd_otp_argp, argc, argv, ARGP_IN_ORDER, 0, &arguments);
+    if (rc != 0)
+        return rc;
 
-    if (!strcmp("conf", argv[1]))
-        reg = otp_region_conf;
-    else if (!strcmp("strap", argv[1]))
-        reg = otp_region_strap;
-    else {
-        loge("Unsupported otp region: %s\n", argv[1]);
-        exit(EXIT_FAILURE);
-    }
-
-    if (!strcmp("write", argv[0])) {
-        rd = false;
-        argo += 2;
-    } else if (strcmp("read", argv[0])) {
-        loge("Unsupported command: %s\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    if (argc < argo) {
-        loge("Not enough arguments for otp command\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if ((rc = host_init(host, argc - argo, argv + argo)) < 0) {
+    if ((rc = host_init(host, &arguments.connection)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
-        exit(EXIT_FAILURE);
+        return rc;
     }
 
     if (!(ahb = host_get_ahb(host))) {
@@ -69,32 +131,25 @@ static int do_otp(const char *name __unused, int argc, char *argv[])
         goto cleanup_host;
     }
 
+    if (soc_generation(soc) != ast_g6) {
+        loge("We currently only support the AST2600-series coprocessor\n");
+        rc = EXIT_FAILURE;
+        goto cleanup_soc;
+    }
+
     if (!(otp = otp_get(soc))) {
         loge("Failed to acquire OTP controller, exiting\n");
         rc = EXIT_FAILURE;
         goto cleanup_soc;
     }
 
-    if (rd)
-        rc = otp_read(otp, reg);
+    if (arguments.read)
+        rc = otp_read(otp, arguments.region);
     else {
-        if (reg == otp_region_strap) {
-            unsigned int bit;
-            unsigned int val;
-
-            bit = strtoul(argv[2], NULL, 0);
-            val = strtoul(argv[3], NULL, 0);
-
-            rc = otp_write_strap(otp, bit, val);
-        } else {
-            unsigned int word;
-            unsigned int bit;
-
-            word = strtoul(argv[2], NULL, 0);
-            bit = strtoul(argv[3], NULL, 0);
-
-            rc = otp_write_conf(otp, word, bit);
-        }
+        if (arguments.region == otp_region_strap)
+            rc = otp_write_strap(otp, arguments.key, arguments.value);
+        else
+            rc = otp_write_conf(otp, arguments.key, arguments.value);
     }
 
 cleanup_soc:
@@ -107,8 +162,8 @@ cleanup_host:
 }
 
 static const struct cmd otp_cmd = {
-    "otp",
-    "<read <conf|strap>|write <conf WORD BIT|strap BIT VALUE>> [INTERFACE [IP PORT USERNAME PASSWORD]]",
-    do_otp,
+    .name = "otp",
+    .description = "Read and write the OTP configuration (AST2600-only)",
+    .fn = do_otp,
 };
 REGISTER_CMD(otp_cmd);
