@@ -83,52 +83,68 @@ out:
     return ret;
 }
 
+static inline int host_probe_bridge(struct host *ctx,
+                                    struct bridge_driver *driver,
+                                    struct connection_args *connection)
+{
+    struct ahb *ahb;
+    struct bridge *bridge;
+
+    if (driver->disabled) {
+        logd("Skipping bridge driver %s\n", driver->name);
+        return 0;
+    }
+
+    logd("Trying bridge driver %s\n", driver->name);
+
+    ahb = driver->probe(connection);
+    if (!ahb)
+        return 0;
+
+    bridge = malloc(sizeof(*bridge));
+    if (!bridge)
+        return -ENOMEM;
+
+    bridge->driver = driver;
+    bridge->ahb = ahb;
+
+    list_add(&ctx->bridges, &bridge->entry);
+    return 0;
+}
+
 int host_init(struct host *ctx, struct connection_args *connection)
 {
     struct bridge_driver **bridges;
-    size_t n_bridges = 0;
-    size_t i;
+    size_t n_bridges;
     int rc;
 
+    /* Always init head for legacy reasons */
     list_head_init(&ctx->bridges);
 
-    bridges = autodata_get(bridge_drivers, &n_bridges);
-
-    logd("Found %zu registered bridge drivers\n", n_bridges);
-
-    for (i = 0; i < n_bridges; i++) {
-        struct ahb *ahb;
-
-        if (bridges[i]->disabled) {
-            logd("Skipping bridge driver %s\n", bridges[i]->name);
-            continue;
-        }
-
-        logd("Trying bridge driver %s\n", bridges[i]->name);
-
-        if ((ahb = bridges[i]->probe(connection))) {
-            struct bridge *bridge;
-
-            bridge = malloc(sizeof(*bridge));
-            if (!bridge) {
-                rc = -ENOMEM;
-                goto cleanup_bridges;
-            }
-
-            bridge->driver = bridges[i];
-            bridge->ahb = ahb;
-
-            list_add(&ctx->bridges, &bridge->entry);
-        }
+    /* If a bridge driver is defined, use it instead of probing all */
+    if (connection->bridge_driver != NULL) {
+        logd("Host probing found bridge driver '%s', using it\n",
+             connection->bridge_driver->name);
+        rc = host_probe_bridge(ctx, connection->bridge_driver, connection);
+        goto done;
     }
 
-    rc = 0;
+    bridges = autodata_get(bridge_drivers, &n_bridges);
+    logd("Found %zu registered bridge drivers\n", n_bridges);
+
+    for (size_t i = 0; i < n_bridges; i++) {
+        rc = host_probe_bridge(ctx, bridges[i], connection);
+        if (rc < 0)
+            goto cleanup_bridges;
+    }
 
 cleanup_bridges:
     autodata_free(bridges);
 
+done:
     return rc;
 }
+
 
 void host_destroy(struct host *ctx)
 {

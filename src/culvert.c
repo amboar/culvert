@@ -5,14 +5,6 @@
 /* For program_invocation_short_name */
 #define _GNU_SOURCE
 
-#include <argp.h>
-#include <errno.h>
-#include <getopt.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "cmd.h"
 #include "config.h"
 #include "compiler.h"
@@ -22,6 +14,14 @@
 #include "host.h"
 
 #include "ccan/autodata/autodata.h"
+
+#include <argp.h>
+#include <errno.h>
+#include <getopt.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 const char *argp_program_version = "culvert " CULVERT_VERSION;
 const char *argp_program_bug_address = "GitHub amboar/culvert";

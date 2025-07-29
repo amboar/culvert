@@ -4,6 +4,8 @@
 #ifndef _CONNECTION_H
 #define _CONNECTION_H
 
+#include "bridge.h"
+
 /**
  * Common struct that can be used in subcommands to pass connection arguments.
  * Commands that use this struct should use cmd_parse_via() to parse the arguments.
@@ -17,6 +19,9 @@
  * then you may have to set it on your own.
  */
 struct connection_args {
+    /** Bridge implementation to be used */
+    struct bridge_driver *bridge_driver;
+
     /** BMC interface path (e.g. /dev/ttyUSB0) */
     const char *interface;
 
