@@ -18,6 +18,9 @@ struct bridge_driver {
 	int (*reinit)(struct ahb *ahb);
 	void (*destroy)(struct ahb *ahb);
 
+	/* Whether or not an explicit device path is required (i.e. debug-uart) */
+	bool path_required;
+
 	/*
 	 * Whether or not this driver is for running culvert on the BMC itself
 	 * (i.e. devmem)

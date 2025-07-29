@@ -468,6 +468,7 @@ static struct bridge_driver debug_driver = {
     .destroy = debug_driver_destroy,
     .release = debug_driver_release,
     .reinit = debug_driver_reinit,
+    .path_required = true,
 };
 REGISTER_BRIDGE_DRIVER(debug_driver);
 
