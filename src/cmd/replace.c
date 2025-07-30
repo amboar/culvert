@@ -6,12 +6,14 @@
 #include "ast.h"
 #include "cmd.h"
 #include "compiler.h"
+#include "connection.h"
 #include "host.h"
 #include "log.h"
 #include "priv.h"
 #include "soc.h"
 #include "soc/sdmc.h"
 
+#include <argp.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +21,77 @@
 
 #define DUMP_RAM_WIN  (8 << 20)
 
-static int do_replace(const char *name __unused, int argc, char *argv[])
+static char cmd_replace_args_doc[] =
+    "ram <MATCH> <REPLACE> "
+    "[via DRIVER [INTERFACE [IP PORT USERNAME PASSWORD]]]";
+
+static char cmd_replace_doc[] =
+    "\n"
+    "Replace commnd"
+    "\v"
+    "Replace a portion in the memory.\n";
+
+static struct argp_option cmd_replace_options[] = {
+    {0},
+};
+
+struct cmd_replace_args {
+    const char *mem_match;
+    const char *mem_replace;
+    struct connection_args connection;
+};
+
+static error_t cmd_replace_parse_opt(int key, char *arg,
+                                     struct argp_state *state)
+{
+    struct cmd_replace_args *arguments = state->input;
+    int rc;
+
+    switch (key) {
+    case ARGP_KEY_ARG:
+        if (!strcmp(arg, "via")) {
+            rc = cmd_parse_via(state->next - 1, state, &arguments->connection);
+            if (rc != 0)
+                argp_error(state, "Failed to parse connection arguments. Returned code %d", rc);
+            break;
+        }
+
+        switch (state->arg_num) {
+        case 0:
+            if (strcmp(arg, "ram"))
+                argp_error(state, "Invalid type '%s' found. Only 'ram' is allowed", arg);
+            break;
+        case 1:
+            arguments->mem_match = arg;
+            break;
+        case 2:
+            arguments->mem_replace = arg;
+            break;
+        }
+        break;
+    case ARGP_KEY_END:
+        if (state->arg_num < 3)
+            argp_error(state, "Not enough arguments...");
+
+        if (strlen(arguments->mem_match) < strlen(arguments->mem_replace))
+            argp_error(state, "REPLACE length %zd overruns MATCH length %zd, bailing",
+                 strlen(arguments->mem_match), strlen(arguments->mem_replace));
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp cmd_replace_argp = {
+    .options = cmd_replace_options,
+    .parser = cmd_replace_parse_opt,
+    .args_doc = cmd_replace_args_doc,
+    .doc = cmd_replace_doc,
+};
+
+static int do_replace(int argc, char **argv)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -32,26 +104,15 @@ static int do_replace(const char *name __unused, int argc, char *argv[])
     void *needle;
     int rc;
 
-    if (argc < 3) {
-        loge("Not enough arguments for replace command\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (strcmp("ram", argv[0])) {
-        loge("Unsupported replace space: '%s'\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    if (strlen(argv[1]) < strlen(argv[2])) {
-        loge("REPLACE length %zd overruns MATCH length %zd, bailing\n",
-             strlen(argv[1]), strlen(argv[2]));
-        exit(EXIT_FAILURE);
-    }
+    struct cmd_replace_args arguments = {0};
+    rc = argp_parse(&cmd_replace_argp, argc, argv, ARGP_IN_ORDER, 0, &arguments);
+    if (rc != 0)
+        return rc;
 
     win_chunk = malloc(DUMP_RAM_WIN);
     if (!win_chunk) { perror("malloc"); exit(EXIT_FAILURE); }
 
-    if ((rc = host_init(host, argc - 3, argv + 3)) < 0) {
+    if ((rc = host_init(host, &arguments.connection)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
         rc = EXIT_FAILURE;
         goto win_chunk_cleanup;
@@ -78,7 +139,7 @@ static int do_replace(const char *name __unused, int argc, char *argv[])
     if ((rc = sdmc_get_vram(sdmc, &vram)))
         goto soc_cleanup;
 
-    replace_len = strlen(argv[1]);
+    replace_len = strlen(arguments.mem_match);
     for (ram_cursor = dram.start;
          ram_cursor < vram.start;
          ram_cursor += DUMP_RAM_WIN) {
@@ -97,16 +158,16 @@ static int do_replace(const char *name __unused, int argc, char *argv[])
         /* FIXME: Handle sub-strings at the right hand edge */
         needle = win_chunk;
         while ((needle = memmem(needle, win_chunk + DUMP_RAM_WIN - needle,
-                                argv[1], strlen(argv[1])))) {
+                                arguments.mem_match, replace_len))) {
             logi("0x%08zx: Replacing '%s' with '%s'\n",
-                 ram_cursor + (needle - win_chunk), argv[1], argv[2]);
-            rc = ahb_write(ahb, ram_cursor + (needle - win_chunk), argv[2],
-                           strlen(argv[2]));
+                 ram_cursor + (needle - win_chunk), arguments.mem_match, arguments.mem_replace);
+            rc = ahb_write(ahb, ram_cursor + (needle - win_chunk), arguments.mem_replace,
+                           strlen(arguments.mem_replace));
             if (rc < 0) {
                 errno = -rc;
                 perror("l2ab_write");
                 break;
-            } else if ((size_t)rc != strlen(argv[2])) {
+            } else if ((size_t)rc != strlen(arguments.mem_replace)) {
                 loge("Short write: %d\n", rc);
                 break;
             }
@@ -131,8 +192,8 @@ win_chunk_cleanup:
 }
 
 static const struct cmd replace_cmd = {
-    "replace",
-    "ram MATCH REPLACE",
-    do_replace,
+    .name = "replace",
+    .description = "Replace a portion in the memory",
+    .fn = do_replace,
 };
 REGISTER_CMD(replace_cmd);
