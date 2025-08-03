@@ -104,6 +104,12 @@ or to cross compile:
 $ meson setup build-arm --cross-file meson/arm-linux-gnueabi-gcc.ini && meson compile -C build-arm
 ```
 
+For arm64 (also known as `aarch64`) a different cross compile config is
+required:
+```
+$ meson setup build-aarch64 --cross-file meson/aarch64-linux-gnu-gcc.ini && meson compile -C build-aarch64
+```
+
 #### Dependencies (Debian)
 ```
 apt install build-essential flex swig bison meson device-tree-compiler libyaml-dev
