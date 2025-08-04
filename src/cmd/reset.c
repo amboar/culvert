@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+
 #include "ahb.h"
 #include "ast.h"
 #include "cmd.h"
 #include "compiler.h"
+#include "connection.h"
 #include "host.h"
 #include "log.h"
 #include "priv.h"
@@ -11,41 +13,102 @@
 #include "soc/clk.h"
 #include "soc/wdt.h"
 
+#include <argp.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-static int do_reset(const char *name __unused, int argc, char *argv[])
+static char cmd_reset_args_doc[] = "TARGET WDT [via DRIVER [INTERFACE [IP PORT USERNAME PASSWORD]]]";
+static char cmd_reset_doc[] =
+    "\n"
+    "Reset command"
+    "\v"
+    "Supported targets:\n"
+    "  soc              Reset the whole SOC\n"
+    "\v"
+    "Examples:\n"
+    " Reset SoC hard via wdt3:\n"
+    "  culvert reset soc wdt3\n\n"
+    " Reset SoC hard via wdt2 (may causes FMC CS switch):\n"
+    "  culvert reset soc wdt2\n";
+
+static struct argp_option cmd_reset_options[] = {
+    {0},
+};
+
+struct cmd_reset_args {
+    struct connection_args connection;
+    const char *wdt;
+};
+
+static error_t cmd_reset_parse_opt(int key, char *arg, struct argp_state *state)
+{
+    struct cmd_reset_args *arguments = state->input;
+    int rc = 0;
+
+    switch (key) {
+    case ARGP_KEY_ARG:
+        if (!strcmp(arg, "via")) {
+            rc = cmd_parse_via(state->next - 1, state, &arguments->connection);
+            if (rc != 0)
+                argp_error(state, "Failed to parse connection arguments. Returned code %d", rc);
+            return 0;
+        }
+
+        switch (state->arg_num) {
+        case 0:
+            /* Right now, we only support soc as reset target */
+            if (strcmp("soc", arg))
+                argp_error(state, "Invalid reset target '%s'", arg);
+            break;
+        case 1:
+            arguments->wdt = arg;
+            break;
+        }
+        break;
+    case ARGP_KEY_END:
+        if (state->arg_num < 2)
+            argp_error(state, "Not enough arguments provided. Need type and watchdog.");
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp cmd_reset_argp = {
+    .options = cmd_reset_options,
+    .parser = cmd_reset_parse_opt,
+    .args_doc = cmd_reset_args_doc,
+    .doc = cmd_reset_doc,
+};
+
+static int do_reset(int argc, char **argv)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
     struct ahb *ahb;
     struct clk *clk;
     struct wdt *wdt;
-    int cleanup;
-    int rc;
+    int cleanup, rc;
 
-    /* reset subcommand argument validation and parsing */
-    if (argc < 2) {
-        loge("Not enough arguments for reset command\n");
-        exit(EXIT_FAILURE);
-    }
+    struct cmd_reset_args arguments = {0};
+    rc = argp_parse(&cmd_reset_argp, argc, argv, ARGP_IN_ORDER, 0, &arguments);
+    if (rc != 0)
+        return rc;
 
-    if (strcmp("soc", argv[0])) {
-        loge("Unsupported reset type: '%s'\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    if ((rc = host_init(host, argc - 2, argv + 2)) < 0) {
+    if ((rc = host_init(host, &arguments.connection)) < 0) {
         loge("Failed to acquire AHB interface, exiting: %d\n", rc);
-        exit(EXIT_FAILURE);
+        return rc;
     }
 
     if (!(ahb = host_get_ahb(host))) {
         loge("Failed to acquire AHB interface, exiting\n");
-        exit(EXIT_FAILURE);
+        rc = EXIT_FAILURE;
+        return rc;
     }
 
     /* Probe the SoC */
@@ -61,8 +124,8 @@ static int do_reset(const char *name __unused, int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if (!(wdt = wdt_get_by_name(soc, argv[1]))) {
-        loge("Failed to acquire %s controller, exiting\n", argv[1]);
+    if (!(wdt = wdt_get_by_name(soc, arguments.wdt))) {
+        loge("Failed to acquire %s controller, exiting\n", arguments.wdt);
         goto cleanup_soc;
     }
 
@@ -102,8 +165,8 @@ cleanup_host:
 }
 
 static const struct cmd reset_cmd = {
-    "reset",
-    "TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]",
-    do_reset,
+    .name = "reset",
+    .description = "Reset a component of the BMC chip",
+    .fn = do_reset,
 };
 REGISTER_CMD(reset_cmd);

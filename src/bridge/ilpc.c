@@ -5,6 +5,7 @@
 #include "bridge.h"
 #include "bridge/ilpc.h"
 #include "compiler.h"
+#include "connection.h"
 #include "log.h"
 #include "rev.h"
 
@@ -308,7 +309,7 @@ static const struct ahb_ops ilpcb_ops = {
     .writel = ilpcb_writel
 };
 
-static struct ahb *ilpcb_driver_probe(int argc, char *argv[]);
+static struct ahb *ilpcb_driver_probe(struct connection_args *connection);
 static void ilpcb_driver_destroy(struct ahb *ahb);
 
 static struct bridge_driver ilpcb_driver = {
@@ -331,15 +332,10 @@ int ilpcb_destroy(struct ilpcb *ctx)
 }
 
 static struct ahb *
-ilpcb_driver_probe(int argc, char *argv[] __unused)
+ilpcb_driver_probe(struct connection_args *connection __unused)
 {
     struct ilpcb *ctx;
     int rc;
-
-    // This driver doesn't require args, so if there are any we're not trying to probe it
-    if (argc > 0) {
-        return NULL;
-    }
 
     ctx = malloc(sizeof(*ctx));
     if (!ctx) {

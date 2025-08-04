@@ -5,7 +5,6 @@
     },
     "features": {
         "ghcr.io/devcontainers/features/python:1": {},
-        "ghcr.io/devcontainers-contrib/features/meson-asdf:2": {},
         "ghcr.io/devcontainers/features/git:1": {}
     },
     "customizations": {
@@ -22,6 +21,5 @@
                 "python.pythonPath": "/usr/local/bin/python3"
             }
         }
-    },
-    "postCreateCommand": "pip install meson"
+    }
 }

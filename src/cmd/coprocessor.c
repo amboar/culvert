@@ -4,6 +4,7 @@
 #include "bits.h"
 #include "cmd.h"
 #include "compiler.h"
+#include "connection.h"
 #include "host.h"
 #include "log.h"
 #include "rev.h"
@@ -11,6 +12,7 @@
 #include "soc/scu.h"
 #include "soc/sdmc.h"
 
+#include <argp.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
@@ -33,54 +35,103 @@
 #define SCU_COPROC_CACHE_FUNC 0xa48
 #define   SCU_COPROC_CACHE_EN BIT(0)
 
-static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[])
+static char cmd_coprocessor_args_doc[] = "<run ADDRESS LENGTH|stop> [via DRIVER [INTERFACE [IP PORT USERNAME PASSWORD]]]";
+static char cmd_coprocessor_doc[] =
+    "\n"
+    "Coprocessor command"
+    "\v"
+    "Supported commands:\n"
+    "  run         Run the coprocessor\n"
+    "  stop        Stop the coprocessor\n";
+
+enum cmd_coprocessor_mode {
+    run,
+    stop,
+};
+
+static struct argp_option cmd_coprocessor_options[] = {
+    {0},
+};
+
+struct cmd_coprocessor_args {
+    unsigned long mem_base;
+    unsigned long mem_size;
+    struct connection_args connection;
+    enum cmd_coprocessor_mode mode;
+    /* padding 4 bytes */
+};
+
+static error_t cmd_coprocessor_parse_opt(int key, char *arg,
+                                         struct argp_state *state)
 {
-    const char *arg_mem_base, *arg_mem_size;
+    struct cmd_coprocessor_args *arguments = state->input;
+    int rc;
+
+    switch (key) {
+    case ARGP_KEY_ARG:
+        if (!strcmp(arg, "via")) {
+            rc = cmd_parse_via(state->next - 1, state, &arguments->connection);
+            if (rc != 0)
+                argp_error(state, "Failed to parse connection arguments. Returned code %d", rc);
+            break;
+        }
+
+        if (state->arg_num == 0) {
+            if (strcmp("run", arg) && strcmp("stop", arg))
+                argp_error(state, "Invalid command '%s'", arg);
+
+            if (!strcmp(arg, "run"))
+                arguments->mode = run;
+            else
+                arguments->mode = stop;
+            break;
+        }
+
+        /* If mode is not run, skip any further args */
+        if (arguments->mode != run)
+            break;
+
+        if (state->arg_num == 1) {
+            parse_mem_arg(state, "coprocessor RAM base", &arguments->mem_base, arg);
+        } else if (state->arg_num == 2) {
+            parse_mem_arg(state, "coprocessor RAM size", &arguments->mem_size, arg);
+            if (arguments->mem_size != COPROC_TOTAL_MEM_SIZE)
+                argp_error(state, "Only 32M memory is currently supported for the coprocessor");
+        }
+
+        break;
+    case ARGP_KEY_END:
+        if (arguments->mode == run && state->arg_num < 3)
+            argp_error(state, "Not enough arguments for run mode...");
+        if (arguments->mode == stop && state->arg_num < 1)
+            argp_error(state, "Not enough arguments for stop mode...");
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp cmd_coprocessor_argp = {
+    .options = cmd_coprocessor_options,
+    .parser = cmd_coprocessor_parse_opt,
+    .args_doc = cmd_coprocessor_args_doc,
+    .doc = cmd_coprocessor_doc,
+};
+
+static int cmd_coprocessor_run(struct cmd_coprocessor_args *arguments)
+{
     struct host _host, *host = &_host;
-    unsigned long mem_base, mem_size;
     struct soc _soc, *soc = &_soc;
     struct soc_region dram;
     struct sdmc *sdmc;
     struct ahb *ahb;
     struct scu *scu;
     ssize_t src;
-    char *endp;
     int rc;
 
-    if (argc < 3) {
-        loge("Not enough arguments for coprocessor command\n");
-        return EXIT_FAILURE;
-    }
-
-    arg_mem_base = argv[1];
-    arg_mem_size = argv[2];
-
-    errno = 0;
-    mem_base = strtoul(arg_mem_base, &endp, 0);
-    if (mem_base == ULONG_MAX && errno) {
-        loge("Failed to parse coprocessor RAM base '%s': %s\n", arg_mem_base, strerror(errno));
-        return EXIT_FAILURE;
-    } else if (arg_mem_base == endp || *endp) {
-        loge("Failed to parse coprocessor RAM base '%s'\n", arg_mem_base);
-        return EXIT_FAILURE;
-    }
-
-    errno = 0;
-    mem_size = strtoul(arg_mem_size, &endp, 0);
-    if (mem_size == ULONG_MAX && errno) {
-        loge("Failed to parse coprocessor RAM size '%s': %s\n", arg_mem_size, strerror(errno));
-        return EXIT_FAILURE;
-    } else if (arg_mem_size == endp || *endp) {
-        loge("Failed to parse coprocessor RAM size '%s'\n", arg_mem_size);
-        return EXIT_FAILURE;
-    }
-
-    if (mem_size != COPROC_TOTAL_MEM_SIZE) {
-        loge("We currently only support assigning 32M of memory to the coprocessor\n");
-        return EXIT_FAILURE;
-    }
-
-    if ((rc = host_init(host, argc - 3, argv + 3)) < 0) {
+    if ((rc = host_init(host, &arguments->connection)) < 0) {
         loge("Failed to initialise host interface: %d\n", rc);
         return EXIT_FAILURE;
     }
@@ -116,20 +167,20 @@ static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[]
     }
 
 #if ULONG_MAX > UINT32_MAX
-    if (mem_base > UINT32_MAX) {
-        loge("Provided RAM base 0x%ux exceeds SoC physical address space\n", mem_base);
+    if (arguments->mem_base > UINT32_MAX) {
+        loge("Provided RAM base 0x%ux exceeds SoC physical address space\n", arguments->mem_base);
         rc = EXIT_FAILURE;
         goto cleanup_soc;
     }
 #endif
 
-    if (((mem_base + mem_size) & UINT32_MAX) < mem_base) {
+    if (((arguments->mem_base + arguments->mem_size) & UINT32_MAX) < arguments->mem_base) {
         loge("Invalid RAM region provided for coprocessor\n");
         rc = EXIT_FAILURE;
         goto cleanup_soc;
     }
 
-    if (mem_base < dram.start || (mem_base + mem_size) > (dram.start + dram.length)) {
+    if (arguments->mem_base < dram.start || (arguments->mem_base + arguments->mem_size) > (dram.start + dram.length)) {
         loge("Ill-formed RAM region provided for coprocessor\n");
         rc = EXIT_FAILURE;
         goto cleanup_soc;
@@ -160,19 +211,19 @@ static int cmd_coprocessor_run(const char *name __unused, int argc, char *argv[]
     }
 
     /* 3. */
-    if ((src = soc_siphon_in(soc, mem_base, mem_size, STDIN_FILENO)) < 0) {
+    if ((src = soc_siphon_in(soc, arguments->mem_base, arguments->mem_size, STDIN_FILENO)) < 0) {
         loge("Failed to load coprocessor firmware to provided region: %d\n", src);
         rc = EXIT_FAILURE;
         goto cleanup_scu;
     }
 
         /* 4. */
-    if (scu_writel(scu, SCU_COPROC_MEM_BASE, mem_base) ||
+    if (scu_writel(scu, SCU_COPROC_MEM_BASE, arguments->mem_base) ||
         /* 5. */
         scu_writel(scu, SCU_COPROC_IMEM_LIMIT,
-                   mem_base + COPROC_CACHED_MEM_SIZE) ||
+                   arguments->mem_base + COPROC_CACHED_MEM_SIZE) ||
         /* 6. */
-        scu_writel(scu, SCU_COPROC_DMEM_LIMIT, mem_base + mem_size) ||
+        scu_writel(scu, SCU_COPROC_DMEM_LIMIT, arguments->mem_base + arguments->mem_size) ||
         /* 7. */
         scu_writel(scu, SCU_COPROC_CACHE_RANGE, SCU_COPROC_CACHE_1ST_16MB_EN) ||
         /* 8. */
@@ -222,7 +273,7 @@ cleanup_host:
     return rc;
 }
 
-static int cmd_coprocessor_stop(const char *name __unused, int argc, char *argv[])
+static int cmd_coprocessor_stop(struct cmd_coprocessor_args *arguments)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -230,7 +281,7 @@ static int cmd_coprocessor_stop(const char *name __unused, int argc, char *argv[
     struct scu *scu;
     int rc;
 
-    if ((rc = host_init(host, argc - 3, argv + 3)) < 0) {
+    if ((rc = host_init(host, &arguments->connection)) < 0) {
         loge("Failed to initialise host interface: %d\n", rc);
         return EXIT_FAILURE;
     }
@@ -275,31 +326,33 @@ cleanup_host:
     return rc;
 }
 
-static int do_coprocessor(const char *name __unused, int argc, char *argv[])
+static int do_coprocessor(int argc, char **argv)
 {
-    const char *arg_subcmd;
+    int rc;
 
-    if (argc < 1) {
-        loge("Not enough arguments for coprocessor command\n");
-        return EXIT_FAILURE;
+    struct cmd_coprocessor_args arguments = {0};
+    rc = argp_parse(&cmd_coprocessor_argp, argc, argv, ARGP_IN_ORDER, 0, &arguments);
+    if (rc != 0) {
+        rc = EXIT_FAILURE;
+        goto done;
     }
 
-    arg_subcmd = argv[0];
-
-    if (!strcmp("run", arg_subcmd)) {
-        return cmd_coprocessor_run(name, argc, argv);
-    } else if (!strcmp("stop", arg_subcmd)) {
-        return cmd_coprocessor_stop(name, argc, argv);
-    } else {
-        loge("Unknown coprocessor subcommand '%s'\n", arg_subcmd);
+    switch (arguments.mode) {
+    case run:
+        rc = cmd_coprocessor_run(&arguments);
+        break;
+    case stop:
+        rc = cmd_coprocessor_stop(&arguments);
+        break;
     }
 
-    return EXIT_FAILURE;
+done:
+    return rc;
 }
 
 static const struct cmd coprocessor_cmd = {
-    "coprocessor",
-    "<run ADDRESS LENGTH|stop> [INTERFACE [IP PORT USERNAME PASSWORD]]",
-    do_coprocessor
+    .name = "coprocessor",
+    .description = "Do things on the coprocessors of the AST2600",
+    .fn = do_coprocessor,
 };
 REGISTER_CMD(coprocessor_cmd);

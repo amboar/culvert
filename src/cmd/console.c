@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "cmd.h"
 #include "compiler.h"
+#include "connection.h"
 #include "host.h"
 #include "log.h"
 #include "priv.h"
@@ -12,48 +13,103 @@
 #include "soc/uart/mux.h"
 #include "uart/suart.h"
 
+#include <argp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-static int do_console(const char *name __unused, int argc, char *argv[])
+static char cmd_console_args_doc[] = "HOST_UART BMC_UART BAUD USER PASSWORD";
+static char cmd_console_doc[] =
+    "\n"
+    "Console command"
+    "\v"
+    "Supported host consoles:\n"
+    "  uart3\n"
+    "\n"
+    "Supported BMC consoles:\n"
+    "  uart2\n";
+
+struct cmd_console_args {
+    const char *host_uart;
+    const char *user;
+    const char *pass;
+    struct connection_args connection;
+    int baud;
+    /* 4 bytes of padding */
+};
+
+static struct argp_option cmd_console_options[] = {
+    {0}
+};
+
+static error_t cmd_console_parse_opt(int key, char *arg,
+                                     struct argp_state *state)
+{
+    struct cmd_console_args *arguments = state->input;
+
+    switch (key) {
+        case ARGP_KEY_ARG:
+            switch (state->arg_num) {
+                case 0:
+                    if (strcmp("uart3", arg))
+                        argp_error(state, "Console only supports host on 'uart3'");
+                    arguments->host_uart = arg;
+                    break;
+                case 1:
+                    if (strcmp("uart2", arg))
+                        argp_error(state, "Console only supports BMC on 'uart2'");
+                    arguments->connection.interface = arg;
+                    break;
+                case 2:
+                    arguments->baud = atoi(arg);
+                    break;
+                case 3:
+                    arguments->user = arg;
+                    break;
+                case 4:
+                    arguments->pass = arg;
+                    break;
+            }
+            break;
+        case ARGP_KEY_END:
+            if (state->arg_num < 5)
+                argp_error(state, "Not enough arguments provided...");
+            break;
+        default:
+            return ARGP_ERR_UNKNOWN;
+    }
+    return 0;
+}
+
+static struct argp cmd_console_argp = {
+    .options = cmd_console_options,
+    .parser = cmd_console_parse_opt,
+    .args_doc = cmd_console_args_doc,
+    .doc = cmd_console_doc,
+};
+
+static int do_console(int argc, char **argv)
 {
     struct suart _suart, *suart = &_suart;
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    const char *user, *pass;
     struct uart_mux *mux;
     struct ahb *ahb;
     struct clk *clk;
     int cleanup;
-    int baud;
     int rc;
 
-    if (argc < 5) {
-        loge("Not enough arguments for console command\n");
-        exit(EXIT_FAILURE);
+    struct cmd_console_args arguments = {0};
+    rc = argp_parse(&cmd_console_argp, argc, argv, ARGP_IN_ORDER, 0, &arguments);
+    if (rc != 0) {
+        rc = EXIT_FAILURE;
+        goto done;
     }
 
-    if (strcmp("uart3", argv[0])) {
-        loge("Console only supports host on 'uart3'\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (strcmp("uart2", argv[1])) {
-        loge("Console only supports BMC on uart2\n");
-        exit(EXIT_FAILURE);
-    }
-
-    baud = atoi(argv[2]);
-
-    user = argv[3];
-    pass = argv[4];
-
-
-    if ((rc = host_init(host, argc - 5, argv + 5)) < 0) {
+    if ((rc = host_init(host, &arguments.connection)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
-        exit(EXIT_FAILURE);
+        goto done;
     }
 
     if (!(ahb = host_get_ahb(host))) {
@@ -102,7 +158,7 @@ static int do_console(const char *name __unused, int argc, char *argv[])
     if (rc) { errno = -rc; perror("suart_set_baud"); goto suart_cleanup; }
 
     logi("Starting getty from BMC console\n");
-    rc = suart_flush(suart, user, strlen(user));
+    rc = suart_flush(suart, arguments.user, strlen(arguments.user));
     if (rc) { errno = -rc; perror("suart_flush"); goto suart_cleanup; }
 
     rc = suart_flush(suart, "\n", 5);
@@ -110,7 +166,7 @@ static int do_console(const char *name __unused, int argc, char *argv[])
 
     sleep(3);
 
-    rc = suart_flush(suart, pass, strlen(pass));
+    rc = suart_flush(suart, arguments.pass, strlen(arguments.pass));
     if (rc) { errno = -rc; perror("suart_flush"); goto suart_cleanup; }
 
     rc = suart_flush(suart, "\n", 8);
@@ -138,8 +194,8 @@ static int do_console(const char *name __unused, int argc, char *argv[])
     rc = uart_mux_connect(mux, mux_obj_uart3, mux_obj_uart2);
     if (rc) { errno = -rc; perror("uart_mux_connect"); goto suart_cleanup; }
 
-    logi("Setting target baud rate of %d\n", baud);
-    rc = suart_set_baud(suart, baud);
+    logi("Setting target baud rate of %d\n", arguments.baud);
+    rc = suart_set_baud(suart, arguments.baud);
     if (rc) { errno = -rc; perror("suart_set_baud"); goto suart_cleanup; }
 
     rc = suart_flush(suart, "\n", 1);
@@ -147,14 +203,14 @@ static int do_console(const char *name __unused, int argc, char *argv[])
 
     sleep(5);
 
-    rc = suart_flush(suart, user, strlen(user)); /* username */
+    rc = suart_flush(suart, arguments.user, strlen(arguments.user)); /* username */
     if (rc) { errno = -rc; perror("suart_flush"); goto suart_cleanup; }
     rc = suart_flush(suart, "\n", 5);
     if (rc) { errno = -rc; perror("suart_flush"); goto suart_cleanup; }
 
     sleep(3);
 
-    rc = suart_flush(suart, pass, strlen(pass)); /* password */
+    rc = suart_flush(suart, arguments.pass, strlen(arguments.pass)); /* password */
     if (rc) { errno = -rc; perror("suart_flush"); goto suart_cleanup; }
 
     rc = suart_flush(suart, "\n", 1);
@@ -177,12 +233,13 @@ soc_cleanup:
 host_cleanup:
     host_destroy(host);
 
+done:
     return rc;
 }
 
 static const struct cmd console_cmd = {
-    "console",
-    "HOST_UART BMC_UART BAUD USER PASSWORD",
-    do_console
+    .name = "console",
+    .description = "Start a getty on the BMC console",
+    .fn = do_console,
 };
 REGISTER_CMD(console_cmd);

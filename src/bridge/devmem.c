@@ -17,6 +17,7 @@
 #include "ast.h"
 #include "bridge.h"
 #include "compiler.h"
+#include "connection.h"
 #include "devmem.h"
 #include "log.h"
 #include "mb.h"
@@ -175,7 +176,7 @@ static const struct ahb_ops devmem_ahb_ops = {
     .writel = devmem_writel
 };
 
-static struct ahb *devmem_driver_probe(int argc, char *argv[]);
+static struct ahb *devmem_driver_probe(struct connection_args *connection);
 static void devmem_driver_destroy(struct ahb *ahb);
 
 static struct bridge_driver devmem_driver = {
@@ -230,15 +231,10 @@ int devmem_destroy(struct devmem *ctx)
 }
 
 static struct ahb *
-devmem_driver_probe(int argc, char *argv[] __unused)
+devmem_driver_probe(struct connection_args *connection __unused)
 {
     struct devmem *ctx;
     int rc;
-
-    // This driver doesn't require args, so if there are any we're not trying to probe it
-    if (argc > 0) {
-        return NULL;
-    }
 
     ctx = malloc(sizeof(*ctx));
     if (!ctx) {

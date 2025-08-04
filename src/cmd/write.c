@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2021 IBM Corp.
+
 #include "ahb.h"
 #include "ast.h"
 #include "cmd.h"
 #include "compiler.h"
+#include "connection.h"
 #include "flash.h"
 #include "host.h"
 #include "log.h"
@@ -14,6 +16,7 @@
 #include "soc/uart/vuart.h"
 #include "soc/wdt.h"
 
+#include <argp.h>
 #include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -23,7 +26,97 @@
 
 #define SFC_FLASH_WIN (64 << 10)
 
-static int cmd_write_firmware(int argc, char *argv[])
+static char cmd_write_args_doc[] =
+    "--type=<firmware|ram> [<ADDRESS> <LENGTH>] "
+    "[via DRIVER [INTERFACE [IP PORT USERNAME PASSWORD]]]";
+
+static char cmd_write_doc[] =
+    "\n"
+    "Write command"
+    "\v"
+    "NOTE: Only the 'ram' type can parse address and length and requires them!\n\n"
+    "All data will be read from stdin.\n\n"
+    "Supported types:\n"
+    "  firmware    Write stdin to the FMC\n"
+    "  ram         Write stdin to the memory\n";
+
+enum cmd_write_mode {
+    none,
+    firmware,
+    ram,
+};
+
+static struct argp_option cmd_write_options[] = {
+    { "type", 't', "TYPE", 0, "Type to be write to", 0 },
+    {0},
+};
+
+struct cmd_write_args {
+    unsigned long mem_base;
+    unsigned long mem_size;
+    struct connection_args connection;
+    enum cmd_write_mode mode;
+};
+
+static error_t cmd_write_parse_opt(int key, char *arg, struct argp_state *state)
+{
+    struct cmd_write_args *arguments = state->input;
+    int rc;
+
+    switch (key) {
+    case 't':
+        if (strcmp(arg, "firmware") && strcmp(arg, "ram"))
+            argp_error(state, "Invalid type '%s'", arg);
+
+        if (!strcmp(arg, "firmware"))
+            arguments->mode = firmware;
+        else
+            arguments->mode = ram;
+        break;
+    case ARGP_KEY_ARG:
+        if (!strcmp(arg, "via")) {
+            rc = cmd_parse_via(state->next - 1, state, &arguments->connection);
+            if (rc != 0)
+                argp_error(state, "Failed to parse connection arguments. Returned code %d", rc);
+            break;
+        }
+
+        /* If mode is not ram, skip any further args */
+        if (arguments->mode != ram)
+            break;
+
+        switch (state->arg_num) {
+        case 0:
+            parse_mem_arg(state, "write RAM base", &arguments->mem_base, arg);
+            break;
+        case 1:
+            parse_mem_arg(state, "write RAM size", &arguments->mem_size, arg);
+            break;
+        }
+
+        break;
+    case ARGP_KEY_END:
+        if (arguments->mode == none)
+            argp_error(state, "No type to write to defined...");
+        /* Other than the read command,this requires the arguments for ram */
+        if (arguments->mode == ram && state->arg_num < 2)
+            argp_error(state, "Not enough arguments for ram mode...");
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static struct argp cmd_write_argp = {
+    .options = cmd_write_options,
+    .parser = cmd_write_parse_opt,
+    .args_doc = cmd_write_args_doc,
+    .doc = cmd_write_doc,
+};
+
+static int cmd_write_firmware(struct cmd_write_args *arguments)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
@@ -37,15 +130,7 @@ static int cmd_write_firmware(int argc, char *argv[])
     uint32_t phys;
     char *buf;
 
-    if (strcmp("firmware", argv[0])) {
-        loge("Expected 'firmware' command, found '%s'\n", argv[0]);
-        return -EINVAL;
-    }
-
-    argc--;
-    argv++;
-
-    if ((rc = host_init(host, argc, argv)) < 0) {
+    if ((rc = host_init(host, &arguments->connection)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
         return rc;
     }
@@ -179,60 +264,16 @@ cleanup_host:
     return rc;
 }
 
-static int cmd_write_ram(int argc, char *argv[])
+static int cmd_write_ram(struct cmd_write_args *arguments)
 {
     struct host _host, *host = &_host;
     struct soc _soc, *soc = &_soc;
-    unsigned long start, length;
     struct soc_region dram;
     struct sdmc *sdmc;
     struct ahb *ahb;
     int rc;
-    char *endp;
 
-    /* FIXME: doesn't handle bridge argument parsing */
-    if (argc < 3) {
-        loge("Not enough arguments for `write ram` command\n");
-        return -EINVAL;
-    }
-
-    if (strcmp("ram", argv[0])) {
-        loge("Expected 'ram' command, found '%s'\n", argv[0]);
-        return -EINVAL;
-    }
-
-    argc--;
-    argv++;
-
-    errno = 0;
-    start = strtoul(argv[0], &endp, 0);
-    if (start == ULONG_MAX && errno) {
-        loge("Failed to parse RAM region start address '%s': %s\n", argv[0], strerror(errno));
-        return -errno;
-#if ULONG_MAX > UINT32_MAX
-    } else if (start > UINT32_MAX) {
-        loge("RAM region start address '%s' exceeds address space\n", argv[0]);
-        return -EINVAL;
-#endif
-    }
-    argc--;
-    argv++;
-
-    errno = 0;
-    length = strtoul(argv[0], &endp, 0);
-    if (length == ULONG_MAX && errno) {
-        loge("Failed to parse RAM region length '%s': %s\n", argv[0], strerror(errno));
-        return -errno;
-#if ULONG_MAX > UINT32_MAX
-    } else if (length > UINT32_MAX) {
-        loge("RAM region length '%s' exceeds address space\n", argv[0]);
-        return -EINVAL;
-#endif
-    }
-    argc--;
-    argv++;
-
-    if ((rc = host_init(host, argc, argv)) < 0) {
+    if ((rc = host_init(host, &arguments->connection)) < 0) {
         loge("Failed to initialise host interfaces: %d\n", rc);
         return rc;
     }
@@ -259,25 +300,19 @@ static int cmd_write_ram(int argc, char *argv[])
         goto cleanup_soc;
     }
 
-    if (((start + length) & UINT32_MAX) < start) {
-        loge("Invalid RAM region provided for write\n");
-        rc = -EINVAL;
-        goto cleanup_soc;
-    }
-
-    if (start < dram.start || (start + length) > (dram.start + dram.length)) {
+    if (arguments->mem_base < dram.start ||
+        (arguments->mem_base + arguments->mem_size) > (dram.start + dram.length)) {
         loge("Ill-formed RAM region provided for write\n");
         rc = -EINVAL;
         goto cleanup_soc;
     }
 
 #if UINT32_MAX > SSIZE_MAX
-    if (SSIZE_MAX < length) {
+    if (SSIZE_MAX < arguments->mem_size)
         return -EINVAL;
-    }
 #endif
 
-    if ((rc = soc_siphon_in(soc, start, length, STDIN_FILENO))) {
+    if ((rc = soc_siphon_in(soc, arguments->mem_base, arguments->mem_size, STDIN_FILENO))) {
         loge("Failed to write to provided memory region: %d\n", rc);
     }
 
@@ -290,53 +325,35 @@ cleanup_host:
     return rc;
 }
 
-static int do_write(const char *name __unused, int argc, char *argv[])
+static int do_write(int argc, char **argv)
 {
     int rc;
 
-    if (argc < 1) {
-        loge("Not enough arguments for write command\n");
-        exit(EXIT_FAILURE);
-    }
+    struct cmd_write_args arguments = {0};
+    rc = argp_parse(&cmd_write_argp, argc, argv, ARGP_IN_ORDER, 0, &arguments);
+    if (rc != 0)
+        return rc;
 
-    /* Do option parsing for the "firmware" write type */
-    while (1) {
-        int option_index = 0;
-        int c;
-
-        static struct option long_options[] = {
-            { "live", no_argument, NULL, 'l' },
-            { },
-        };
-
-        c = getopt_long(argc, argv, "l", long_options, &option_index);
-        if (c == -1)
-            break;
-
-        switch (c) {
-            case 'l':
-                /* no-op flag retained for backwards compatibility */
-                break;
-            case '?':
-                return -EINVAL;
-        }
-    }
-
-    if (!strcmp("firmware", argv[optind])) {
-        rc = cmd_write_firmware(argc - optind, &argv[optind]);
-    } else if (!strcmp("ram", argv[optind])) {
-        rc = cmd_write_ram(argc - optind, &argv[optind]);
-    } else {
-        loge("Unsupported write type '%s'\n", argv[optind]);
+    switch (arguments.mode) {
+    case firmware:
+        rc = cmd_write_firmware(&arguments);
+        break;
+    case ram:
+        rc = cmd_write_ram(&arguments);
+        break;
+    /* If it reaches none here, then the argument parse logic is broken. */
+    case none:
+        loge("read: Reached 'none' mode after argument parsing. This is a bug!\n");
         rc = -EINVAL;
+        break;
     }
 
     return rc;
 }
 
 static const struct cmd write_cmd = {
-    "write",
-    "<firmware|ram ADDRESS LENGTH> [INTERFACE [IP PORT USERNAME PASSWORD]]",
-    do_write,
+    .name = "write",
+    .description = "Write data to the FMC or RAM",
+    .fn = do_write,
 };
 REGISTER_CMD(write_cmd);
