@@ -112,31 +112,44 @@ $ meson setup build-aarch64 --cross-file meson/aarch64-linux-gnu-gcc.ini && meso
 
 #### Dependencies (Debian)
 ```
-apt install build-essential flex swig bison meson device-tree-compiler libyaml-dev
+apt install build-essential flex swig bison meson device-tree-compiler libyaml-dev qemu-user
 ```
 
 ## Execution and Example output
 
 ```
-$ ./build/src/culvert -h
-culvert: v0.4.0-196-g34001fbe828a
-Usage:
+$ ./build/src/culvert --help
+Usage: culvert [OPTION...] <cmd> [CMD_OPTIONS]...
 
-        culvert console HOST_UART BMC_UART BAUD USER PASSWORD
-        culvert coprocessor <run ADDRESS LENGTH|stop> [INTERFACE [IP PORT USERNAME PASSWORD]]
-        culvert debug <read ADDRESS|write ADDRESS VALUE> INTERFACE [IP PORT USERNAME PASSWORD]
-        culvert devmem <read ADDRESS|write ADDRESS VALUE>
-        culvert ilpc <read ADDRESS|write ADDRESS VALUE
-        culvert jtag [INTERFACE [IP PORT USERNAME PASSWORD]]
-        culvert otp <read <conf|strap>|write <conf WORD BIT|strap BIT VALUE>> [INTERFACE [IP PORT USERNAME PASSWORD]]
-        culvert p2a vga <read ADDRESS|write ADDRESS VALUE>
-        culvert probe [INTERFACE [IP PORT USERNAME PASSWORD]]
-        culvert read <firmware|ram ADDRESS LENGTH> [INTERFACE [IP PORT USERNAME PASSWORD]]
-        culvert replace ram MATCH REPLACE
-        culvert reset TYPE WDT [INTERFACE [IP PORT USERNAME PASSWORD]]
-        culvert sfc fmc <erase|read|write> ADDRESS LENGTH [INTERFACE [IP PORT USERNAME PASSWORD]]
-        culvert trace ADDRESS WIDTH MODE [INTERFACE [IP PORT USERNAME PASSWORD]]
-        culvert write <firmware|ram ADDRESS LENGTH> [INTERFACE [IP PORT USERNAME PASSWORD]]
+Culvert — A Test and Debug Tool for BMC AHB Interfaces
+
+  -l, --list-bridges         List available bridge drivers
+  -q, --quiet                Don't produce any output
+  -s, --skip-bridge=BRIDGE   Skip BRIDGE driver
+  -v, --verbose              Get verbose output
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Available commands:
+  console              Start a getty on the BMC console
+  coprocessor          Do things on the coprocessors of the AST2600
+  debug                Read or write 4 bytes of data via the AHB bridge
+  devmem               Read or write data to /dev/mem
+  ilpc                 Read or write via iLPC
+  jtag                 Start a JTAG OpenOCD Bitbang server
+  otp                  Read and write the OTP configuration (AST2600-only)
+  p2a                  Read or write data via p2a devices
+  probe                Probe for any BMC
+  read                 Read data from the FMC or RAM
+  replace              Replace a portion in the memory
+  reset                Reset a component of the BMC chip
+  sfc                  Read, write or erase areas of a supported SFC
+  trace                Trace what happens on a register
+  write                Write data to the FMC or RAM
 ```
 
 ```
@@ -163,4 +176,54 @@ ilpc:   Disabled
 # echo $?
 1
 #
+```
+
+```
+# ./culvert probe --help
+Usage: culvert probe [OPTION...]
+            [-l] [-r REQUIREMENT] [via DRIVER [INTERFACE [IP PORT USERNAME
+            PASSWORD]]]
+
+Probe command
+
+  -l, --list-interfaces      List available interfaces
+  -r, --require=REQUIREMENT  Requirement to probe for
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Supported requirements:
+  integrity        Require integrity
+  confidentiality  Require confidentiality
+
+Report bugs to GitHub amboar/culvert.
+
+# ./culvert probe via debug-uart /dev/ttyUSB0
+[*] Opening /dev/ttyUSB0
+[*] Entering debug mode
+xdma:   Restricted
+        BMC: Disabled
+        VGA: Enabled
+        XDMA on VGA: Enabled
+        XDMA is constrained: Yes
+p2a:    Permissive
+        BMC: Disabled
+        VGA: Enabled
+        MMIO on VGA: Enabled
+        [0x00000000 - 0x0fffffff]   Firmware: Writable
+        [0x10000000 - 0x1fffffff]     SoC IO: Writable
+        [0x20000000 - 0x2fffffff]  BMC Flash: Writable
+        [0x30000000 - 0x3fffffff] Host Flash: Writable
+        [0x40000000 - 0x5fffffff]   Reserved: Writable
+        [0x60000000 - 0x7fffffff]   LPC Host: Writable
+        [0x80000000 - 0xffffffff]       DRAM: Writable
+debug:  Permissive
+        Debug UART port: UART1
+debug:  Permissive
+        Debug UART port: UART5
+ilpc:   Disabled
+[*] Exiting debug mode
 ```

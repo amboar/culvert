@@ -18,6 +18,7 @@ struct debug {
     struct console *console;
     struct prompt prompt;
     int port;
+    int force_quit;
 };
 
 int debug_init(struct debug *ctx, ...);

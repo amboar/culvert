@@ -5,13 +5,17 @@ RUN apt-get update && apt-get install -y \
     flex \
     swig \
     bison \
-    meson \
+    ninja-build \
     device-tree-compiler \
     libyaml-dev \
     cmake \
     pkg-config \
+    python3 \
+    python3-pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install meson
 
 ARG USERNAME=vscode
 ARG GROUPNAME=vscode

@@ -5,6 +5,7 @@
 #include "ahb.h"
 #include "bridge.h"
 #include "compiler.h"
+#include "connection.h"
 #include "log.h"
 #include "mb.h"
 #include "mmio.h"
@@ -208,7 +209,7 @@ static const struct ahb_ops p2ab_ahb_ops = {
     .writel = p2ab_writel,
 };
 
-static struct ahb *p2ab_driver_probe(int argc, char *argv[]);
+static struct ahb *p2ab_driver_probe(struct connection_args *connection);
 static int p2ab_driver_reinit(struct ahb *ahb);
 static void p2ab_driver_destroy(struct ahb *ahb);
 
@@ -272,15 +273,10 @@ int p2ab_destroy(struct p2ab *ctx)
 }
 
 static struct ahb *
-p2ab_driver_probe(int argc, char *argv[] __unused)
+p2ab_driver_probe(struct connection_args *connection __unused)
 {
     struct p2ab *ctx;
     int rc;
-
-    // This driver doesn't require args, so if there are any we're not trying to probe it
-    if (argc > 0) {
-        return NULL;
-    }
 
     ctx = malloc(sizeof(*ctx));
     if (!ctx) {
