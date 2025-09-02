@@ -62,7 +62,7 @@ target create $_TARGETNAME arm11 -chain-position auto0.tap
 
 Run culvert (via Debug UART on `/dev/ttyUSB0` in this case):
 ```bash
-culvert jtag /dev/ttyUSB0
+culvert jtag via debug-uart /dev/ttyUSB0
 ```
 
 > Wait for culvert to be ready:
@@ -97,12 +97,12 @@ set architecture armv6
 target extended-remote localhost:3333
 ```
 
-Using GDB over a Debug UART connection is painfully slow, but it'll work in a pinch.  
+Using GDB over a Debug UART connection is painfully slow, but it'll work in a pinch.
 You can now use GDB to open the ELF binary of your Linux kernel, u-boot, etc. and try to debug it.
 
 ## External devices
 
 Run culvert (via Debug UART on `/dev/ttyUSB0`) using the --target flag:
 ```bash
-culvert jtag --target external /dev/ttyUSB0
+culvert jtag --target external via debug-uart /dev/ttyUSB0
 ```
