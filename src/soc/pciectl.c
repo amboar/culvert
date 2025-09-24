@@ -764,7 +764,7 @@ static int pciectl_driver_init(struct soc *soc, struct soc_device *dev)
     struct pciectl *ctx;
     int rc;
 
-    ctx = malloc(sizeof(*ctx));
+    ctx = calloc(1, sizeof(*ctx));
     if (!ctx) {
         return -ENOMEM;
     }
