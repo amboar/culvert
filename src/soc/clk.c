@@ -42,6 +42,32 @@ union ast2500_h_pll_reg {
 	} b;
 };
 
+/* We only care about SCU004 for now, revision is not required here */
+#define AST2600_SCU_SILICON_REVISION	0x04
+
+#define AST2600_SCU_H_PLL		0x200
+
+union ast2600_h_pll_reg {
+	uint32_t w;
+	struct {
+		uint32_t m : 13;	/* bit[12:0]	*/
+		uint32_t n : 6;		/* bit[18:13]	*/
+		uint32_t p : 4;		/* bit[22:19]	*/
+		uint32_t off : 1;	/* bit[23]	*/
+		uint32_t bypass : 1;	/* bit[24]	*/
+		uint32_t reset : 1;	/* bit[25]	*/
+		uint32_t reserved : 6;	/* bit[31:26]	*/
+	} b;
+};
+
+#define AST2600_SCU_HW_STRAP1		0x500
+#define 	AST2600_SCU_HW_STRAP1_ARM_CLK			BIT(0)
+#define 	AST2600_SCU_HW_STRAP1_CPU_AXI_RATIO		BIT(16)
+#define 	AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_MASK	GENMASK(12, 11)
+#define 	AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_SHIFT	11
+
+#define	AST2600_SCU_HW_STRAP1_CLEAR	0x504
+
 struct clk_ops {
 	int64_t (*rate_ahb)(struct clk *ctx);
 	int (*disable)(struct clk *ctx, enum clksrc src);
@@ -266,9 +292,86 @@ static const struct clk_ops ast2500_clk_ops = {
 	.enable = ast2500_clk_enable,
 };
 
+static int64_t ast2600_clk_rate_ahb(struct clk *ctx)
+{
+	union ast2600_h_pll_reg h_pll_reg;
+	uint32_t strap, ahb_ratio, cpu_axi_ratio, h_pll, hclk;
+	int rc;
+
+	if ((rc = scu_readl(ctx->scu, AST2600_SCU_HW_STRAP1, &strap)) < 0)
+		return rc;
+
+	/* The H-PLL register allows us to calculate the CPU freq */
+	if ((rc = scu_readl(ctx->scu, AST2600_SCU_H_PLL, &h_pll_reg.w)) < 0)
+		return rc;
+
+	/* H-PLL = CLKIN (always 25 MHz) * (M+1/N+1) / P+1 */
+	h_pll = 25
+		* (h_pll_reg.b.m + 1)
+		/ (h_pll_reg.b.n + 1)
+		/ (h_pll_reg.b.p + 1);
+	logt("clk: ast2600: calculated h-pll is %d MHz\n", h_pll);
+
+	cpu_axi_ratio = (strap & AST2600_SCU_HW_STRAP1_CPU_AXI_RATIO);
+
+	/* AXI/AHB clock frequency ratio selection */
+	ahb_ratio = (strap & AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_MASK)
+			>> AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_SHIFT;
+	if (!ahb_ratio)
+		return -EINVAL;
+
+	/*
+	 * If cpu_axi_ratio is set, then the ratios are default, 4, 6, 8.
+	 * Otherwise, the ratios are default, 2, 3, 4.
+	 * The default is "that makes HCLK = 200MHz", but there's no explanation
+	 * in the datasheet how HCLK is being calculated so just return the
+	 * reference value of 200 MHz as AHB Rate if no ratio is set lol
+	 */
+	if (!ahb_ratio)
+		return 200;
+
+	/* Ratio calc from the binary value */
+	ahb_ratio++;
+	if (cpu_axi_ratio)
+		ahb_ratio *= 2;
+
+	logt("clk: ast2600: ahb ratio: %d:1\n", ahb_ratio);
+
+	/* I'm just gonna assume that HCLK = H-PLL / 2 / ahb_ratio */
+	hclk = h_pll / 2 / ahb_ratio;
+	logt("clk: ast2600: ahb freq: %d MHz\n", hclk);
+
+	return hclk;
+}
+
+int ast2600_clk_disable(struct clk *ctx, enum clksrc src)
+{
+	if (src != clk_arm)
+		return -ENOTSUP;
+
+	return scu_writel(ctx->scu, AST2600_SCU_HW_STRAP1,
+				    AST2600_SCU_HW_STRAP1_ARM_CLK);
+}
+
+int ast2600_clk_enable(struct clk *ctx, enum clksrc src)
+{
+	if (src != clk_arm)
+		return -ENOTSUP;
+
+	return scu_writel(ctx->scu, AST2600_SCU_HW_STRAP1_CLEAR,
+				    AST2600_SCU_HW_STRAP1_ARM_CLK);
+}
+
+static const struct clk_ops ast2600_clk_ops = {
+	.rate_ahb = ast2600_clk_rate_ahb,
+	.disable = ast2600_clk_disable,
+	.enable = ast2600_clk_enable,
+};
+
 static const struct soc_device_id clk_match[] = {
     { .compatible = "aspeed,ast2400-clock", .data = &ast2400_clk_ops },
     { .compatible = "aspeed,ast2500-clock", .data = &ast2500_clk_ops },
+    { .compatible = "aspeed,ast2600-clock", .data = &ast2600_clk_ops },
     { },
 };
 

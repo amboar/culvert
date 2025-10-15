@@ -67,6 +67,10 @@
 				compatible = "aspeed,ast2600-scu", "syscon", "simple-mfd";
 				reg = <0x1e6e2000 0x1000>;
 
+				clock {
+					compatible = "aspeed,ast2600-clock";
+				};
+
 				strapping {
 					compatible = "aspeed,ast2600-strapping";
 				};
