@@ -52,7 +52,7 @@ int clk_enable(struct clk *ctx, enum clksrc src)
 	return ctx->ops->enable(ctx, src);
 }
 
-static int64_t ast2500_clk_rate_ahb(struct clk *ctx)
+int64_t ast2400_clk_rate_ahb(struct clk *ctx)
 {
 	static const uint32_t cpu_freqs_24_48[] = {
 		384000000,
@@ -86,7 +86,7 @@ static int64_t ast2500_clk_rate_ahb(struct clk *ctx)
 	return cpu_clk / div;
 }
 
-int ast2500_clk_disable(struct clk *ctx, enum clksrc src)
+int ast2400_clk_disable(struct clk *ctx, enum clksrc src)
 {
 	uint32_t reg;
 	int rc;
@@ -111,14 +111,15 @@ int ast2500_clk_disable(struct clk *ctx, enum clksrc src)
 	return -ENOTSUP;
 }
 
-int ast2500_clk_enable(struct clk *ctx, enum clksrc src)
+int ast2400_clk_enable(struct clk *ctx, enum clksrc src)
 {
 	uint32_t reg;
 	int rc;
 
 	switch (src) {
 	case clk_arm:
-		return scu_writel(ctx->scu, SCU_SILICON_REVISION, SCU_HW_STRAP_ARM_CLK);
+		return scu_writel(ctx->scu, SCU_SILICON_REVISION,
+					    SCU_HW_STRAP_ARM_CLK);
 	case clk_uart3:
 		if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
 			return rc;
@@ -136,14 +137,14 @@ int ast2500_clk_enable(struct clk *ctx, enum clksrc src)
 	return -ENOTSUP;
 }
 
-static const struct clk_ops ast2500_clk_ops = {
-	.rate_ahb = ast2500_clk_rate_ahb,
-	.disable = ast2500_clk_disable,
-	.enable = ast2500_clk_enable,
+static const struct clk_ops ast2400_clk_ops = {
+	.rate_ahb = ast2400_clk_rate_ahb,
+	.disable = ast2400_clk_disable,
+	.enable = ast2400_clk_enable,
 };
 
 static const struct soc_device_id clk_match[] = {
-    { .compatible = "aspeed,ast2500-clock", .data = &ast2500_clk_ops },
+    { .compatible = "aspeed,ast2400-clock", .data = &ast2400_clk_ops },
     { },
 };
 

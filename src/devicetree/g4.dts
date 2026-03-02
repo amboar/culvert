@@ -55,6 +55,10 @@
 				compatible = "aspeed,ast2400-scu", "syscon", "simple-mfd";
 				reg = <0x1e6e2000 0x1a8>;
 
+				clock {
+					compatible = "aspeed,ast2400-clock";
+				};
+
 				strapping {
 					compatible = "aspeed,ast2400-strapping";
 				};
