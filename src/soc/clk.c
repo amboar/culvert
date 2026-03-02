@@ -10,18 +10,37 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdint.h>
 
-#define	SCU_CLK_STOP			0x0c
-#define		SCU_CLK_STOP_UART3		BIT(25)
+/* Shared registers between the AST2400 and 2500 will not (!) have a prefix */
+#define SCU_CLK_STOP			0x0c
+#define 	SCU_CLK_STOP_UART3			BIT(25)
 
-#define	SCU_HW_STRAP				0x70
-#define		SCU_HW_STRAP_UART_DBG_SEL	BIT(29)
-#define		SCU_HW_STRAP_CLKIN_IN_MOD	BIT(23)
-#define		SCU_HW_STRAP_SIO_DEC		BIT(20)
-#define		SCU_HW_STRAP_ARM_CLK		BIT(0)
+#define SCU_HW_STRAP			0x70
+#define 	SCU_HW_STRAP_UART_DBG_SEL		BIT(29)
+#define 	SCU_HW_STRAP_CLKIN_IN_MOD		BIT(23)
+#define 	SCU_HW_STRAP_SIO_DEC			BIT(20)
+#define 	SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_MASK	GENMASK(11, 9)
+#define 	SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_SHIFT	9
+#define 	SCU_HW_STRAP_ARM_CLK			BIT(0)
 
-#define	SCU_SILICON_REVISION		0x7c
+#define SCU_SILICON_REVISION		0x7c
+
+#define AST2500_SCU_H_PLL		0x24
+
+union ast2500_h_pll_reg {
+	uint32_t w;
+	struct {
+		uint32_t n : 5;		/* bit[4:0]	*/
+		uint32_t m : 8;		/* bit[12:5]	*/
+		uint32_t p : 6;		/* bit[18:13]	*/
+		uint32_t off : 1;	/* bit[19]	*/
+		uint32_t bypass : 1;	/* bit[20]	*/
+		uint32_t reset : 1;	/* bit[21]	*/
+		uint32_t reserved : 10;	/* bit[31:22]	*/
+	} b;
+};
 
 struct clk_ops {
 	int64_t (*rate_ahb)(struct clk *ctx);
@@ -143,8 +162,113 @@ static const struct clk_ops ast2400_clk_ops = {
 	.enable = ast2400_clk_enable,
 };
 
+int64_t ast2500_clk_rate_ahb(struct clk *ctx)
+{
+	union ast2500_h_pll_reg h_pll_reg;
+	uint32_t strap, ahb_ratio, h_pll, hclk;
+	bool clk_25mhz;
+	int rc;
+
+	/* HW strapping gives us CLKIN and the AHB divisor */
+	if ((rc = scu_readl(ctx->scu, SCU_HW_STRAP, &strap)) < 0)
+		return rc;
+
+	/* The H-PLL register allows us to calculate the CPU freq */
+	if ((rc = scu_readl(ctx->scu, AST2500_SCU_H_PLL, &h_pll_reg.w)) < 0)
+		return rc;
+
+	clk_25mhz = strap & SCU_HW_STRAP_CLKIN_IN_MOD;
+	logt("clk: ast2500: clk is %d MHz\n", (clk_25mhz ? 25 : 24));
+
+	/*
+	 * H-PLL = CLKIN * [(M+1) / (N+1)] / (P+1)
+	 * The usual frequency for H-PLL with CLKIN 24 MHz is 792 MHz.
+	 */
+	h_pll = (clk_25mhz ? 25 : 24)
+		* (h_pll_reg.b.m + 1)
+		/ (h_pll_reg.b.n + 1)
+		/ (h_pll_reg.b.p + 1);
+	logt("clk: ast2500: calculated h-pll is %d MHz\n", h_pll);
+
+	/* AXI/AHB clock frequency ratio selection */
+	ahb_ratio = (strap & SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_MASK)
+			>> SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_SHIFT;
+	if (!ahb_ratio)
+		return -EINVAL;
+	/*
+	 * Incrementing the AHB ratio by one returns the actual ratio
+	 * (e.g. mask 0b001 represents a 2:1 ratio.)
+	 */
+	ahb_ratio++;
+	logt("clk: ast2500: ahb ratio: %d:1\n", ahb_ratio);
+
+	/* HCLK = H-PLL / 2 / ahb_ratio */
+	hclk = h_pll / 2 / ahb_ratio;
+	logt("clk: ast2500: ahb freq: %d MHz\n", hclk);
+
+	return hclk;
+}
+
+int ast2500_clk_disable(struct clk *ctx, enum clksrc src)
+{
+	uint32_t reg;
+	int rc;
+
+	switch (src) {
+	case clk_arm:
+		return scu_writel(ctx->scu, SCU_HW_STRAP, SCU_HW_STRAP_ARM_CLK);
+	case clk_uart3:
+		if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
+			return rc;
+
+		reg |= SCU_CLK_STOP_UART3;
+
+		if ((rc = scu_writel(ctx->scu, SCU_CLK_STOP, reg)) < 0)
+			return rc;
+
+		return 0;
+	default:
+		break;
+	}
+
+	return -ENOTSUP;
+}
+
+int ast2500_clk_enable(struct clk *ctx, enum clksrc src)
+{
+	uint32_t reg;
+	int rc;
+
+	switch (src) {
+	case clk_arm:
+		return scu_writel(ctx->scu, SCU_SILICON_REVISION,
+					    SCU_HW_STRAP_ARM_CLK);
+	case clk_uart3:
+		if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
+			return rc;
+
+		reg &= ~SCU_CLK_STOP_UART3;
+
+		if ((rc = scu_writel(ctx->scu, SCU_CLK_STOP, reg)) < 0)
+			return rc;
+
+		return 0;
+	default:
+		break;
+	}
+
+	return -ENOTSUP;
+}
+
+static const struct clk_ops ast2500_clk_ops = {
+	.rate_ahb = ast2500_clk_rate_ahb,
+	.disable = ast2500_clk_disable,
+	.enable = ast2500_clk_enable,
+};
+
 static const struct soc_device_id clk_match[] = {
     { .compatible = "aspeed,ast2400-clock", .data = &ast2400_clk_ops },
+    { .compatible = "aspeed,ast2500-clock", .data = &ast2500_clk_ops },
     { },
 };
 
