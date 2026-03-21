@@ -369,61 +369,61 @@ static const struct clk_ops ast2600_clk_ops = {
 };
 
 static const struct soc_device_id clk_match[] = {
-    { .compatible = "aspeed,ast2400-clock", .data = &ast2400_clk_ops },
-    { .compatible = "aspeed,ast2500-clock", .data = &ast2500_clk_ops },
-    { .compatible = "aspeed,ast2600-clock", .data = &ast2600_clk_ops },
-    { },
+	{ .compatible = "aspeed,ast2400-clock", .data = &ast2400_clk_ops },
+	{ .compatible = "aspeed,ast2500-clock", .data = &ast2500_clk_ops },
+	{ .compatible = "aspeed,ast2600-clock", .data = &ast2600_clk_ops },
+	{ },
 };
 
 static int clk_driver_init(struct soc *soc, struct soc_device *dev)
 {
-    struct clk *ctx;
-    int rc;
+	struct clk *ctx;
+	int rc;
 
-    ctx = malloc(sizeof(*ctx));
-    if (!ctx) {
-        return -ENOMEM;
-    }
+	ctx = malloc(sizeof(*ctx));
+	if (!ctx) {
+		return -ENOMEM;
+	}
 
-    ctx->scu = scu_get(soc);
-    if (!ctx->scu) {
-        rc = -ENODEV;
-        goto cleanup_ctx;
-    }
+	ctx->scu = scu_get(soc);
+	if (!ctx->scu) {
+		rc = -ENODEV;
+		goto cleanup_ctx;
+	}
 
-    ctx->ops = soc_device_get_match_data(soc, clk_match, &dev->node);
-    if (!ctx->ops) {
-        loge("Failed to find clk ops\n");
-        rc = -EINVAL;
-        goto cleanup_ctx;
-    }
+	ctx->ops = soc_device_get_match_data(soc, clk_match, &dev->node);
+	if (!ctx->ops) {
+		loge("Failed to find clk ops\n");
+		rc = -EINVAL;
+		goto cleanup_ctx;
+	}
 
-    soc_device_set_drvdata(dev, ctx);
+	soc_device_set_drvdata(dev, ctx);
 
-    return 0;
+	return 0;
 
 cleanup_ctx:
-    free(ctx);
+	free(ctx);
 
-    return rc;
+	return rc;
 }
 
 static void clk_driver_destroy(struct soc_device *dev)
 {
-    struct clk *ctx = soc_device_get_drvdata(dev);
-    scu_put(ctx->scu);
-    free(ctx);
+	struct clk *ctx = soc_device_get_drvdata(dev);
+	scu_put(ctx->scu);
+	free(ctx);
 }
 
 static const struct soc_driver clk_driver = {
-    .name = "clk",
-    .matches = clk_match,
-    .init = clk_driver_init,
-    .destroy = clk_driver_destroy,
+	.name = "clk",
+	.matches = clk_match,
+	.init = clk_driver_init,
+	.destroy = clk_driver_destroy,
 };
 REGISTER_SOC_DRIVER(clk_driver);
 
 struct clk *clk_get(struct soc *soc)
 {
-    return soc_driver_get_drvdata(soc, &clk_driver);
+	return soc_driver_get_drvdata(soc, &clk_driver);
 }
