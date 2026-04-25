@@ -19,28 +19,28 @@
  * then you may have to set it on your own.
  */
 struct connection_args {
-    /** Bridge implementation to be used */
-    struct bridge_driver *bridge_driver;
+	/** Bridge implementation to be used */
+	struct bridge_driver *bridge_driver;
 
-    /** BMC interface path (e.g. /dev/ttyUSB0) */
-    const char *interface;
+	/** BMC interface path (e.g. /dev/ttyUSB0) */
+	const char *interface;
 
-    /** IP address of the console server */
-    const char *ip;
+	/** IP address of the console server */
+	const char *ip;
 
-    /** Username for connecting to the console server */
-    const char *username;
+	/** Username for connecting to the console server */
+	const char *username;
 
-    /** Password for connecting to the console server */
-    const char *password;
+	/** Password for connecting to the console server */
+	const char *password;
 
-    /** Port for connecting to the console server */
-    int port;
+	/** Port for connecting to the console server */
+	int port;
 
-    /**
-     * Internal flag that must be true if console server fields
-     * (IP, username, etc.) are set.
-     */
-    bool internet_args;
+	/**
+	 * Internal flag that must be true if console server fields
+	 * (IP, username, etc.) are set.
+	 */
+	bool internet_args;
 };
 #endif

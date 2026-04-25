@@ -13,39 +13,46 @@
 #include "log.h"
 
 #ifndef MIN
-#define MIN(a, b)	((a) < (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
 #define FL_ERR(fmt, ...) loge(fmt, ##__VA_ARGS__)
 #define FL_DBG(fmt, ...) logd(fmt, ##__VA_ARGS__)
 
 static const struct flash_info flash_info[] = {
-	{ 0xc22018, 0x01000000, FL_ERASE_ALL | FL_CAN_4B, "Macronix MXxxL12835F"},
-	{ 0xc22019, 0x02000000, FL_ERASE_ALL | FL_CAN_4B, "Macronix MXxxL25635F"},
-	{ 0xc2201a, 0x04000000, FL_ERASE_ALL | FL_CAN_4B, "Macronix MXxxL51235F"},
-	{ 0xc2201b, 0x08000000, FL_ERASE_ALL | FL_CAN_4B, "Macronix MX66L1G45G"},
-	{ 0xef4018, 0x01000000, FL_ERASE_ALL,             "Winbond W25Q128BV"   },
-	{ 0xef4019, 0x02000000, FL_ERASE_ALL | FL_ERASE_64K | FL_CAN_4B |
-				FL_ERASE_BULK,
-							"Winbond W25Q256BV"},
-	{ 0xef4020, 0x04000000, FL_ERASE_ALL | FL_ERASE_64K | FL_CAN_4B |
-				FL_ERASE_BULK,
-							"Winbond W25Q512JV"},
-	{ 0xef4021, 0x08000000, FL_ERASE_ALL | FL_ERASE_64K | FL_CAN_4B |
-				FL_ERASE_BULK,
-							"Winbond W25Q01JV"},
-	{ 0x20ba20, 0x04000000, FL_ERASE_4K  | FL_ERASE_64K | FL_CAN_4B |
-                                FL_ERASE_BULK | FL_MICRON_BUGS,
-                                                          "Micron N25Qx512Ax"   },
-	{ 0x20ba19, 0x02000000, FL_ERASE_4K  | FL_ERASE_64K | FL_CAN_4B |
-                                FL_ERASE_BULK | FL_MICRON_BUGS,
-                                                          "Micron N25Q256Ax"    },
-	{ 0x1940ef, 0x02000000, FL_ERASE_4K  | FL_ERASE_64K | FL_CAN_4B |
-				FL_ERASE_BULK | FL_MICRON_BUGS,
-							"Micron N25Qx256Ax"   },
-	{ 0x4d5444, 0x02000000, FL_ERASE_ALL | FL_CAN_4B, "File Abstraction"},
+	{ 0xc22018, 0x01000000, FL_ERASE_ALL | FL_CAN_4B,
+	  "Macronix MXxxL12835F" },
+	{ 0xc22019, 0x02000000, FL_ERASE_ALL | FL_CAN_4B,
+	  "Macronix MXxxL25635F" },
+	{ 0xc2201a, 0x04000000, FL_ERASE_ALL | FL_CAN_4B,
+	  "Macronix MXxxL51235F" },
+	{ 0xc2201b, 0x08000000, FL_ERASE_ALL | FL_CAN_4B,
+	  "Macronix MX66L1G45G" },
+	{ 0xef4018, 0x01000000, FL_ERASE_ALL, "Winbond W25Q128BV" },
+	{ 0xef4019, 0x02000000,
+	  FL_ERASE_ALL | FL_ERASE_64K | FL_CAN_4B | FL_ERASE_BULK,
+	  "Winbond W25Q256BV" },
+	{ 0xef4020, 0x04000000,
+	  FL_ERASE_ALL | FL_ERASE_64K | FL_CAN_4B | FL_ERASE_BULK,
+	  "Winbond W25Q512JV" },
+	{ 0xef4021, 0x08000000,
+	  FL_ERASE_ALL | FL_ERASE_64K | FL_CAN_4B | FL_ERASE_BULK,
+	  "Winbond W25Q01JV" },
+	{ 0x20ba20, 0x04000000,
+	  FL_ERASE_4K | FL_ERASE_64K | FL_CAN_4B | FL_ERASE_BULK |
+		  FL_MICRON_BUGS,
+	  "Micron N25Qx512Ax" },
+	{ 0x20ba19, 0x02000000,
+	  FL_ERASE_4K | FL_ERASE_64K | FL_CAN_4B | FL_ERASE_BULK |
+		  FL_MICRON_BUGS,
+	  "Micron N25Q256Ax" },
+	{ 0x1940ef, 0x02000000,
+	  FL_ERASE_4K | FL_ERASE_64K | FL_CAN_4B | FL_ERASE_BULK |
+		  FL_MICRON_BUGS,
+	  "Micron N25Qx256Ax" },
+	{ 0x4d5444, 0x02000000, FL_ERASE_ALL | FL_CAN_4B, "File Abstraction" },
 	{ 0x55aa55, 0x00100000, FL_ERASE_ALL | FL_CAN_4B, "TEST_FLASH" },
-	{ 0xaa55aa, 0x02000000, FL_ERASE_ALL | FL_CAN_4B, "EMULATED_FLASH"},
+	{ 0xaa55aa, 0x02000000, FL_ERASE_ALL | FL_CAN_4B, "EMULATED_FLASH" },
 };
 
 static int fl_read_stat(struct sfc *ct, uint8_t *stat)
@@ -74,7 +81,8 @@ static int fl_sync_wait_idle(struct sfc *ct)
 	/* XXX Add timeout */
 	for (;;) {
 		rc = fl_read_stat(ct, &stat);
-		if (rc) return rc;
+		if (rc)
+			return rc;
 		if (!(stat & STAT_WIP)) {
 			if (ct->finfo->flags & FL_MICRON_BUGS)
 				fl_micron_status(ct);
@@ -93,9 +101,11 @@ static int fl_wren(struct sfc *ct)
 	/* Some flashes need it to be hammered */
 	for (i = 0; i < 1000; i++) {
 		rc = ct->cmd_wr(ct, CMD_WREN, false, 0, NULL, 0);
-		if (rc) return rc;
+		if (rc)
+			return rc;
 		rc = fl_read_stat(ct, &stat);
-		if (rc) return rc;
+		if (rc)
+			return rc;
 		if (stat & STAT_WIP) {
 			FL_ERR("LIBFLASH: WREN has WIP status set !\n");
 			rc = fl_sync_wait_idle(ct);
@@ -178,15 +188,15 @@ int flash_erase(struct flash_chip *c, uint64_t dst, uint64_t size)
 	if ((dst | size) & c->min_erase_mask)
 		return -EINVAL;
 
-	FL_DBG("LIBFLASH: Erasing 0x%" PRIx64"..0%" PRIx64 "...\n",
-	       dst, dst + size);
+	FL_DBG("LIBFLASH: Erasing 0x%" PRIx64 "..0%" PRIx64 "...\n", dst,
+	       dst + size);
 
 	/* Use controller erase if supported */
 	if (ct->erase)
 		return ct->erase(ct, dst, size);
 
 	/* Allright, loop as long as there's something to erase */
-	while(size) {
+	while (size) {
 		/* How big can we make it based on alignent & size */
 		fl_get_best_erase(c, dst, size, &chunk, &cmd);
 
@@ -222,17 +232,18 @@ int flash_erase_chip(struct flash_chip *c)
 	int rc;
 
 	/* XXX TODO: Fallback to using normal erases */
-	if (!(c->info.flags & (FL_ERASE_CHIP|FL_ERASE_BULK)))
+	if (!(c->info.flags & (FL_ERASE_CHIP | FL_ERASE_BULK)))
 		return -EOPNOTSUPP;
 
 	FL_DBG("LIBFLASH: Erasing chip...\n");
-	
+
 	/* Use controller erase if supported */
 	if (ct->erase)
 		return ct->erase(ct, 0, 0xffffffff);
 
 	rc = fl_wren(ct);
-	if (rc) return rc;
+	if (rc)
+		return rc;
 
 	if (c->info.flags & FL_ERASE_CHIP)
 		rc = ct->cmd_wr(ct, CMD_CE, false, 0, NULL, 0);
@@ -255,7 +266,8 @@ static int fl_wpage(struct flash_chip *c, uint32_t dst, const void *src,
 		return -EINVAL;
 
 	rc = fl_wren(ct);
-	if (rc) return rc;
+	if (rc)
+		return rc;
 
 	rc = ct->cmd_wr(ct, CMD_PP, true, dst, src, size);
 	if (rc)
@@ -273,7 +285,7 @@ int flash_write(struct flash_chip *c, uint32_t dst, const void *src,
 	uint32_t d = dst;
 	const void *s = src;
 	uint8_t vbuf[0x100];
-	int rc;	
+	int rc;
 
 	/* Some sanity checking */
 	if (((dst + size) <= dst) || !size || (dst + size) > c->tsize)
@@ -298,7 +310,7 @@ int flash_write(struct flash_chip *c, uint32_t dst, const void *src,
 		return -EOPNOTSUPP;
 
 	/* Iterate for each page to write */
-	while(todo) {
+	while (todo) {
 		uint32_t chunk;
 
 		/* Handle misaligned start */
@@ -307,7 +319,8 @@ int flash_write(struct flash_chip *c, uint32_t dst, const void *src,
 			chunk = todo;
 
 		rc = fl_wpage(c, d, s, chunk);
-		if (rc) return rc;
+		if (rc)
+			return rc;
 		d += chunk;
 		s += chunk;
 		todo -= chunk;
@@ -316,21 +329,22 @@ int flash_write(struct flash_chip *c, uint32_t dst, const void *src,
 	}
 	fprintf(stderr, "\n");
 
- writing_done:
+writing_done:
 	if (!verify)
 		return 0;
 
 	/* Verify */
 	FL_DBG("LIBFLASH: Verifying...\n");
 
-	while(size) {
+	while (size) {
 		uint32_t chunk;
 
 		chunk = sizeof(vbuf);
 		if (chunk > size)
 			chunk = size;
 		rc = flash_read(c, dst, vbuf, chunk);
-		if (rc) return rc;
+		if (rc)
+			return rc;
 		if (memcmp(vbuf, src, chunk)) {
 			FL_ERR("LIBFLASH: Miscompare at 0x%08x\n", dst);
 			return -EREMOTEIO;
@@ -351,8 +365,7 @@ enum sm_comp_res {
 	sm_need_erase,
 };
 
-static enum sm_comp_res flash_smart_comp(struct flash_chip *c,
-					 const void *src,
+static enum sm_comp_res flash_smart_comp(struct flash_chip *c, const void *src,
 					 uint32_t offset, uint32_t size)
 {
 	uint8_t *b = c->smart_buf + offset;
@@ -363,9 +376,9 @@ static enum sm_comp_res flash_smart_comp(struct flash_chip *c,
 	/* SRC DEST  NEED_ERASE
 	 *  0   1       0
 	 *  1   1       0
-         *  0   0       0
-         *  1   0       1
-         */
+	 *  0   0       0
+	 *  1   0       1
+	 */
 	for (i = 0; i < size; i++) {
 		/* Any bit need to be set, need erase */
 		if (s[i] & ~b[i])
@@ -393,15 +406,15 @@ int flash_smart_write(struct flash_chip *c, uint64_t dst, const void *src,
 	       dst, dst + size);
 
 	/* As long as we have something to write ... */
-	while(dst < end) {
+	while (dst < end) {
 		uint32_t page, off, chunk;
 		enum sm_comp_res sr;
 
 		/* Figure out which erase page we are in and read it */
 		page = dst & ~c->min_erase_mask;
 		off = dst & c->min_erase_mask;
-		FL_DBG("LIBFLASH:   reading page 0x%08x..0x%08x...",
-		       page, page + er_size);
+		FL_DBG("LIBFLASH:   reading page 0x%08x..0x%08x...", page,
+		       page + er_size);
 		rc = flash_read(c, page, c->smart_buf, er_size);
 		if (rc) {
 			FL_DBG(" error %d!\n", rc);
@@ -415,7 +428,7 @@ int flash_smart_write(struct flash_chip *c, uint64_t dst, const void *src,
 
 		/* Compare against what we are writing and ff */
 		sr = flash_smart_comp(c, src, off, chunk);
-		switch(sr) {
+		switch (sr) {
 		case sm_no_change:
 			/* Identical, skip it */
 			FL_DBG(" same !\n");
@@ -452,8 +465,7 @@ int flash_smart_write(struct flash_chip *c, uint64_t dst, const void *src,
 	return 0;
 }
 
-static int fl_chip_id(struct sfc *ct, uint8_t *id_buf,
-		      uint32_t *id_size)
+static int fl_chip_id(struct sfc *ct, uint8_t *id_buf, uint32_t *id_size)
 {
 	int rc;
 	uint8_t stat;
@@ -486,7 +498,7 @@ static int flash_identify(struct flash_chip *c)
 	struct sfc *ct = c->ctrl;
 	const struct flash_info *info = NULL;
 	uint32_t iid, id_size;
-#define MAX_ID_SIZE	16
+#define MAX_ID_SIZE 16
 	uint8_t id[MAX_ID_SIZE];
 	int rc, i;
 
@@ -506,14 +518,14 @@ static int flash_identify(struct flash_chip *c)
 	iid = (iid << 8) | id[1];
 	iid = (iid << 8) | id[2];
 
-	FL_DBG("LIBFLASH: Flash ID: %02x.%02x.%02x (%06x)\n",
-	       id[0], id[1], id[2], iid);
+	FL_DBG("LIBFLASH: Flash ID: %02x.%02x.%02x (%06x)\n", id[0], id[1],
+	       id[2], iid);
 
 	/* Lookup in flash_info */
 	for (i = 0; (size_t)i < ARRAY_SIZE(flash_info); i++) {
 		info = &flash_info[i];
 		if (info->id == iid)
-			break;		
+			break;
 	}
 	if (!info || info->id != iid)
 		return -ENXIO;
@@ -594,7 +606,6 @@ static int flash_configure(struct flash_chip *c)
 				return rc;
 			}
 		}
-
 
 		/* Set controller to 4b mode if supported */
 		if (ct->set_4b) {

@@ -4,8 +4,8 @@
 
 #include "scu.h"
 
-#define AST_SCU_PROT_KEY	0x000
-#define AST_SCU_PASSWORD	0x1688a8a8
+#define AST_SCU_PROT_KEY 0x000
+#define AST_SCU_PASSWORD 0x1688a8a8
 
 struct scu {
 	int refcnt;
@@ -90,7 +90,7 @@ static const struct soc_device_id scu_match[] = {
 	{ .compatible = "aspeed,ast2400-scu" },
 	{ .compatible = "aspeed,ast2500-scu" },
 	{ .compatible = "aspeed,ast2600-scu" },
-	{ },
+	{},
 };
 
 static const struct soc_driver scu_driver = {

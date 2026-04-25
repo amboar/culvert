@@ -23,17 +23,17 @@
 #include <stdbool.h>
 
 /* Flash status bits */
-#define STAT_WIP	0x01
-#define STAT_WEN	0x02
+#define STAT_WIP 0x01
+#define STAT_WEN 0x02
 
 struct flash_chip {
-    struct sfc *ctrl;
-    struct flash_info info;
-    uint32_t tsize;
-    uint32_t min_erase_mask;
-    bool mode_4b;
-    struct flash_req *cur_req;
-    void *smart_buf;
+	struct sfc *ctrl;
+	struct flash_info info;
+	uint32_t tsize;
+	uint32_t min_erase_mask;
+	bool mode_4b;
+	struct flash_req *cur_req;
+	void *smart_buf;
 };
 
 int flash_init(struct sfc *ctrl, struct flash_chip **chip);

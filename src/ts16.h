@@ -8,12 +8,12 @@
 #include "prompt.h"
 
 struct ts16 {
-    struct console console;
-    struct prompt concentrator;
-    int port;
+	struct console console;
+	struct prompt concentrator;
+	int port;
 };
 
 int ts16_init(struct ts16 *ctx, const char *ip, int port, const char *username,
-              const char *password);
+	      const char *password);
 
 #endif

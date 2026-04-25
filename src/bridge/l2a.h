@@ -12,13 +12,13 @@
 #include <sys/types.h>
 
 struct l2ab {
-    struct ahb ahb;
-    struct lpc fw;
-    struct ilpcb ilpcb;
-    uint32_t phys;
-    size_t len;
-    uint32_t restore7;
-    uint32_t restore8;
+	struct ahb ahb;
+	struct lpc fw;
+	struct ilpcb ilpcb;
+	uint32_t phys;
+	size_t len;
+	uint32_t restore7;
+	uint32_t restore8;
 };
 
 int l2ab_init(struct l2ab *ctx);
@@ -28,7 +28,7 @@ int64_t l2ab_map(struct l2ab *ctx, uint32_t phys, size_t len);
 
 static inline struct ahb *l2ab_as_ahb(struct l2ab *ctx)
 {
-    return &ctx->ahb;
+	return &ctx->ahb;
 }
 
 ssize_t l2ab_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len);

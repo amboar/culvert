@@ -7,8 +7,8 @@
 #include "soc.h"
 
 enum otp_region {
-    otp_region_strap,
-    otp_region_conf,
+	otp_region_strap,
+	otp_region_conf,
 };
 
 struct otp;

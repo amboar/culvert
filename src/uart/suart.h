@@ -10,13 +10,12 @@
 #include "../lpc.h"
 #include "../sio.h"
 
-struct suart
-{
-    enum sio_dev dev;
-    struct lpc io;
-    uint8_t sirq;
-    uint16_t base;
-    uint16_t baud;
+struct suart {
+	enum sio_dev dev;
+	struct lpc io;
+	uint8_t sirq;
+	uint16_t base;
+	uint16_t baud;
 };
 
 /* If base is 0 the hardware default is selected */

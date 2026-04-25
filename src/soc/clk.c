@@ -14,20 +14,20 @@
 #include <stdint.h>
 
 /* Shared registers between the AST2400 and 2500 will not (!) have a prefix */
-#define SCU_CLK_STOP			0x0c
-#define 	SCU_CLK_STOP_UART3			BIT(25)
+#define SCU_CLK_STOP	   0x0c
+#define SCU_CLK_STOP_UART3 BIT(25)
 
-#define SCU_HW_STRAP			0x70
-#define 	SCU_HW_STRAP_UART_DBG_SEL		BIT(29)
-#define 	SCU_HW_STRAP_CLKIN_IN_MOD		BIT(23)
-#define 	SCU_HW_STRAP_SIO_DEC			BIT(20)
-#define 	SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_MASK	GENMASK(11, 9)
-#define 	SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_SHIFT	9
-#define 	SCU_HW_STRAP_ARM_CLK			BIT(0)
+#define SCU_HW_STRAP			      0x70
+#define SCU_HW_STRAP_UART_DBG_SEL	      BIT(29)
+#define SCU_HW_STRAP_CLKIN_IN_MOD	      BIT(23)
+#define SCU_HW_STRAP_SIO_DEC		      BIT(20)
+#define SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_MASK  GENMASK(11, 9)
+#define SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_SHIFT 9
+#define SCU_HW_STRAP_ARM_CLK		      BIT(0)
 
-#define SCU_SILICON_REVISION		0x7c
+#define SCU_SILICON_REVISION 0x7c
 
-#define AST2500_SCU_H_PLL		0x24
+#define AST2500_SCU_H_PLL 0x24
 
 union ast2500_h_pll_reg {
 	uint32_t w;
@@ -38,35 +38,35 @@ union ast2500_h_pll_reg {
 		uint32_t off : 1;	/* bit[19]	*/
 		uint32_t bypass : 1;	/* bit[20]	*/
 		uint32_t reset : 1;	/* bit[21]	*/
-		uint32_t reserved : 10;	/* bit[31:22]	*/
+		uint32_t reserved : 10; /* bit[31:22]	*/
 	} b;
 };
 
 /* We only care about SCU004 for now, revision is not required here */
-#define AST2600_SCU_SILICON_REVISION	0x04
+#define AST2600_SCU_SILICON_REVISION 0x04
 
-#define AST2600_SCU_H_PLL		0x200
+#define AST2600_SCU_H_PLL 0x200
 
 union ast2600_h_pll_reg {
 	uint32_t w;
 	struct {
-		uint32_t m : 13;	/* bit[12:0]	*/
-		uint32_t n : 6;		/* bit[18:13]	*/
-		uint32_t p : 4;		/* bit[22:19]	*/
-		uint32_t off : 1;	/* bit[23]	*/
-		uint32_t bypass : 1;	/* bit[24]	*/
-		uint32_t reset : 1;	/* bit[25]	*/
-		uint32_t reserved : 6;	/* bit[31:26]	*/
+		uint32_t m : 13;       /* bit[12:0]	*/
+		uint32_t n : 6;	       /* bit[18:13]	*/
+		uint32_t p : 4;	       /* bit[22:19]	*/
+		uint32_t off : 1;      /* bit[23]	*/
+		uint32_t bypass : 1;   /* bit[24]	*/
+		uint32_t reset : 1;    /* bit[25]	*/
+		uint32_t reserved : 6; /* bit[31:26]	*/
 	} b;
 };
 
-#define AST2600_SCU_HW_STRAP1		0x500
-#define 	AST2600_SCU_HW_STRAP1_ARM_CLK			BIT(0)
-#define 	AST2600_SCU_HW_STRAP1_CPU_AXI_RATIO		BIT(16)
-#define 	AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_MASK	GENMASK(12, 11)
-#define 	AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_SHIFT	11
+#define AST2600_SCU_HW_STRAP1			   0x500
+#define AST2600_SCU_HW_STRAP1_ARM_CLK		   BIT(0)
+#define AST2600_SCU_HW_STRAP1_CPU_AXI_RATIO	   BIT(16)
+#define AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_MASK  GENMASK(12, 11)
+#define AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_SHIFT 11
 
-#define	AST2600_SCU_HW_STRAP1_CLEAR	0x504
+#define AST2600_SCU_HW_STRAP1_CLEAR 0x504
 
 struct clk_ops {
 	int64_t (*rate_ahb)(struct clk *ctx);
@@ -99,19 +99,11 @@ int clk_enable(struct clk *ctx, enum clksrc src)
 
 int64_t ast2400_clk_rate_ahb(struct clk *ctx)
 {
-	static const uint32_t cpu_freqs_24_48[] = {
-		384000000,
-		360000000,
-		336000000,
-		408000000
-	};
+	static const uint32_t cpu_freqs_24_48[] = { 384000000, 360000000,
+						    336000000, 408000000 };
 
-	static const uint32_t cpu_freqs_25[] = {
-		400000000,
-		375000000,
-		350000000,
-		425000000
-	};
+	static const uint32_t cpu_freqs_25[] = { 400000000, 375000000,
+						 350000000, 425000000 };
 
 	static const uint32_t ahb_div[] = { 1, 2, 4, 3 };
 	uint32_t strap, cpu_clk, div;
@@ -164,7 +156,7 @@ int ast2400_clk_enable(struct clk *ctx, enum clksrc src)
 	switch (src) {
 	case clk_arm:
 		return scu_writel(ctx->scu, SCU_SILICON_REVISION,
-					    SCU_HW_STRAP_ARM_CLK);
+				  SCU_HW_STRAP_ARM_CLK);
 	case clk_uart3:
 		if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
 			return rc;
@@ -210,15 +202,13 @@ int64_t ast2500_clk_rate_ahb(struct clk *ctx)
 	 * H-PLL = CLKIN * [(M+1) / (N+1)] / (P+1)
 	 * The usual frequency for H-PLL with CLKIN 24 MHz is 792 MHz.
 	 */
-	h_pll = (clk_25mhz ? 25 : 24)
-		* (h_pll_reg.b.m + 1)
-		/ (h_pll_reg.b.n + 1)
-		/ (h_pll_reg.b.p + 1);
+	h_pll = (clk_25mhz ? 25 : 24) * (h_pll_reg.b.m + 1) /
+		(h_pll_reg.b.n + 1) / (h_pll_reg.b.p + 1);
 	logt("clk: ast2500: calculated h-pll is %d MHz\n", h_pll);
 
 	/* AXI/AHB clock frequency ratio selection */
-	ahb_ratio = (strap & SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_MASK)
-			>> SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_SHIFT;
+	ahb_ratio = (strap & SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_MASK) >>
+		    SCU_HW_STRAP_AXI_CLK_FREQ_RATIO_SHIFT;
 	if (!ahb_ratio)
 		return -EINVAL;
 	/*
@@ -268,7 +258,7 @@ int ast2500_clk_enable(struct clk *ctx, enum clksrc src)
 	switch (src) {
 	case clk_arm:
 		return scu_writel(ctx->scu, SCU_SILICON_REVISION,
-					    SCU_HW_STRAP_ARM_CLK);
+				  SCU_HW_STRAP_ARM_CLK);
 	case clk_uart3:
 		if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
 			return rc;
@@ -306,17 +296,15 @@ static int64_t ast2600_clk_rate_ahb(struct clk *ctx)
 		return rc;
 
 	/* H-PLL = CLKIN (always 25 MHz) * (M+1/N+1) / P+1 */
-	h_pll = 25
-		* (h_pll_reg.b.m + 1)
-		/ (h_pll_reg.b.n + 1)
-		/ (h_pll_reg.b.p + 1);
+	h_pll = 25 * (h_pll_reg.b.m + 1) / (h_pll_reg.b.n + 1) /
+		(h_pll_reg.b.p + 1);
 	logt("clk: ast2600: calculated h-pll is %d MHz\n", h_pll);
 
 	cpu_axi_ratio = (strap & AST2600_SCU_HW_STRAP1_CPU_AXI_RATIO);
 
 	/* AXI/AHB clock frequency ratio selection */
-	ahb_ratio = (strap & AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_MASK)
-			>> AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_SHIFT;
+	ahb_ratio = (strap & AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_MASK) >>
+		    AST2600_SCU_HW_STRAP1_AHB_FREQ_RATIO_SHIFT;
 	if (!ahb_ratio)
 		return -EINVAL;
 
@@ -350,7 +338,7 @@ int ast2600_clk_disable(struct clk *ctx, enum clksrc src)
 		return -ENOTSUP;
 
 	return scu_writel(ctx->scu, AST2600_SCU_HW_STRAP1,
-				    AST2600_SCU_HW_STRAP1_ARM_CLK);
+			  AST2600_SCU_HW_STRAP1_ARM_CLK);
 }
 
 int ast2600_clk_enable(struct clk *ctx, enum clksrc src)
@@ -359,7 +347,7 @@ int ast2600_clk_enable(struct clk *ctx, enum clksrc src)
 		return -ENOTSUP;
 
 	return scu_writel(ctx->scu, AST2600_SCU_HW_STRAP1_CLEAR,
-				    AST2600_SCU_HW_STRAP1_ARM_CLK);
+			  AST2600_SCU_HW_STRAP1_ARM_CLK);
 }
 
 static const struct clk_ops ast2600_clk_ops = {
@@ -372,7 +360,7 @@ static const struct soc_device_id clk_match[] = {
 	{ .compatible = "aspeed,ast2400-clock", .data = &ast2400_clk_ops },
 	{ .compatible = "aspeed,ast2500-clock", .data = &ast2500_clk_ops },
 	{ .compatible = "aspeed,ast2600-clock", .data = &ast2600_clk_ops },
-	{ },
+	{},
 };
 
 static int clk_driver_init(struct soc *soc, struct soc_device *dev)

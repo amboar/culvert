@@ -9,22 +9,20 @@
 
 #include "lpc.h"
 
-enum sio_dev
-{
-    sio_suart1 = 0x02,
-    sio_suart2 = 0x03,
-    sio_wakeup = 0x04,
-    sio_gpio   = 0x07,
-    sio_suart3 = 0x0b,
-    sio_suart4 = 0x0c,
-    sio_ilpc   = 0x0d,
-    sio_mbox   = 0x0e,
+enum sio_dev {
+	sio_suart1 = 0x02,
+	sio_suart2 = 0x03,
+	sio_wakeup = 0x04,
+	sio_gpio = 0x07,
+	sio_suart3 = 0x0b,
+	sio_suart4 = 0x0c,
+	sio_ilpc = 0x0d,
+	sio_mbox = 0x0e,
 };
 
-struct sio
-{
-    struct lpc io;
-    uint16_t base;
+struct sio {
+	struct lpc io;
+	uint16_t base;
 };
 
 int sio_init(struct sio *ctx);

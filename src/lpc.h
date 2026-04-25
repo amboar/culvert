@@ -11,10 +11,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-struct lpc
-{
-    int fd;
-    const char *space;
+struct lpc {
+	int fd;
+	const char *space;
 };
 
 #if HAVE_LPC
@@ -31,70 +30,62 @@ int lpc_writel(struct lpc *ctx, size_t addr, uint32_t val);
 int lpc_read(struct lpc *ctx, size_t addr, void *val, size_t size);
 int lpc_write(struct lpc *ctx, size_t addr, const void *val, size_t size);
 #else
-static inline int
-lpc_init(struct lpc *ctx __unused, const char *space __unused)
+static inline int lpc_init(struct lpc *ctx __unused, const char *space __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_destroy(struct lpc *ctx __unused)
+static inline int lpc_destroy(struct lpc *ctx __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_readb(struct lpc *ctx __unused, size_t addr __unused, uint8_t *val __unused)
+static inline int lpc_readb(struct lpc *ctx __unused, size_t addr __unused,
+			    uint8_t *val __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_writeb(struct lpc *ctx __unused, size_t addr __unused, uint8_t val __unused)
+static inline int lpc_writeb(struct lpc *ctx __unused, size_t addr __unused,
+			     uint8_t val __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_readw(struct lpc *ctx __unused, size_t addr __unused,
-          uint16_t *val __unused)
+static inline int lpc_readw(struct lpc *ctx __unused, size_t addr __unused,
+			    uint16_t *val __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_writew(struct lpc *ctx __unused, size_t addr __unused,
-           uint16_t val __unused)
+static inline int lpc_writew(struct lpc *ctx __unused, size_t addr __unused,
+			     uint16_t val __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_readl(struct lpc *ctx __unused, size_t addr __unused,
-          uint32_t *val __unused)
+static inline int lpc_readl(struct lpc *ctx __unused, size_t addr __unused,
+			    uint32_t *val __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_writel(struct lpc *ctx __unused, size_t addr __unused,
-           uint32_t val __unused)
+static inline int lpc_writel(struct lpc *ctx __unused, size_t addr __unused,
+			     uint32_t val __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_read(struct lpc *ctx __unused, size_t addr __unused, void *val __unused,
-         size_t size __unused)
+static inline int lpc_read(struct lpc *ctx __unused, size_t addr __unused,
+			   void *val __unused, size_t size __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 
-static inline int
-lpc_write(struct lpc *ctx __unused, size_t addr __unused, const void *val
-          __unused, size_t size __unused)
+static inline int lpc_write(struct lpc *ctx __unused, size_t addr __unused,
+			    const void *val __unused, size_t size __unused)
 {
-    return -ENOTSUP;
+	return -ENOTSUP;
 }
 #endif
 
