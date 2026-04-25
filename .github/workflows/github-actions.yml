@@ -2,6 +2,27 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: sudo apt-get update -qq &&
+          sudo apt-get install -qq
+          ninja-build python3-pip
+          device-tree-compiler
+      - name: Install meson
+        run: pip3 install --user meson
+      - name: Install clang
+        uses: KyleMayes/install-llvm-action@v2.0.9
+        with:
+          version: "21"
+      - name: Check clang-format
+        run: meson setup build-lint && ninja -C build-lint clang-format-check
+      - name: Check meson format
+        run: meson format --check-only --recursive
+
   build:
     name: Build
     runs-on: ubuntu-latest
