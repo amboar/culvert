@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 
-volatile void *mmio_memcpy(volatile void *dst, const volatile void *src, size_t len);
+volatile void *mmio_memcpy(volatile void *dst, const volatile void *src,
+			   size_t len);
 
 #endif

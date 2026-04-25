@@ -14,11 +14,11 @@
 #include <sys/types.h>
 
 struct debug {
-    struct ahb ahb;
-    struct console *console;
-    struct prompt prompt;
-    int port;
-    int force_quit;
+	struct ahb ahb;
+	struct console *console;
+	struct prompt prompt;
+	int port;
+	int force_quit;
 };
 
 int debug_init(struct debug *ctx, ...);
@@ -31,11 +31,12 @@ int debug_probe(struct debug *ctx);
 
 static inline struct ahb *debug_as_ahb(struct debug *ctx)
 {
-    return &ctx->ahb;
+	return &ctx->ahb;
 }
 
 ssize_t debug_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len);
-ssize_t debug_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len);
+ssize_t debug_write(struct ahb *ahb, uint32_t phys, const void *buf,
+		    size_t len);
 int debug_readl(struct ahb *ahb, uint32_t phys, uint32_t *val);
 int debug_writel(struct ahb *ahb, uint32_t phys, uint32_t val);
 

@@ -9,9 +9,9 @@
 #include <sys/types.h>
 
 struct prompt {
-    FILE *stream;
-    const char *eol;
-    bool have_echo;
+	FILE *stream;
+	const char *eol;
+	bool have_echo;
 };
 
 /**
@@ -22,7 +22,7 @@ int prompt_destroy(struct prompt *ctx);
 
 int prompt_expect(struct prompt *ctx, const char *str);
 int prompt_expect_into(struct prompt *ctx, const char *str, char *prior,
-			 size_t len, char **prompt);
+		       size_t len, char **prompt);
 ssize_t prompt_write(struct prompt *ctx, const char *cmd, size_t len);
 ssize_t prompt_read(struct prompt *ctx, char *output, size_t len);
 int prompt_gets(struct prompt *ctx, char *output, size_t len);

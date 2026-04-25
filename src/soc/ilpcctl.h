@@ -5,5 +5,5 @@
 
 struct ilpcctl;
 
-struct ilpcctl *ilpcctl_get(struct soc* soc);
+struct ilpcctl *ilpcctl_get(struct soc *soc);
 struct bridgectl *ilpcctl_as_bridgectl(struct ilpcctl *ctx);

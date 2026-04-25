@@ -34,444 +34,454 @@
  *
  * https://github.com/AspeedTech-BMC/openbmc/releases/download/v09.01/SDK_User_Guide_v09.01.pdf
  */
-static const char *password = "5z&0VK{@`HW}H~V310=l=JB+M]IV-f;Sz98XfCA&Rp)i|Jo=2?IBN$QaQ2\"Kb|Ov";
+static const char *password =
+	"5z&0VK{@`HW}H~V310=l=JB+M]IV-f;Sz98XfCA&Rp)i|Jo=2?IBN$QaQ2\"Kb|Ov";
 
 static inline int streq(const char *a, const char *b)
 {
-    return !strcmp(a, b);
+	return !strcmp(a, b);
 }
 
 int debug_enter(struct debug *ctx)
 {
-    int rc;
+	int rc;
 
-    if (ctx->force_quit) {
-        logi("Foce quit requested\n");
-        rc = console_set_baud(ctx->console, 115200);
-        if (rc < 0)
-            return rc;
+	if (ctx->force_quit) {
+		logi("Foce quit requested\n");
+		rc = console_set_baud(ctx->console, 115200);
+		if (rc < 0)
+			return rc;
 
-        // Escape character should cancel previous commands
-        // q will exit debug mode
-        rc = prompt_write(&ctx->prompt,
-                          "\x1Bq\r\n\x1Bq\r\n", strlen("\x1Bq\r\n\x1Bq\r\n"));
-        if (rc < 0)
-            return rc;
-    }
+		// Escape character should cancel previous commands
+		// q will exit debug mode
+		rc = prompt_write(&ctx->prompt, "\x1Bq\r\n\x1Bq\r\n",
+				  strlen("\x1Bq\r\n\x1Bq\r\n"));
+		if (rc < 0)
+			return rc;
+	}
 
-    logi("Entering debug mode\n");
+	logi("Entering debug mode\n");
 
-    // Enter debug mode
-    rc = console_set_baud(ctx->console, 1200);
-    if (rc < 0)
-        return rc;
+	// Enter debug mode
+	rc = console_set_baud(ctx->console, 1200);
+	if (rc < 0)
+		return rc;
 
-    rc = prompt_write(&ctx->prompt, password, strlen(password));
-    if (rc < 0)
-        goto cleanup_port_password;
+	rc = prompt_write(&ctx->prompt, password, strlen(password));
+	if (rc < 0)
+		goto cleanup_port_password;
 
-    rc = prompt_expect(&ctx->prompt, "$ ");
-    if (rc < 0)
-        goto cleanup_port_password;
+	rc = prompt_expect(&ctx->prompt, "$ ");
+	if (rc < 0)
+		goto cleanup_port_password;
 
-    rc = console_set_baud(ctx->console, 115200);
-    if (!rc)
-        sleep(1);
+	rc = console_set_baud(ctx->console, 115200);
+	if (!rc)
+		sleep(1);
 
-    return rc;
+	return rc;
 
 cleanup_port_password:
-    console_set_baud(ctx->console, 115200);
+	console_set_baud(ctx->console, 115200);
 
-    prompt_run(&ctx->prompt, "");
+	prompt_run(&ctx->prompt, "");
 
-    return rc;
+	return rc;
 }
 
 int debug_exit(struct debug *ctx)
 {
-    int rc;
+	int rc;
 
-    logi("Exiting debug mode\n");
-    rc = prompt_run(&ctx->prompt, "q");
-    if (rc < 0)
-        return rc;
+	logi("Exiting debug mode\n");
+	rc = prompt_run(&ctx->prompt, "q");
+	if (rc < 0)
+		return rc;
 
-    sleep(1);
+	sleep(1);
 
-    prompt_run(&ctx->prompt, "");
+	prompt_run(&ctx->prompt, "");
 
-    return console_set_baud(ctx->console, 115200);
+	return console_set_baud(ctx->console, 115200);
 }
 
 int debug_probe(struct debug *ctx)
 {
-    int rc;
+	int rc;
 
-    logd("Probing %s\n", ctx->ahb.drv->name);
+	logd("Probing %s\n", ctx->ahb.drv->name);
 
-    rc = debug_enter(ctx);
-    if (rc < 0)
-        return rc;
+	rc = debug_enter(ctx);
+	if (rc < 0)
+		return rc;
 
-    return debug_exit(ctx);
+	return debug_exit(ctx);
 }
 
 static ssize_t debug_parse_d(char *line, char *buf)
 {
-    char *eoa, *words, *token, *stream;
-    char *saveptr;
-    char *cursor;
-    ssize_t rc;
+	char *eoa, *words, *token, *stream;
+	char *saveptr;
+	char *cursor;
+	ssize_t rc;
 
-    /* Strip leading address */
-    eoa = strchr(line, ':');
-    if (!eoa)
-        return -EBADE;
+	/* Strip leading address */
+	eoa = strchr(line, ':');
+	if (!eoa)
+		return -EBADE;
 
-    /* Extract 4-byte values */
-    words = eoa + 1;
-    cursor = buf;
-    stream = strdup(words);
-    while ((token = strtok_r(words, " ", &saveptr))) {
-        rc = sscanf(token, "%02hhx%02hhx%02hhx%02hhx",
-                    &cursor[3], &cursor[2], &cursor[1], &cursor[0]);
-        if (rc < 0) {
-            rc = -errno;
-            goto done;
-        }
+	/* Extract 4-byte values */
+	words = eoa + 1;
+	cursor = buf;
+	stream = strdup(words);
+	while ((token = strtok_r(words, " ", &saveptr))) {
+		rc = sscanf(token, "%02hhx%02hhx%02hhx%02hhx", &cursor[3],
+			    &cursor[2], &cursor[1], &cursor[0]);
+		if (rc < 0) {
+			rc = -errno;
+			goto done;
+		}
 
-        if (rc < 4) {
-            loge("Wanted 4 but extracted %zd bytes from token '%s' in words '%s' from line '%s'\n",
-                 rc, token, words, line);
-            rc = -EBADE;
-            goto done;
-        }
+		if (rc < 4) {
+			loge("Wanted 4 but extracted %zd bytes from token '%s' in words '%s' from line '%s'\n",
+			     rc, token, words, line);
+			rc = -EBADE;
+			goto done;
+		}
 
-        cursor += rc;
-        words = NULL;
-    }
+		cursor += rc;
+		words = NULL;
+	}
 
-    rc = cursor - buf;
+	rc = cursor - buf;
 
 done:
-    free(stream);
-    return rc;
+	free(stream);
+	return rc;
 }
 
 static int debug_read_fixed(struct debug *ctx, char mode, uint32_t phys,
-                            uint32_t *val)
+			    uint32_t *val)
 {
-    char buf[100], *response, *prompt;
-    char *command;
-    unsigned long parsed;
-    int rc;
+	char buf[100], *response, *prompt;
+	char *command;
+	unsigned long parsed;
+	int rc;
 
-    if (!(mode == 'i' || mode == 'r'))
-        return -EINVAL;
+	if (!(mode == 'i' || mode == 'r'))
+		return -EINVAL;
 
-    rc = asprintf(&command, "%c %x", mode, phys);
-    if (rc < 0)
-        return -errno;
+	rc = asprintf(&command, "%c %x", mode, phys);
+	if (rc < 0)
+		return -errno;
 
-    prompt = &buf[0];
-    rc = prompt_run_expect(&ctx->prompt, command, "$ ", &prompt, sizeof(buf));
-    free(command);
-    if (rc < 0)
-        return rc;
+	prompt = &buf[0];
+	rc = prompt_run_expect(&ctx->prompt, command, "$ ", &prompt,
+			       sizeof(buf));
+	free(command);
+	if (rc < 0)
+		return rc;
 
-    /* Terminate the string by overwriting the prompt */
-    *prompt = '\0';
+	/* Terminate the string by overwriting the prompt */
+	*prompt = '\0';
 
-    /* Discard echoed response */
-    response = strchr(buf, ctx->prompt.eol[0]);
-    if (!response)
-        return -EIO;
+	/* Discard echoed response */
+	response = strchr(buf, ctx->prompt.eol[0]);
+	if (!response)
+		return -EIO;
 
-    /* Extract the data */
-    errno = 0;
-    parsed = strtoul(response, NULL, 16);
-    if (errno == ERANGE && (parsed == ULONG_MAX))
-        return -errno;
+	/* Extract the data */
+	errno = 0;
+	parsed = strtoul(response, NULL, 16);
+	if (errno == ERANGE && (parsed == ULONG_MAX))
+		return -errno;
 
-    *val = parsed;
+	*val = parsed;
 
-    return 0;
+	return 0;
 }
 
 #define DEBUG_D_MAX_LEN (128 * 1024)
 
 ssize_t debug_read(struct ahb *ahb, uint32_t phys, void *buf, size_t len)
 {
-    char line[2 * sizeof("20002ba0:31e01002 20433002 30813003 e1a06002\r\n")];
-    struct debug *ctx = to_debug(ahb);
-    size_t remaining = len;
-    size_t ingress;
-    char *command;
-    char *cursor;
-    ssize_t rc;
+	char line[2 *
+		  sizeof("20002ba0:31e01002 20433002 30813003 e1a06002\r\n")];
+	struct debug *ctx = to_debug(ahb);
+	size_t remaining = len;
+	size_t ingress;
+	char *command;
+	char *cursor;
+	ssize_t rc;
 
-    if (len > SSIZE_MAX) {
-        return -1;
-    }
+	if (len > SSIZE_MAX) {
+		return -1;
+	}
 
-    if (len < 4) {
-        uint32_t val = 0;
+	if (len < 4) {
+		uint32_t val = 0;
 
-        cursor = buf;
-        while (remaining) {
-            rc = debug_read_fixed(ctx, 'i', phys, &val);
-            if (rc < 0)
-                return -1;
+		cursor = buf;
+		while (remaining) {
+			rc = debug_read_fixed(ctx, 'i', phys, &val);
+			if (rc < 0)
+				return -1;
 
-            *cursor++ = val & 0xff;
-            remaining--;
-            phys++;
-        }
+			*cursor++ = val & 0xff;
+			remaining--;
+			phys++;
+		}
 
-        return len;
-    }
+		return len;
+	}
 
-    cursor = buf;
-    do {
-        size_t consumed;
-        int found;
+	cursor = buf;
+	do {
+		size_t consumed;
+		int found;
 
 retry:
-        ingress = remaining > DEBUG_D_MAX_LEN ? DEBUG_D_MAX_LEN : remaining;
+		ingress = remaining > DEBUG_D_MAX_LEN ? DEBUG_D_MAX_LEN :
+							remaining;
 
-        rc = asprintf(&command, "d %x %zx", phys, ingress);
-        if (rc < 0)
-            return -1;
+		rc = asprintf(&command, "d %x %zx", phys, ingress);
+		if (rc < 0)
+			return -1;
 
-        rc = prompt_run(&ctx->prompt, command);
-        free(command);
-        if (rc < 0)
-            return -1;
+		rc = prompt_run(&ctx->prompt, command);
+		free(command);
+		if (rc < 0)
+			return -1;
 
-        /* Eat the echoed command */
-        do {
-            found = prompt_gets(&ctx->prompt, line, sizeof(line));
-            if (found < 0)
-                return -1;
-        } while (!strcmp("$ \n", line)); /* Deal any prompt from a prior run */
+		/* Eat the echoed command */
+		do {
+			found = prompt_gets(&ctx->prompt, line, sizeof(line));
+			if (found < 0)
+				return -1;
+		} while (!strcmp("$ \n",
+				 line)); /* Deal any prompt from a prior run */
 
-        consumed = 0;
-        do {
-            found = prompt_gets(&ctx->prompt, line, sizeof(line));
-            if (found < 0)
-                return -1;
+		consumed = 0;
+		do {
+			found = prompt_gets(&ctx->prompt, line, sizeof(line));
+			if (found < 0)
+				return -1;
 
-            rc = debug_parse_d(line, cursor);
-            if (rc < 0) {
-                rc = prompt_run(&ctx->prompt, "");
-                if (rc < 0)
-                    return -1;
-                rc = prompt_expect(&ctx->prompt, "$ ");
-                if (rc < 0)
-                    return -1;
-                loge("Failed to parse line '%s'\n", line);
-                loge("Retrying from address 0x%"PRIx32"\n", phys);
-                goto retry;
-            }
+			rc = debug_parse_d(line, cursor);
+			if (rc < 0) {
+				rc = prompt_run(&ctx->prompt, "");
+				if (rc < 0)
+					return -1;
+				rc = prompt_expect(&ctx->prompt, "$ ");
+				if (rc < 0)
+					return -1;
+				loge("Failed to parse line '%s'\n", line);
+				loge("Retrying from address 0x%" PRIx32 "\n",
+				     phys);
+				goto retry;
+			}
 
-            cursor += rc;
-            consumed += rc;
-        } while (consumed < ingress);
+			cursor += rc;
+			consumed += rc;
+		} while (consumed < ingress);
 
-        /*
-         * Normally we would prompt_expect() here, but prompt_gets() has likely
-         * swallowed the prompt, so we'll YOLO and just assume it's done.
-         */
+		/*
+		 * Normally we would prompt_expect() here, but prompt_gets() has likely
+		 * swallowed the prompt, so we'll YOLO and just assume it's done.
+		 */
 
-        phys += ingress;
-        remaining -= ingress;
-    } while(remaining);
+		phys += ingress;
+		remaining -= ingress;
+	} while (remaining);
 
-    return len;
+	return len;
 }
 
 #define DEBUG_CMD_U_MAX 128
 
 ssize_t debug_write(struct ahb *ahb, uint32_t phys, const void *buf, size_t len)
 {
-    struct debug *ctx = to_debug(ahb);
-    const void *cursor;
-    size_t remaining;
-    size_t egress;
-    char *command;
-    char mode;
-    int rc;
+	struct debug *ctx = to_debug(ahb);
+	const void *cursor;
+	size_t remaining;
+	size_t egress;
+	char *command;
+	char mode;
+	int rc;
 
-    if (len > SSIZE_MAX) {
-        return -1;
-    }
+	if (len > SSIZE_MAX) {
+		return -1;
+	}
 
-    if (len <= 4) {
-        size_t remaining;
+	if (len <= 4) {
+		size_t remaining;
 
-        remaining = len;
-        cursor = buf;
-        while (remaining) {
-            rc = asprintf(&command, "o %x %hhx", phys, *(const uint8_t *)cursor);
-            if (rc < 0)
-                return -1;
+		remaining = len;
+		cursor = buf;
+		while (remaining) {
+			rc = asprintf(&command, "o %x %hhx", phys,
+				      *(const uint8_t *)cursor);
+			if (rc < 0)
+				return -1;
 
-            rc = prompt_run(&ctx->prompt, command);
-            if (rc < 0)
-                return -1;
+			rc = prompt_run(&ctx->prompt, command);
+			if (rc < 0)
+				return -1;
 
-            rc = prompt_expect(&ctx->prompt, "$ ");
-            if (rc < 0)
-                return rc;
-            if (rc == 0)
-                return -1;
+			rc = prompt_expect(&ctx->prompt, "$ ");
+			if (rc < 0)
+				return rc;
+			if (rc == 0)
+				return -1;
 
-            cursor++;
-            phys++;
-            remaining--;
-        }
+			cursor++;
+			phys++;
+			remaining--;
+		}
 
-        return len;
-    }
+		return len;
+	}
 
-    mode = 'u';
+	mode = 'u';
 
-    remaining = len;
-    cursor = buf;
-    do {
-        egress = remaining > DEBUG_CMD_U_MAX ? DEBUG_CMD_U_MAX : remaining;
+	remaining = len;
+	cursor = buf;
+	do {
+		egress = remaining > DEBUG_CMD_U_MAX ? DEBUG_CMD_U_MAX :
+						       remaining;
 
-        rc = asprintf(&command, "%c %x %zx", mode, phys, egress);
-        if (rc < 0)
-            return -1;
+		rc = asprintf(&command, "%c %x %zx", mode, phys, egress);
+		if (rc < 0)
+			return -1;
 
-        rc = prompt_run(&ctx->prompt, command);
-        free(command);
-        if (rc < 0)
-            return -1;
+		rc = prompt_run(&ctx->prompt, command);
+		free(command);
+		if (rc < 0)
+			return -1;
 
-        rc = prompt_write(&ctx->prompt, (const char *)cursor, egress);
-        if (rc < 0)
-            return -1;
+		rc = prompt_write(&ctx->prompt, (const char *)cursor, egress);
+		if (rc < 0)
+			return -1;
 
-        rc = prompt_expect(&ctx->prompt, "$ ");
-        if (rc < 0)
-            return -1;
+		rc = prompt_expect(&ctx->prompt, "$ ");
+		if (rc < 0)
+			return -1;
 
-        phys += egress;
-        cursor += egress;
-        remaining -= egress;
-    } while (remaining);
+		phys += egress;
+		cursor += egress;
+		remaining -= egress;
+	} while (remaining);
 
-    return len;
+	return len;
 }
 
 int debug_readl(struct ahb *ahb, uint32_t phys, uint32_t *val)
 {
-    struct debug *ctx = to_debug(ahb);
-    return debug_read_fixed(ctx, 'r', phys, val);
+	struct debug *ctx = to_debug(ahb);
+	return debug_read_fixed(ctx, 'r', phys, val);
 }
 
 int debug_writel(struct ahb *ahb, uint32_t phys, uint32_t val)
 {
-    struct debug *ctx = to_debug(ahb);
-    char *command;
-    int rc;
+	struct debug *ctx = to_debug(ahb);
+	char *command;
+	int rc;
 
-    rc = asprintf(&command, "w %x %x", phys, val);
-    if (rc < 0)
-        return -errno;
+	rc = asprintf(&command, "w %x %x", phys, val);
+	if (rc < 0)
+		return -errno;
 
-    rc = prompt_run(&ctx->prompt, command);
-    if (rc < 0)
-        return rc;
+	rc = prompt_run(&ctx->prompt, command);
+	if (rc < 0)
+		return rc;
 
-    /* XXX: This kludge is super annoying */
-#define AST_G5_WDT	0x1e785000
-#define   WDT_RELOAD	0x04
-    if (!((phys & ~0x20) == (AST_G5_WDT | WDT_RELOAD) && val == 0)) {
+	/* XXX: This kludge is super annoying */
+#define AST_G5_WDT 0x1e785000
+#define WDT_RELOAD 0x04
+	if (!((phys & ~0x20) == (AST_G5_WDT | WDT_RELOAD) && val == 0)) {
 #undef AST_G5_WDT
-#undef    WDT_RELOAD
-        rc = prompt_expect(&ctx->prompt, "$ ");
-        if (rc < 0)
-            return rc;
-        if (rc == 0)
-            return -EINVAL;
-    }
+#undef WDT_RELOAD
+		rc = prompt_expect(&ctx->prompt, "$ ");
+		if (rc < 0)
+			return rc;
+		if (rc == 0)
+			return -EINVAL;
+	}
 
-    return 0;
+	return 0;
 }
 
 static int ts16_console_init(struct debug *ctx, va_list args)
 {
-    const char *ip, *username, *password;
-    struct ts16 *ts16;
-    int port;
-    int fd;
+	const char *ip, *username, *password;
+	struct ts16 *ts16;
+	int port;
+	int fd;
 
-    ts16 = malloc(sizeof(*ts16));
-    if (!ts16)
-        return -ENOMEM;
+	ts16 = malloc(sizeof(*ts16));
+	if (!ts16)
+		return -ENOMEM;
 
-    ip = va_arg(args, const char *);
-    port = va_arg(args, int);
-    username = va_arg(args, const char *);
-    password = va_arg(args, const char *);
+	ip = va_arg(args, const char *);
+	port = va_arg(args, int);
+	username = va_arg(args, const char *);
+	password = va_arg(args, const char *);
 
-    fd = ts16_init(ts16, ip, port, username, password);
-    if (fd < 0) { goto cleanup_free; }
+	fd = ts16_init(ts16, ip, port, username, password);
+	if (fd < 0) {
+		goto cleanup_free;
+	}
 
-    ctx->console = &ts16->console;
+	ctx->console = &ts16->console;
 
-    return fd;
+	return fd;
 
 cleanup_free:
-    free(ts16);
+	free(ts16);
 
-    return fd;
+	return fd;
 }
 
 static int tty_console_init(struct debug *ctx, const char *path)
 {
-    struct tty *tty;
-    int fd;
+	struct tty *tty;
+	int fd;
 
-    tty = malloc(sizeof(*tty));
-    if (!tty)
-        return -ENOMEM;
+	tty = malloc(sizeof(*tty));
+	if (!tty)
+		return -ENOMEM;
 
-    fd = tty_init(tty, path);
-    if (fd < 0) { goto cleanup_free; }
+	fd = tty_init(tty, path);
+	if (fd < 0) {
+		goto cleanup_free;
+	}
 
-    ctx->console = &tty->console;
+	ctx->console = &tty->console;
 
-    return fd;
+	return fd;
 
 cleanup_free:
-    free(tty);
+	free(tty);
 
-    return fd;
+	return fd;
 }
 
 int debug_init(struct debug *ctx, ...)
 {
-    va_list args;
-    int rc;
+	va_list args;
+	int rc;
 
-    va_start(args, ctx);
-    rc = debug_init_v(ctx, args);
-    va_end(args);
+	va_start(args, ctx);
+	rc = debug_init_v(ctx, args);
+	va_end(args);
 
-    return rc;
+	return rc;
 }
 
-static const struct ahb_ops debug_ahb_ops = {
-    .read = debug_read,
-    .write = debug_write,
-    .readl = debug_readl,
-    .writel = debug_writel
-};
+static const struct ahb_ops debug_ahb_ops = { .read = debug_read,
+					      .write = debug_write,
+					      .readl = debug_readl,
+					      .writel = debug_writel };
 
 static struct ahb *debug_driver_probe(struct connection_args *connection);
 static void debug_driver_destroy(struct ahb *ahb);
@@ -479,134 +489,139 @@ static int debug_driver_release(struct ahb *ahb);
 static int debug_driver_reinit(struct ahb *ahb);
 
 static struct bridge_driver debug_driver = {
-    .name = "debug-uart",
-    .probe = debug_driver_probe,
-    .destroy = debug_driver_destroy,
-    .release = debug_driver_release,
-    .reinit = debug_driver_reinit,
-    .path_required = true,
+	.name = "debug-uart",
+	.probe = debug_driver_probe,
+	.destroy = debug_driver_destroy,
+	.release = debug_driver_release,
+	.reinit = debug_driver_reinit,
+	.path_required = true,
 };
 REGISTER_BRIDGE_DRIVER(debug_driver);
 
 int debug_init_v(struct debug *ctx, va_list args)
 {
-    const char *interface;
-    int rc, fd;
+	const char *interface;
+	int rc, fd;
 
-    interface = va_arg(args, const char *);
+	interface = va_arg(args, const char *);
 
-    if (!interface)
-        return -EINVAL;
+	if (!interface)
+		return -EINVAL;
 
-    if (streq("digi,portserver-ts-16", interface)) {
-        fd = ts16_console_init(ctx, args);
-    } else {
-        fd = tty_console_init(ctx, interface);
-    }
+	if (streq("digi,portserver-ts-16", interface)) {
+		fd = ts16_console_init(ctx, args);
+	} else {
+		fd = tty_console_init(ctx, interface);
+	}
 
-    if (fd < 0) {
-        loge("Failed to initialise the console (%s): %d\n", interface, fd);
-        return fd;
-    }
+	if (fd < 0) {
+		loge("Failed to initialise the console (%s): %d\n", interface,
+		     fd);
+		return fd;
+	}
 
-    rc = prompt_init(&ctx->prompt, fd, "\r", false);
-    if (rc < 0) { goto cleanup_ts16; }
+	rc = prompt_init(&ctx->prompt, fd, "\r", false);
+	if (rc < 0) {
+		goto cleanup_ts16;
+	}
 
-    ahb_init_ops(&ctx->ahb, &debug_driver, &debug_ahb_ops);
+	ahb_init_ops(&ctx->ahb, &debug_driver, &debug_ahb_ops);
 
-    return 0;
+	return 0;
 
 cleanup_ts16:
-    console_destroy(ctx->console);
+	console_destroy(ctx->console);
 
-    return rc;
+	return rc;
 }
 
 int debug_destroy(struct debug *ctx)
 {
-    int rc = 0;
+	int rc = 0;
 
-    rc |= prompt_destroy(&ctx->prompt);
-    rc |= console_destroy(ctx->console);
+	rc |= prompt_destroy(&ctx->prompt);
+	rc |= console_destroy(ctx->console);
 
-    return rc ? -EBADF : 0;
+	return rc ? -EBADF : 0;
 }
 
 static struct ahb *debug_driver_probe(struct connection_args *connection)
 {
-    struct debug *ctx;
-    int rc;
+	struct debug *ctx;
+	int rc;
 
-    ctx = malloc(sizeof(*ctx));
-    if (!ctx) {
-        return NULL;
-    }
+	ctx = malloc(sizeof(*ctx));
+	if (!ctx) {
+		return NULL;
+	}
 
-    /* Early abort if no interface at all is defined */
-    if (connection->interface == NULL) {
-        logd("No interface for debug provided, skipping...\n");
-        return NULL;
-    }
+	/* Early abort if no interface at all is defined */
+	if (connection->interface == NULL) {
+		logd("No interface for debug provided, skipping...\n");
+		return NULL;
+	}
 
-    if (!connection->internet_args) {
-        /* Local debug interface */
-        if ((rc = debug_init(ctx, connection->interface)) < 0) {
-            loge("Failed to initialise local debug interace on %s: %d\n",
-                    connection->interface, rc);
-            goto cleanup_ctx;
-        }
-    } else {
-        /* Remote debug interface */
-        rc = debug_init(ctx, connection->interface, connection->ip, connection->port,
-                        connection->username, connection->password);
-        if (rc < 0) {
-            loge("Failed to initialise remote debug interface: %d\n", rc);
-            goto cleanup_ctx;
-        }
-    }
+	if (!connection->internet_args) {
+		/* Local debug interface */
+		if ((rc = debug_init(ctx, connection->interface)) < 0) {
+			loge("Failed to initialise local debug interace on %s: %d\n",
+			     connection->interface, rc);
+			goto cleanup_ctx;
+		}
+	} else {
+		/* Remote debug interface */
+		rc = debug_init(ctx, connection->interface, connection->ip,
+				connection->port, connection->username,
+				connection->password);
+		if (rc < 0) {
+			loge("Failed to initialise remote debug interface: %d\n",
+			     rc);
+			goto cleanup_ctx;
+		}
+	}
 
-    if ((rc = debug_enter(ctx)) < 0) {
-        loge("Failed to enter debug UART context: %d\n", rc);
-        goto destroy_ctx;
-    }
+	if ((rc = debug_enter(ctx)) < 0) {
+		loge("Failed to enter debug UART context: %d\n", rc);
+		goto destroy_ctx;
+	}
 
-    return debug_as_ahb(ctx);
+	return debug_as_ahb(ctx);
 
 destroy_ctx:
-    debug_destroy(ctx);
+	debug_destroy(ctx);
 
 cleanup_ctx:
-    free(ctx);
+	free(ctx);
 
-    return NULL;
+	return NULL;
 }
 
 static void debug_driver_destroy(struct ahb *ahb)
 {
-    struct debug *ctx = to_debug(ahb);
-    int rc;
+	struct debug *ctx = to_debug(ahb);
+	int rc;
 
-    if ((rc = debug_exit(ctx)) < 0) {
-        loge("Failed to exit debug UART context: %d\n", rc);
-    }
+	if ((rc = debug_exit(ctx)) < 0) {
+		loge("Failed to exit debug UART context: %d\n", rc);
+	}
 
-    if ((rc = debug_destroy(ctx)) < 0) {
-        loge("Failed to destroy debug bridge: %d\n", rc);
-    }
+	if ((rc = debug_destroy(ctx)) < 0) {
+		loge("Failed to destroy debug bridge: %d\n", rc);
+	}
 
-    free(ctx);
+	free(ctx);
 }
 
 static int debug_driver_release(struct ahb *ahb)
 {
-    struct debug *ctx = to_debug(ahb);
+	struct debug *ctx = to_debug(ahb);
 
-    return debug_exit(ctx);
+	return debug_exit(ctx);
 }
 
 static int debug_driver_reinit(struct ahb *ahb)
 {
-    struct debug *ctx = to_debug(ahb);
+	struct debug *ctx = to_debug(ahb);
 
-    return debug_enter(ctx);
+	return debug_enter(ctx);
 }

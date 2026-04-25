@@ -13,11 +13,11 @@ enum mux_io { io1, io2, io3, io4, io5, io6, mux_io_count };
 enum mux_uart { uart1, uart2, uart3, uart4, uart5, mux_uart_count };
 
 struct mux_obj {
-    enum mux_type type;
-    union {
-        enum mux_io io;
-        enum mux_uart uart;
-    };
+	enum mux_type type;
+	union {
+		enum mux_io io;
+		enum mux_uart uart;
+	};
 };
 
 extern const struct mux_obj *mux_obj_io1;
@@ -33,11 +33,11 @@ int uart_mux_restore(struct uart_mux *ctx);
 
 /* Uni-directional connection */
 int uart_mux_route(struct uart_mux *ctx, const struct mux_obj *s,
-                   const struct mux_obj *d);
+		   const struct mux_obj *d);
 
 /* Bi-directional connection */
 int uart_mux_connect(struct uart_mux *ctx, const struct mux_obj *a,
-                     const struct mux_obj *b);
+		     const struct mux_obj *b);
 
 struct uart_mux *uart_mux_get(struct soc *soc);
 

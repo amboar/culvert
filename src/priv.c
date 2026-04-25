@@ -11,10 +11,10 @@
 
 bool priv_am_root(void)
 {
-    return !geteuid();
+	return !geteuid();
 }
 
 void priv_print_unprivileged(const char *name)
 {
-    loge("%s needs to be run as root\n", name);
+	loge("%s needs to be run as root\n", name);
 }

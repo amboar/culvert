@@ -1,7 +1,13 @@
 #ifndef _LOG_H
 #define _LOG_H
 
-enum log_level { level_none, level_error, level_info, level_debug, level_trace };
+enum log_level {
+	level_none,
+	level_error,
+	level_info,
+	level_debug,
+	level_trace
+};
 
 enum log_colour { colour_white, colour_yellow, colour_green, colour_red };
 

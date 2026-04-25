@@ -8,7 +8,11 @@
 
 struct sioctl;
 
-enum sioctl_decode { sioctl_decode_disable, sioctl_decode_2e, sioctl_decode_4e };
+enum sioctl_decode {
+	sioctl_decode_disable,
+	sioctl_decode_2e,
+	sioctl_decode_4e
+};
 
 int sioctl_decode_configure(struct sioctl *ctx, const enum sioctl_decode mode);
 int sioctl_decode_status(struct sioctl *ctx, enum sioctl_decode *status);

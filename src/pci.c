@@ -44,9 +44,9 @@ int read_sysfs_id(int dirfd, const char *file)
 
 int pci_open(uint16_t vid, uint16_t did, int bar)
 {
-        char *res;
-        int rc;
-        int fd;
+	char *res;
+	int rc;
+	int fd;
 	int found = 0;
 
 	struct dirent *de;
@@ -94,12 +94,12 @@ int pci_open(uint16_t vid, uint16_t did, int bar)
 	free(res);
 	closedir(d);
 
-        return fd;
+	return fd;
 }
 
 int pci_close(int fd)
 {
-        assert(fd >= 0);
+	assert(fd >= 0);
 
-        return close(fd);
+	return close(fd);
 }

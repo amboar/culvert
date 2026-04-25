@@ -61,7 +61,8 @@ int soc_from_rev(struct soc *ctx, struct ahb *ahb, uint32_t rev)
 	if (!(rev_is_generation(rev, ast_g4) ||
 	      rev_is_generation(rev, ast_g5) ||
 	      rev_is_generation(rev, ast_g6))) {
-		loge("Found unsupported SoC generation: 0x%08" PRIx32 "\n", rev);
+		loge("Found unsupported SoC generation: 0x%08" PRIx32 "\n",
+		     rev);
 		return -ENOTSUP;
 	}
 
@@ -73,11 +74,13 @@ int soc_from_rev(struct soc *ctx, struct ahb *ahb, uint32_t rev)
 }
 
 /* soc_bus_enumerate_devices() and soc_device_bind_driver() mutually recurse */
-static int
-soc_bus_enumerate_devices(struct soc *ctx, struct soc_device *dev, int bus, struct soc_driver **drivers, size_t n_drivers);
+static int soc_bus_enumerate_devices(struct soc *ctx, struct soc_device *dev,
+				     int bus, struct soc_driver **drivers,
+				     size_t n_drivers);
 
-static int
-soc_device_bind_driver(struct soc *ctx, struct soc_device *parent, int node, struct soc_driver **drivers, size_t n_drivers)
+static int soc_device_bind_driver(struct soc *ctx, struct soc_device *parent,
+				  int node, struct soc_driver **drivers,
+				  size_t n_drivers)
 {
 	struct soc_device *dev;
 	char path[PATH_MAX];
@@ -107,7 +110,8 @@ soc_device_bind_driver(struct soc *ctx, struct soc_device *parent, int node, str
 	is_mfd = !fdt_node_check_compatible(ctx->fdt.start, node, "simple-mfd");
 
 	if (is_bus || is_mfd) {
-		rc = soc_bus_enumerate_devices(ctx, dev, node, drivers, n_drivers);
+		rc = soc_bus_enumerate_devices(ctx, dev, node, drivers,
+					       n_drivers);
 		if (rc < 0) {
 			return rc;
 		}
@@ -116,8 +120,10 @@ soc_device_bind_driver(struct soc *ctx, struct soc_device *parent, int node, str
 	for (i = 0; i < n_drivers; i++) {
 		const struct soc_device_id *entry;
 
-		for (entry = drivers[i]->matches; entry && entry->compatible; entry++) {
-			if (fdt_node_check_compatible(ctx->fdt.start, node, entry->compatible)) {
+		for (entry = drivers[i]->matches; entry && entry->compatible;
+		     entry++) {
+			if (fdt_node_check_compatible(ctx->fdt.start, node,
+						      entry->compatible)) {
 				continue;
 			}
 
@@ -138,12 +144,15 @@ soc_device_bind_driver(struct soc *ctx, struct soc_device *parent, int node, str
 	return 0;
 }
 
-static int soc_bus_enumerate_devices(struct soc *ctx, struct soc_device *dev, int bus, struct soc_driver **drivers, size_t n_drivers)
+static int soc_bus_enumerate_devices(struct soc *ctx, struct soc_device *dev,
+				     int bus, struct soc_driver **drivers,
+				     size_t n_drivers)
 {
 	int node;
 	int rc;
 
-	fdt_for_each_subnode(node, ctx->fdt.start, bus) {
+	fdt_for_each_subnode(node, ctx->fdt.start, bus)
+	{
 		rc = soc_device_bind_driver(ctx, dev, node, drivers, n_drivers);
 		if (rc < 0) {
 			return rc;
@@ -220,8 +229,7 @@ void soc_destroy(struct soc *ctx)
 	free(ctx->fdt.start);
 }
 
-int soc_device_match_node(struct soc *ctx,
-			  const struct soc_device_id table[],
+int soc_device_match_node(struct soc *ctx, const struct soc_device_id table[],
 			  struct soc_device_node *dn)
 {
 	const char *pval;
@@ -356,7 +364,8 @@ int soc_device_from_type(struct soc *ctx, const char *type,
 
 	logd("fdt: Searching devicetree for type '%s'\n", type);
 
-	fdt_for_each_subnode(node, ctx->fdt.start, 0) {
+	fdt_for_each_subnode(node, ctx->fdt.start, 0)
+	{
 		const char *found;
 
 		found = fdt_getprop(ctx->fdt.start, node, "device_type", NULL);
@@ -372,9 +381,9 @@ int soc_device_from_type(struct soc *ctx, const char *type,
 	return -ENOENT;
 }
 
-static int
-soc_device_resolve_node(struct soc *ctx, const struct soc_device_node *src,
-			struct soc_device_node *dst)
+static int soc_device_resolve_node(struct soc *ctx,
+				   const struct soc_device_node *src,
+				   struct soc_device_node *dst)
 {
 	bool is_mfd;
 	int parent;
@@ -386,7 +395,8 @@ soc_device_resolve_node(struct soc *ctx, const struct soc_device_node *src,
 		return -EINVAL;
 	}
 
-	is_mfd = !fdt_node_check_compatible(ctx->fdt.start, parent, "simple-mfd");
+	is_mfd = !fdt_node_check_compatible(ctx->fdt.start, parent,
+					    "simple-mfd");
 	dst->offset = is_mfd ? parent : src->offset;
 
 	return 0;
@@ -412,7 +422,8 @@ int soc_device_get_memory_index(struct soc *ctx,
 		char path[PATH_MAX];
 		int rc;
 
-		rc = fdt_get_path(ctx->fdt.start, dn->offset, path, sizeof(path));
+		rc = fdt_get_path(ctx->fdt.start, dn->offset, path,
+				  sizeof(path));
 		if (rc < 0) {
 			loge("fdt: Failed to determine node path while reporting failure to find reg property for offset %d\n",
 			     dn->offset);
@@ -435,9 +446,10 @@ int soc_device_get_memory_index(struct soc *ctx,
 	return 0;
 }
 
-int
-soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node *dn,
-				   const char *name, struct soc_region *region)
+int soc_device_get_memory_region_named(struct soc *ctx,
+				       const struct soc_device_node *dn,
+				       const char *name,
+				       struct soc_region *region)
 {
 	struct soc_device_node rdn;
 	const uint32_t *regions;
@@ -446,13 +458,16 @@ soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node
 	int idx;
 	int len;
 
-	idx = fdt_stringlist_search(ctx->fdt.start, dn->offset, "memory-region-names", name);
+	idx = fdt_stringlist_search(ctx->fdt.start, dn->offset,
+				    "memory-region-names", name);
 	if (idx < 0) {
-		loge("fdt: No memory region named '%s' for node %d: %d\n", name, dn->offset, idx);
+		loge("fdt: No memory region named '%s' for node %d: %d\n", name,
+		     dn->offset, idx);
 		return -ENOENT;
 	}
 
-	regions = fdt_getprop(ctx->fdt.start, dn->offset, "memory-region", &len);
+	regions =
+		fdt_getprop(ctx->fdt.start, dn->offset, "memory-region", &len);
 	if (len < 0) {
 		loge("fdt: Failed to find 'memory-region' property in node %d: %d\n",
 		     dn->offset, len);
@@ -469,7 +484,9 @@ soc_device_get_memory_region_named(struct soc *ctx, const struct soc_device_node
 
 	offset = fdt_node_offset_by_phandle(ctx->fdt.start, phandle);
 	if (offset < 0) {
-		loge("fdt: Failed to find node for phandle %"PRIu32" at index %d: %d\n", phandle, idx, offset);
+		loge("fdt: Failed to find node for phandle %" PRIu32
+		     " at index %d: %d\n",
+		     phandle, idx, offset);
 		return -EUCLEAN;
 	}
 
@@ -493,9 +510,11 @@ static void *soc_device_init_driver(struct soc *ctx, struct soc_device *dev)
 		char path[PATH_MAX];
 		int rc;
 
-		rc = fdt_get_path(ctx->fdt.start, dev->node.offset, path, sizeof(path));
+		rc = fdt_get_path(ctx->fdt.start, dev->node.offset, path,
+				  sizeof(path));
 		if (rc < 0) {
-			loge("Failed to get path for offset %d\n", dev->node.offset);
+			loge("Failed to get path for offset %d\n",
+			     dev->node.offset);
 			return NULL;
 		}
 
@@ -526,7 +545,8 @@ void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match)
 	return NULL;
 }
 
-void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *match,
+void *soc_driver_get_drvdata_by_name(struct soc *soc,
+				     const struct soc_driver *match,
 				     const char *name)
 {
 	struct soc_device_node dn;
@@ -545,7 +565,8 @@ void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *m
 		}
 
 		if (dev->driver != match) {
-			logi("Failed to match driver %s on device %s", match->name, name);
+			logi("Failed to match driver %s on device %s",
+			     match->name, name);
 			return NULL;
 		}
 
@@ -555,7 +576,8 @@ void *soc_driver_get_drvdata_by_name(struct soc *soc, const struct soc_driver *m
 	return NULL;
 }
 
-void *soc_driver_get_drvdata_by_node(struct soc *soc, const struct soc_device_node *dn)
+void *soc_driver_get_drvdata_by_node(struct soc *soc,
+				     const struct soc_device_node *dn)
 {
 	struct soc_device *dev;
 
@@ -570,8 +592,8 @@ void *soc_driver_get_drvdata_by_node(struct soc *soc, const struct soc_device_no
 	return NULL;
 }
 
-int
-soc_bridge_controller_register(struct soc *ctx, struct bridgectl *bridge, const struct bridgectl_ops *ops)
+int soc_bridge_controller_register(struct soc *ctx, struct bridgectl *bridge,
+				   const struct bridgectl_ops *ops)
 {
 	bridge->ops = ops;
 	list_add(&ctx->bridges, &bridge->entry);
@@ -579,19 +601,20 @@ soc_bridge_controller_register(struct soc *ctx, struct bridgectl *bridge, const 
 	return 0;
 }
 
-void
-soc_bridge_controller_unregister(struct soc *ctx __unused, struct bridgectl *bridge)
+void soc_bridge_controller_unregister(struct soc *ctx __unused,
+				      struct bridgectl *bridge)
 {
 	list_del(&bridge->entry);
 }
 
 static void soc_init_bridge_controllers(struct soc *ctx)
 {
-	static const char *compatible =  "bridge-controller";
+	static const char *compatible = "bridge-controller";
 	struct soc_device *dev;
 
 	list_for_each(&ctx->devices, dev, entry) {
-		if (fdt_node_check_compatible(ctx->fdt.start, dev->node.offset, compatible)) {
+		if (fdt_node_check_compatible(ctx->fdt.start, dev->node.offset,
+					      compatible)) {
 			continue;
 		}
 
@@ -599,7 +622,8 @@ static void soc_init_bridge_controllers(struct soc *ctx)
 			continue;
 		}
 
-		logd("Initialised %s AHB bridge controller\n", dev->driver->name);
+		logd("Initialised %s AHB bridge controller\n",
+		     dev->driver->name);
 	}
 }
 
@@ -614,7 +638,8 @@ void soc_list_bridge_controllers(struct soc *ctx)
 	}
 }
 
-int soc_probe_bridge_controllers(struct soc *ctx, enum bridge_mode *discovered, const char *name)
+int soc_probe_bridge_controllers(struct soc *ctx, enum bridge_mode *discovered,
+				 const char *name)
 {
 	enum bridge_mode current, aggregate;
 	struct bridgectl *bridge;
@@ -633,7 +658,8 @@ int soc_probe_bridge_controllers(struct soc *ctx, enum bridge_mode *discovered, 
 
 		/* Write the report to stdout */
 		if ((rc = bridgectl_report(bridge, 1, &current)) < 0) {
-			loge("Failed to generate %s report: %d\n", bridgectl_name(bridge), rc);
+			loge("Failed to generate %s report: %d\n",
+			     bridgectl_name(bridge), rc);
 			error = rc;
 		}
 
