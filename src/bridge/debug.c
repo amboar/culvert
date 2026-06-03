@@ -562,6 +562,8 @@ static struct ahb *debug_driver_probe(struct connection_args *connection)
 		return NULL;
 	}
 
+	ctx->force_quit = connection->force_quit;
+
 	if (!connection->internet_args) {
 		/* Local debug interface */
 		if ((rc = debug_init(ctx, connection->interface)) < 0) {
