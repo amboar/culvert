@@ -280,7 +280,7 @@ p2ab_driver_probe(struct connection_args *connection __unused)
 	struct p2ab *ctx;
 	int rc;
 
-	ctx = malloc(sizeof(*ctx));
+	ctx = calloc(1, sizeof(*ctx));
 	if (!ctx) {
 		return NULL;
 	}
