@@ -23,35 +23,42 @@
 #include <unistd.h>
 
 static char cmd_read_args_doc[] =
-	"--type=<firmware|ram> [<ADDRESS> <LENGTH>] "
+	"--type=<firmware|ram|reg> [[<ADDRESS>] <LENGTH>] "
 	"[via DRIVER [INTERFACE [IP PORT USERNAME PASSWORD]]]";
 
 static char cmd_read_doc[] =
 	"\n"
 	"Read command"
 	"\v"
-	"NOTE: Only the 'ram' type can parse address and length!\n\n"
+	"NOTE: Only the 'ram' type can parse both address and length!\n"
+	"The 'reg' type only accepts an address!\n\n"
 	"All data will be written to stdout.\n\n"
 	"Supported types:\n"
 	"  firmware    Read the content from the FMC\n"
+	"  reg         Read the content of a specific register "
+	"(requires the use of the via keyword)\n"
 	"  ram         Read the content from the memory\n";
 
 enum cmd_read_mode {
 	none,
 	firmware,
 	ram,
+	reg,
 };
 
 static struct argp_option cmd_read_options[] = {
 	{ "type", 't', "TYPE", 0, "Type to be read from", 0 },
+	{ "force-quit", 'F', 0, 0, "Blindly exit debug mode before entering",
+	  0 },
 	{ 0 },
 };
 
 struct cmd_read_args {
 	unsigned long mem_base;
 	unsigned long mem_size;
-	struct connection_args connection;
 	enum cmd_read_mode mode;
+	struct connection_args connection;
+	struct ast_ahb_args ahb_args;
 };
 
 static error_t cmd_read_parse_opt(int key, char *arg, struct argp_state *state)
@@ -61,13 +68,19 @@ static error_t cmd_read_parse_opt(int key, char *arg, struct argp_state *state)
 
 	switch (key) {
 	case 't':
-		if (strcmp(arg, "firmware") && strcmp(arg, "ram"))
+		if (strcmp(arg, "firmware") && strcmp(arg, "ram") &&
+		    strcmp(arg, "reg"))
 			argp_error(state, "Invalid type '%s'", arg);
 
 		if (!strcmp(arg, "firmware"))
 			arguments->mode = firmware;
-		else
+		else if (!strcmp(arg, "ram"))
 			arguments->mode = ram;
+		else
+			arguments->mode = reg;
+		break;
+	case 'F':
+		arguments->connection.force_quit = true;
 		break;
 	case ARGP_KEY_ARG:
 		if (!strcmp(arg, "via")) {
@@ -76,19 +89,20 @@ static error_t cmd_read_parse_opt(int key, char *arg, struct argp_state *state)
 			if (rc != 0)
 				argp_error(
 					state,
-					"Failed to parse connection arguments. Returned code %d",
+					"Failed to parse connection arguments."
+					" Returned code %d",
 					rc);
 			break;
 		}
 
-		/* If mode is not ram, skip any further args */
-		if (arguments->mode != ram)
+		if (arguments->mode != ram && arguments->mode != reg)
 			break;
 
 		if (state->arg_num == 0)
-			parse_mem_arg(state, "read RAM base",
-				      &arguments->mem_base, arg);
-		else if (state->arg_num == 1)
+			parse_mem_arg(state, "read base", &arguments->mem_base,
+				      arg);
+
+		if (arguments->mode == ram && state->arg_num == 1)
 			parse_mem_arg(state, "read RAM size",
 				      &arguments->mem_size, arg);
 
@@ -96,11 +110,20 @@ static error_t cmd_read_parse_opt(int key, char *arg, struct argp_state *state)
 	case ARGP_KEY_END:
 		if (arguments->mode == none)
 			argp_error(state, "No type to be read from defined...");
-		/* It is possible to not pass the ram base and size */
+
+		if (arguments->mode == reg && state->arg_num < 1)
+			argp_error(state,
+				   "Not enough arguments for 'reg' mode...");
+
+		if (arguments->mode == reg &&
+		    arguments->connection.bridge_driver == NULL)
+			argp_error(state,
+				   "Connection arguments (via) missing...");
+
 		if (arguments->mode == ram &&
 		    (state->arg_num > 0 && state->arg_num < 2))
 			argp_error(state,
-				   "Not enough arguments for ram mode...");
+				   "Not enough arguments for 'ram' mode...");
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
@@ -262,6 +285,33 @@ cleanup_host:
 	return rc;
 }
 
+static int cmd_read_reg(struct cmd_read_args *arguments)
+{
+	struct host _host, *host = &_host;
+	struct ahb *ahb;
+	int rc;
+
+	if ((rc = host_init(host, &arguments->connection)) < 0) {
+		loge("Failed to initialise host interfaces: %d\n", rc);
+		return rc;
+	}
+
+	if (!(ahb = host_get_ahb(host))) {
+		loge("Failed to acquire AHB interface, exiting\n");
+		rc = -ENODEV;
+		goto cleanup_host;
+	}
+
+	arguments->ahb_args.read = true;
+	arguments->ahb_args.address = arguments->mem_base;
+	rc = ast_ahb_access(&arguments->ahb_args, ahb);
+
+cleanup_host:
+	host_destroy(host);
+
+	return rc;
+}
+
 static int do_read(int argc, char **argv)
 {
 	int rc;
@@ -280,6 +330,9 @@ static int do_read(int argc, char **argv)
 	case ram:
 		rc = cmd_read_ram(&arguments);
 		break;
+	case reg:
+		rc = cmd_read_reg(&arguments);
+		break;
 	/* If it reaches none here, then the argument parse logic is broken. */
 	case none:
 		loge("read: Reached 'none' mode after argument parsing. This is a bug!\n");
@@ -292,7 +345,7 @@ static int do_read(int argc, char **argv)
 
 static const struct cmd read_cmd = {
 	.name = "read",
-	.description = "Read data from the FMC or RAM",
+	.description = "Read data from the FMC, RAM or a register",
 	.fn = do_read,
 };
 REGISTER_CMD(read_cmd);
