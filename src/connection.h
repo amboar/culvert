@@ -42,5 +42,12 @@ struct connection_args {
 	 * (IP, username, etc.) are set.
 	 */
 	bool internet_args;
+
+	/**
+	 * Blindly send an escape + quit sequence to the debug UART, before
+	 * entering debug mode, in case a previous session was left open.
+	 * Only relevant for the debug-uart bridge driver.
+	 */
+	bool force_quit;
 };
 #endif

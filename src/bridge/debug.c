@@ -550,7 +550,7 @@ static struct ahb *debug_driver_probe(struct connection_args *connection)
 	struct debug *ctx;
 	int rc;
 
-	ctx = malloc(sizeof(*ctx));
+	ctx = calloc(1, sizeof(*ctx));
 	if (!ctx) {
 		return NULL;
 	}
@@ -558,8 +558,11 @@ static struct ahb *debug_driver_probe(struct connection_args *connection)
 	/* Early abort if no interface at all is defined */
 	if (connection->interface == NULL) {
 		logd("No interface for debug provided, skipping...\n");
+		free(ctx);
 		return NULL;
 	}
+
+	ctx->force_quit = connection->force_quit;
 
 	if (!connection->internet_args) {
 		/* Local debug interface */

@@ -335,7 +335,7 @@ ilpcb_driver_probe(struct connection_args *connection __unused)
 	struct ilpcb *ctx;
 	int rc;
 
-	ctx = malloc(sizeof(*ctx));
+	ctx = calloc(1, sizeof(*ctx));
 	if (!ctx) {
 		return NULL;
 	}

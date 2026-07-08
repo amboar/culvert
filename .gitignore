@@ -5,6 +5,9 @@
 subprojects/*
 !subprojects/*.wrap
 
+# LSP cache
+.cache/
+
 # segfault core file
 */core
 

@@ -1,9 +1,6 @@
 src += files(
     'console.c',
     'coprocessor.c',
-    'debug.c',
-    'devmem.c',
-    'ilpc.c',
     'jtag.c',
     'otp.c',
     'p2a.c',

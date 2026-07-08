@@ -141,7 +141,7 @@ cleanup_host:
 	host_destroy(host);
 
 done:
-	exit(rc);
+	return rc;
 }
 
 static const struct cmd probe_cmd = {
