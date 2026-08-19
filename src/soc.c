@@ -408,15 +408,38 @@ int soc_device_get_memory_index(struct soc *ctx,
 {
 	struct soc_device_node _dn, *dn = &_dn;
 	const uint32_t *reg;
-	int len;
+	const void *ranges;
+	int ranges_len;
+	int addr_cells, size_cells;
+	int parent, len;
 	int rc;
 
 	/* MFD transparency for resource acquisition */
-	if ((rc = soc_device_resolve_node(ctx, sdn, dn)) < 0) {
+	if ((rc = soc_device_resolve_node(ctx, sdn, dn)) < 0)
 		return rc;
+
+	parent = fdt_parent_offset(ctx->fdt.start, dn->offset);
+	if (parent < 0) {
+		loge("fdt: Failed to find parent node for offset %d: %d\n",
+			dn->offset, parent);
+		return -EINVAL;
 	}
 
-	/* FIXME: Do ranges translation */
+	addr_cells = fdt_address_cells(ctx->fdt.start, parent);
+	size_cells = fdt_size_cells(ctx->fdt.start, parent);
+
+	if (addr_cells < 0 || size_cells < 0) {
+		loge("fdt: Failed to read address-cells/size-cells from parent"
+		     " at offset %d\n", dn->offset);
+		return -EUCLEAN;
+	}
+
+	if (addr_cells != 1 || size_cells != 1) {
+		loge("fdt: Unsupport address-cells and size-cells for offset"
+		     " %d\n", dn->offset);
+		return -ENOTSUP;
+	}
+
 	reg = fdt_getprop(ctx->fdt.start, dn->offset, "reg", &len);
 	if (!reg) {
 		char path[PATH_MAX];
@@ -435,13 +458,26 @@ int soc_device_get_memory_index(struct soc *ctx,
 		}
 	}
 
-	/* FIXME: Assumes #address-cells = <1>, #size-cells = <1> */
-	if (len < (8 * (index + 1)))
+	if (len < (int)(sizeof(uint32_t)
+		* (addr_cells + size_cells) * (index + 1)))
 		return -EINVAL;
 
 	/* <address, size> */
-	region->start = be32toh(reg[2 * index + 0]);
-	region->length = be32toh(reg[2 * index + 1]);
+	region->start = be32toh(reg[(addr_cells + size_cells) * index + 0]);
+	region->length = be32toh(reg[(addr_cells + size_cells) * index + addr_cells]);
+
+	ranges = fdt_getprop(ctx->fdt.start, parent, "ranges", &ranges_len);
+	if (!ranges && ranges_len != -FDT_ERR_NOTFOUND) {
+		loge("fdt: Failed to read ranges property for parent of offset %d: %d\n",
+			dn->offset, ranges_len);
+		return -EUCLEAN;
+	}
+
+	if (ranges && ranges_len > 0) {
+		loge("fdt: Non-identity ranges translation not supported for offset %d\n",
+			dn->offset);
+		return -ENOTSUP;
+	}
 
 	return 0;
 }
@@ -537,9 +573,8 @@ void *soc_driver_get_drvdata(struct soc *soc, const struct soc_driver *match)
 	struct soc_device *dev;
 
 	list_for_each(&soc->devices, dev, entry) {
-		if (dev->driver && !strcmp(dev->driver->name, match->name)) {
+		if (dev->driver == match)
 			return soc_device_init_driver(soc, dev);
-		}
 	}
 
 	return NULL;
