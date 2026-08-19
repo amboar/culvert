@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2018,2019 IBM Corp.
 
+#include "bits.h"
 #include "log.h"
 #include "wdt.h"
 
@@ -12,24 +13,86 @@
 #include <unistd.h>
 
 /* Registers */
-#define WDT_RELOAD	   0x04
-#define WDT_RESTART	   0x08
-#define WDT_RESTART_MAGIC  0x4755
-#define WDT_CTRL	   0x0c
-#define WDT_CTRL_ALT_BOOT  (1 << 7)
-#define WDT_CTRL_RESET_SOC (0b00 << 5)
-#define WDT_CTRL_RESET_SYS (0b01 << 5)
-#define WDT_CTRL_RESET_CPU (0b10 << 5)
-#define WDT_CTRL_CLK_1MHZ  (1 << 4)
-#define WDT_CTRL_SYS_RESET (1 << 1)
-#define WDT_CTRL_ENABLE	   (1 << 0)
-#define WDT_RESET_MASK	   0x1c
+#define AST2500_WDT_RELOAD		 0x04
+#define AST2500_WDT_RESTART		 0x08
+#define AST2500_WDT_RESTART_MAGIC	 0x4755
+#define AST2500_WDT_CTRL		 0x0c
+#define AST2500_WDT_CTRL_ALT_BOOT	 BIT(7)
+#define AST2500_WDT_CTRL_RESET_MODE_MASK GENMASK(6, 5)
+#define AST2500_WDT_CTRL_RESET_SOC \
+	FIELD_PREP(AST2500_WDT_CTRL_RESET_MODE_MASK, 0b00)
+#define AST2500_WDT_CTRL_RESET_SYS \
+	FIELD_PREP(AST2500_WDT_CTRL_RESET_MODE_MASK, 0b01)
+#define AST2500_WDT_CTRL_RESET_CPU \
+	FIELD_PREP(AST2500_WDT_CTRL_RESET_MODE_MASK, 0b10)
+#define AST2500_WDT_CTRL_CLK_1MHZ  BIT(4)
+#define AST2500_WDT_CTRL_SYS_RESET BIT(1)
+#define AST2500_WDT_CTRL_ENABLE	   BIT(0)
+#define AST2500_WDT_RESET_MASK	   0x1c
+
+#define AST2600_WDT_RELOAD		 0x04
+#define AST2600_WDT_RESTART		 0x08
+#define AST2600_WDT_RESTART_MAGIC	 0x4755
+#define AST2600_WDT_CTRL		 0x0c
+#define AST2600_WDT_CTRL_RESET_MODE_MASK GENMASK(6, 5)
+#define AST2600_WDT_CTRL_RESET_SOC \
+	FIELD_PREP(AST2600_WDT_CTRL_RESET_MODE_MASK, 0b00)
+#define AST2600_WDT_CTRL_RESET_FULL \
+	FIELD_PREP(AST2600_WDT_CTRL_RESET_MODE_MASK, 0b01)
+#define AST2600_WDT_CTRL_RESET_CPU \
+	FIELD_PREP(AST2600_WDT_CTRL_RESET_MODE_MASK, 0b10)
+#define AST2600_WDT_CTRL_RESET_BY_SOC	   BIT(4)
+#define AST2600_WDT_CTRL_SYS_RESET	   BIT(1)
+#define AST2600_WDT_CTRL_ENABLE		   BIT(0)
+#define AST2600_WDT_TIMEOUT_STATUS	   0x10
+#define AST2600_WDT_TIMEOUT_STATUS_TIMEOUT BIT(0)
+#define AST2600_WDT_TIMEOUT_STATUS_CLR	   0x14
+#define AST2600_WDT_RESET_MASK1		   0x1c
+#define AST2600_WDT_RESET_MASK1_SDRAM	   BIT(1)
+#define AST2600_WDT_RESET_MASK2		   0x20
+#define AST2600_WDT_RESET_MASK2_SPI	   BIT(1)
+
+static const struct soc_driver wdt_driver;
+
+struct wdt_ops {
+	int (*wdt_perform_reset)(struct wdt *ctx);
+	int (*stop)(struct wdt *ctx);
+};
 
 struct wdt {
 	struct soc *soc;
+	const struct wdt_ops *ops;
 	struct soc_region iomem;
 	struct clk *clk;
 };
+
+int wdt_perform_reset(struct wdt *ctx)
+{
+	return ctx->ops->wdt_perform_reset(ctx);
+}
+
+int wdt_prevent_reset(struct soc *soc)
+{
+	struct soc_device *dev;
+
+	list_for_each(&soc->devices, dev, entry) {
+		struct wdt *wdt;
+		int rc;
+
+		if (dev->driver != &wdt_driver)
+			continue;
+
+		wdt = soc_driver_get_drvdata_by_node(soc, &dev->node);
+		if (!wdt)
+			return -ENODEV;
+
+		rc = wdt->ops->stop(wdt);
+		if (rc < 0)
+			return rc;
+	}
+
+	return 0;
+}
 
 static inline int wdt_readl(struct wdt *ctx, uint32_t reg, uint32_t *val)
 {
@@ -49,72 +112,45 @@ static inline int wdt_writel(struct wdt *ctx, uint32_t reg, uint32_t val)
 	return soc_writel(ctx->soc, ctx->iomem.start + reg, val);
 }
 
-static int wdt_stop(struct wdt *ctx)
+static int ast2500_wdt_stop(struct wdt *ctx)
 {
 	uint32_t val;
 	int rc;
 
-	rc = wdt_readl(ctx, WDT_CTRL, &val);
+	rc = wdt_readl(ctx, AST2500_WDT_CTRL, &val);
 	if (rc < 0)
 		return rc;
 
-	val &= ~WDT_CTRL_ENABLE;
+	val &= ~AST2500_WDT_CTRL_ENABLE;
 
-	return wdt_writel(ctx, WDT_CTRL, val);
+	return wdt_writel(ctx, AST2500_WDT_CTRL, val);
 }
 
-static int wdt_config_clksrc(struct wdt *ctx)
+static int ast2500_wdt_config_clksrc(struct wdt *ctx)
 {
 	uint32_t val;
 	int rc;
 
-	rc = wdt_readl(ctx, WDT_CTRL, &val);
+	rc = wdt_readl(ctx, AST2500_WDT_CTRL, &val);
 	if (rc < 0)
 		return rc;
 
-	val |= WDT_CTRL_CLK_1MHZ;
+	val |= AST2500_WDT_CTRL_CLK_1MHZ;
 
-	return wdt_writel(ctx, WDT_CTRL, val);
+	return wdt_writel(ctx, AST2500_WDT_CTRL, val);
 }
 
-#define AST_WDT_MAX 3
-
-int wdt_prevent_reset(struct soc *soc)
-{
-	/* FIXME: use for_each over the wdt dt nodes or something... */
-	for (int i = 0; i < AST_WDT_MAX; i++) {
-		struct wdt _wdt, *wdt = &_wdt;
-		char name[] = "wdt1";
-		int rc;
-
-		/* ... but for now we YOLO */
-		assert(i < 10);
-		name[3] = '1' + i;
-
-		if (!(wdt = wdt_get_by_name(soc, name))) {
-			logd("Failed to acquire %s controller\n", name);
-			return -ENODEV;
-		}
-
-		rc = wdt_stop(wdt);
-		if (rc < 0)
-			return rc;
-	}
-
-	return 0;
-}
-
-static int64_t wdt_usecs_to_ticks(struct wdt *ctx, uint32_t usecs)
+static int64_t ast2500_wdt_usecs_to_ticks(struct wdt *ctx, uint32_t usecs)
 {
 	uint32_t val;
 	int rc;
 
-	rc = wdt_readl(ctx, WDT_CTRL, &val);
+	rc = wdt_readl(ctx, AST2500_WDT_CTRL, &val);
 	if (rc < 0)
 		return rc;
 
 	/* Don't support PCLK as a source yet, involves scraping around in SCU */
-	if (!(val & WDT_CTRL_CLK_1MHZ)) {
+	if (!(val & AST2500_WDT_CTRL_CLK_1MHZ)) {
 		loge("wdt: PCLK source unsupported, bailing\n");
 		return (int64_t)-EIO;
 	}
@@ -122,44 +158,45 @@ static int64_t wdt_usecs_to_ticks(struct wdt *ctx, uint32_t usecs)
 	return usecs;
 }
 
-int wdt_perform_reset(struct wdt *ctx)
+int ast2500_wdt_perform_reset(struct wdt *ctx)
 {
 	uint32_t mode;
 	int64_t wait;
 	int rc;
 
-	if ((rc = wdt_stop(ctx)) < 0)
+	if ((rc = ast2500_wdt_stop(ctx)) < 0)
 		return rc;
 
-	if ((rc = wdt_config_clksrc(ctx)) < 0)
+	if ((rc = ast2500_wdt_config_clksrc(ctx)) < 0)
 		return rc;
 
 	/* Reset everything except SPI, X-DMA, MCTP and SDRAM */
 	/* Explicitly, reset the AHB bridges */
-	rc = wdt_writel(ctx, WDT_RESET_MASK, 0x23ffffb);
+	rc = wdt_writel(ctx, AST2500_WDT_RESET_MASK, 0x23ffffb);
 	if (rc < 0)
 		return rc;
 
 	/* Wait enough time to cover using the debug UART for a reset */
-	wait = wdt_usecs_to_ticks(ctx, 5000000);
+	wait = ast2500_wdt_usecs_to_ticks(ctx, 5000000);
 	if (wait < 0)
 		return wait;
 
-	rc = wdt_writel(ctx, WDT_RELOAD, wait);
+	rc = wdt_writel(ctx, AST2500_WDT_RELOAD, wait);
 	if (rc < 0)
 		return rc;
 
-	rc = wdt_writel(ctx, WDT_RESTART, WDT_RESTART_MAGIC);
+	rc = wdt_writel(ctx, AST2500_WDT_RESTART, AST2500_WDT_RESTART_MAGIC);
 	if (rc < 0)
 		return rc;
 
-	if ((rc = wdt_readl(ctx, WDT_CTRL, &mode)) < 0)
+	if ((rc = wdt_readl(ctx, AST2500_WDT_CTRL, &mode)) < 0)
 		return rc;
 
-	mode |= WDT_CTRL_RESET_SOC | WDT_CTRL_SYS_RESET | WDT_CTRL_ENABLE;
-	mode &= ~WDT_CTRL_ALT_BOOT;
+	mode |= AST2500_WDT_CTRL_RESET_SOC | AST2500_WDT_CTRL_SYS_RESET |
+		AST2500_WDT_CTRL_ENABLE;
+	mode &= ~AST2500_WDT_CTRL_ALT_BOOT;
 
-	if ((rc = wdt_writel(ctx, WDT_CTRL, mode)) < 0)
+	if ((rc = wdt_writel(ctx, AST2500_WDT_CTRL, mode)) < 0)
 		return rc;
 
 	if ((rc = ahb_release_bridge(ctx->soc->ahb)) < 0)
@@ -183,15 +220,105 @@ int wdt_perform_reset(struct wdt *ctx)
 	if ((rc = clk_enable(ctx->clk, clk_arm)) < 0)
 		return rc;
 
-	rc = wdt_writel(ctx, WDT_RELOAD, 0);
+	rc = wdt_writel(ctx, AST2500_WDT_RELOAD, 0);
 	if (rc < 0)
 		return rc;
 
 	return 0;
 }
 
+static const struct wdt_ops ast2500_wdt_ops = {
+	.wdt_perform_reset = ast2500_wdt_perform_reset,
+	.stop = ast2500_wdt_stop,
+};
+
+static int ast2600_wdt_stop(struct wdt *ctx)
+{
+	uint32_t val;
+	int rc;
+
+	rc = wdt_readl(ctx, AST2600_WDT_CTRL, &val);
+	if (rc < 0)
+		return rc;
+
+	val &= ~AST2600_WDT_CTRL_ENABLE;
+
+	return wdt_writel(ctx, AST2600_WDT_CTRL, val);
+}
+
+static int ast2600_wdt_perform_reset(struct wdt *ctx)
+{
+	uint32_t mode;
+	int64_t wait;
+	int rc;
+
+	if ((rc = ast2600_wdt_stop(ctx)) < 0)
+		return rc;
+
+	if ((rc = wdt_writel(ctx, AST2600_WDT_RESET_MASK1,
+			     GENMASK(25, 0) & ~AST2600_WDT_RESET_MASK1_SDRAM)) <
+	    0)
+		return rc;
+
+	if ((rc = wdt_writel(ctx, AST2600_WDT_RESET_MASK2,
+			     (GENMASK(27, 0) & ~GENMASK(25, 24)) &
+				     ~AST2600_WDT_RESET_MASK2_SPI)) < 0)
+		return rc;
+
+	wait = 5000000;
+
+	if ((rc = wdt_writel(ctx, AST2600_WDT_RELOAD, wait)) < 0)
+		return rc;
+
+	if ((rc = wdt_writel(ctx, AST2600_WDT_RESTART,
+			     AST2600_WDT_RESTART_MAGIC)) < 0)
+		return rc;
+
+	if ((rc = wdt_readl(ctx, AST2600_WDT_CTRL, &mode)) < 0)
+		return rc;
+
+	mode &= ~AST2600_WDT_CTRL_RESET_MODE_MASK;
+	mode |= AST2600_WDT_CTRL_RESET_SOC | AST2600_WDT_CTRL_SYS_RESET |
+		AST2600_WDT_CTRL_ENABLE;
+
+	if ((rc = wdt_writel(ctx, AST2600_WDT_CTRL, mode)) < 0)
+		return rc;
+
+	if ((rc = ahb_release_bridge(ctx->soc->ahb)) < 0)
+		return rc;
+
+	/*
+	 * Allow a little extra time for reset to occur (we're timing this
+	 * asynchronously after all) before we try to reinitialize the bridge
+	 */
+	wait += 1000000;
+	logd("Waiting %" PRId64 " microseconds for watchdog timer to expire\n",
+	     wait);
+	usleep(wait);
+
+	if ((rc = ahb_reinit_bridge(ctx->soc->ahb)) < 0) {
+		loge("Failed to reinitialize bridge after reset: %d\n", rc);
+		return rc;
+	}
+
+	/* The ARM clock gate is sticky on reset?! Ensure it's clear */
+	if ((rc = clk_enable(ctx->clk, clk_arm)) < 0)
+		return rc;
+
+	if ((rc = wdt_writel(ctx, AST2600_WDT_RELOAD, 0)) < 0)
+		return rc;
+
+	return 0;
+}
+
+static const struct wdt_ops ast2600_wdt_ops = {
+	.wdt_perform_reset = ast2600_wdt_perform_reset,
+	.stop = ast2600_wdt_stop,
+};
+
 static const struct soc_device_id wdt_match[] = {
-	{ .compatible = "aspeed,ast2500-wdt" },
+	{ .compatible = "aspeed,ast2500-wdt", .data = &ast2500_wdt_ops },
+	{ .compatible = "aspeed,ast2600-wdt", .data = &ast2600_wdt_ops },
 	{},
 };
 
@@ -201,17 +328,22 @@ static int wdt_driver_init(struct soc *soc, struct soc_device *dev)
 	int rc;
 
 	ctx = malloc(sizeof(*ctx));
-	if (!ctx) {
+	if (!ctx)
 		return -ENOMEM;
-	}
 
-	if ((rc = soc_device_get_memory(soc, &dev->node, &ctx->iomem)) < 0) {
+	if ((rc = soc_device_get_memory(soc, &dev->node, &ctx->iomem)) < 0)
 		goto cleanup_ctx;
-	}
 
 	if (!(ctx->clk = clk_get(soc))) {
 		loge("Failed to acquire clock controller\n");
 		rc = -ENODEV;
+		goto cleanup_ctx;
+	}
+
+	ctx->ops = soc_device_get_match_data(soc, wdt_match, &dev->node);
+	if (!ctx->ops) {
+		loge("Failed to find wdt ops\n");
+		rc = -EINVAL;
 		goto cleanup_ctx;
 	}
 
