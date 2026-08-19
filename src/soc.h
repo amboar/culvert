@@ -167,6 +167,5 @@ void soc_bridge_controller_unregister(struct soc *soc,
 				      struct bridgectl *bridge);
 
 void soc_list_bridge_controllers(struct soc *soc);
-int soc_probe_bridge_controllers(struct soc *soc, enum bridge_mode *discovered,
-				 const char *name);
+int soc_probe_bridge_controllers(struct soc *soc, enum bridge_mode *discovered);
 #endif
