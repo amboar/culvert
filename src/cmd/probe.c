@@ -121,9 +121,7 @@ static int do_probe(int argc, char **argv)
 		soc_list_bridge_controllers(soc);
 		rc = EXIT_SUCCESS;
 	} else {
-		if ((rc = soc_probe_bridge_controllers(
-			     soc, &discovered,
-			     arguments.connection.interface)) < 0) {
+		if ((rc = soc_probe_bridge_controllers(soc, &discovered)) < 0) {
 			loge("Failed to probe SoC bridge controllers: %d\n",
 			     rc);
 			rc = EXIT_FAILURE;

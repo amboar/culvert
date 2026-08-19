@@ -638,8 +638,7 @@ void soc_list_bridge_controllers(struct soc *ctx)
 	}
 }
 
-int soc_probe_bridge_controllers(struct soc *ctx, enum bridge_mode *discovered,
-				 const char *name)
+int soc_probe_bridge_controllers(struct soc *ctx, enum bridge_mode *discovered)
 {
 	enum bridge_mode current, aggregate;
 	struct bridgectl *bridge;
@@ -651,10 +650,6 @@ int soc_probe_bridge_controllers(struct soc *ctx, enum bridge_mode *discovered,
 	error = 0;
 	list_for_each(&ctx->bridges, bridge, entry) {
 		int rc;
-
-		if (name && strcmp(name, bridgectl_name(bridge))) {
-			continue;
-		}
 
 		/* Write the report to stdout */
 		if ((rc = bridgectl_report(bridge, 1, &current)) < 0) {
