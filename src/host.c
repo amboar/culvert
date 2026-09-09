@@ -11,6 +11,7 @@
 #include "connection.h"
 #include "compiler.h"
 #include "host.h"
+#include "lock.h"
 #include "log.h"
 
 #include "ccan/autodata/autodata.h"
@@ -21,6 +22,7 @@ struct bridge {
 	struct list_node entry;
 	const struct bridge_driver *driver;
 	struct ahb *ahb;
+	int lock;
 };
 
 void print_bridge_drivers(void)
@@ -89,6 +91,7 @@ static inline int host_probe_bridge(struct host *ctx,
 {
 	struct ahb *ahb;
 	struct bridge *bridge;
+	int lock;
 
 	if (driver->disabled) {
 		logd("Skipping bridge driver %s\n", driver->name);
@@ -97,16 +100,32 @@ static inline int host_probe_bridge(struct host *ctx,
 
 	logd("Trying bridge driver %s\n", driver->name);
 
+	/*
+	 * Hold the bridge's lock across the probe attempt as well as its
+	 * subsequent use, not just the successful case: probing can itself
+	 * drive the bridge hardware (e.g. to fingerprint what's present),
+	 * which is exactly the kind of access that must not race against
+	 * another culvert instance.
+	 */
+	lock = lock_acquire(driver->name);
+	if (lock < 0)
+		return lock;
+
 	ahb = driver->probe(connection);
-	if (!ahb)
+	if (!ahb) {
+		lock_release(lock);
 		return 0;
+	}
 
 	bridge = malloc(sizeof(*bridge));
-	if (!bridge)
+	if (!bridge) {
+		lock_release(lock);
 		return -ENOMEM;
+	}
 
 	bridge->driver = driver;
 	bridge->ahb = ahb;
+	bridge->lock = lock;
 
 	list_add(&ctx->bridges, &bridge->entry);
 	return 0;
@@ -152,6 +171,7 @@ void host_destroy(struct host *ctx)
 
 	list_for_each_safe(&ctx->bridges, bridge, next, entry) {
 		bridge->driver->destroy(bridge->ahb);
+		lock_release(bridge->lock);
 		list_del(&bridge->entry);
 		free(bridge);
 	}

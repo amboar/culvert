@@ -12,6 +12,7 @@ src = files(
     'culvert.c',
     'flash.c',
     'host.c',
+    'lock.c',
     'log.c',
     'mmio.c',
     'pci.c',
