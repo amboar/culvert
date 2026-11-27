@@ -990,6 +990,7 @@ int sfc_get_flash(struct sfc *ctrl, struct soc_region *flash)
 }
 
 static const struct soc_device_id sfc_match[] = {
+	{ .compatible = "aspeed,ast2400-fmc", .data = (void *)SFC_TYPE_FMC },
 	{ .compatible = "aspeed,ast2500-fmc", .data = (void *)SFC_TYPE_FMC },
 	{ .compatible = "aspeed,ast2500-spi", .data = (void *)SFC_TYPE_SMC },
 	{},
