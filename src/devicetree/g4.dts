@@ -9,6 +9,7 @@
 	#size-cells = <1>;
 
 	aliases {
+		fmc = &fmc;
 		vuart = &vuart;
 		wdt1 = &wdt1;
 		wdt2 = &wdt2;
@@ -45,6 +46,12 @@
 			compatible = "simple-bus";
 			#address-cells = <1>;
 			#size-cells = <1>;
+
+			fmc: spi@1e620000 {
+				reg = <0x1e620000 0xc4
+				       0x20000000 0x10000000>;
+				compatible = "aspeed,ast2400-fmc";
+			};
 
 			sdmc: memory-controller@1e6e0000 {
 				compatible = "aspeed,ast2400-sdram-controller";

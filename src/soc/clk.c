@@ -130,7 +130,10 @@ int ast2400_clk_disable(struct clk *ctx, enum clksrc src)
 
 	switch (src) {
 	case clk_arm:
-		return scu_writel(ctx->scu, SCU_HW_STRAP, SCU_HW_STRAP_ARM_CLK);
+		if ((rc = scu_readl(ctx->scu, SCU_HW_STRAP, &reg)) < 0)
+			return rc;
+		reg |= SCU_HW_STRAP_ARM_CLK;
+		return scu_writel(ctx->scu, SCU_HW_STRAP, reg);
 	case clk_uart3:
 		if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
 			return rc;
@@ -155,8 +158,10 @@ int ast2400_clk_enable(struct clk *ctx, enum clksrc src)
 
 	switch (src) {
 	case clk_arm:
-		return scu_writel(ctx->scu, SCU_SILICON_REVISION,
-				  SCU_HW_STRAP_ARM_CLK);
+		if ((rc = scu_readl(ctx->scu, SCU_HW_STRAP, &reg)) < 0)
+			return rc;
+		reg &= ~SCU_HW_STRAP_ARM_CLK;
+		return scu_writel(ctx->scu, SCU_HW_STRAP, reg);
 	case clk_uart3:
 		if ((rc = scu_readl(ctx->scu, SCU_CLK_STOP, &reg)) < 0)
 			return rc;
